@@ -12,10 +12,16 @@
 #include <clock_control.h>
 #include <misc/__assert.h>
 #include <arch/arm/cortex_m/cmsis.h>
+#include <nrf_power.h>
+
+struct nrf5_usb_event_cb {
+	void (*cb)(nrf_power_event_t event);
+};
 
 static u8_t m16src_ref;
 static u8_t m16src_grd;
 static u8_t k32src_initialized;
+static struct nrf5_usb_event_cb usb_event;
 
 static int _m16src_start(struct device *dev, clock_control_subsys_t sub_system)
 {
@@ -239,6 +245,7 @@ lf_already_started:
 static void _power_clock_isr(void *arg)
 {
 	u8_t pof, hf_intenset, hf_stat, hf, lf, done, ctto;
+	u8_t usb_detected, usb_power_ready, usb_removed;
 	struct device *dev = arg;
 
 	pof = (NRF_POWER->EVENTS_POFWARN != 0);
@@ -253,7 +260,12 @@ static void _power_clock_isr(void *arg)
 	done = (NRF_CLOCK->EVENTS_DONE != 0);
 	ctto = (NRF_CLOCK->EVENTS_CTTO != 0);
 
-	__ASSERT_NO_MSG(pof || hf || hf_intenset || lf || done || ctto);
+	usb_detected = (NRF_POWER->EVENTS_USBDETECTED != 0);
+	usb_power_ready = (NRF_POWER->EVENTS_USBPWRRDY != 0);
+	usb_removed = (NRF_POWER->EVENTS_USBREMOVED != 0);
+
+	__ASSERT_NO_MSG(pof || hf || hf_intenset || lf || done || ctto ||
+			usb_detected || usb_power_ready || usb_removed);
 
 	if (pof) {
 		NRF_POWER->EVENTS_POFWARN = 0;
@@ -310,6 +322,24 @@ static void _power_clock_isr(void *arg)
 			__ASSERT_NO_MSG(err == -EINPROGRESS);
 		}
 	}
+
+	if (usb_detected) {
+		NRF_POWER->EVENTS_USBDETECTED = 0;
+		if (usb_event.cb)
+			usb_event.cb(NRF_POWER_EVENT_USBDETECTED);
+	}
+
+	if (usb_power_ready) {
+		NRF_POWER->EVENTS_USBPWRRDY = 0;
+		if (usb_event.cb)
+			usb_event.cb(NRF_POWER_EVENT_USBPWRRDY);
+	}
+
+	if (usb_removed) {
+		NRF_POWER->EVENTS_USBREMOVED = 0;
+		if (usb_event.cb)
+			usb_event.cb(NRF_POWER_EVENT_USBREMOVED);
+	}
 }
 
 static int _clock_control_init(struct device *dev)
@@ -327,6 +357,22 @@ static int _clock_control_init(struct device *dev)
 	irq_enable(POWER_CLOCK_IRQn);
 
 	return 0;
+}
+
+void nrf5_power_clock_install_usb_cb(void (*cb)(nrf_power_event_t ev))
+{
+	usb_event.cb = cb;
+	NRF_POWER->INTENSET |= (NRF_POWER_INT_USBDETECTED_MASK |
+				NRF_POWER_INT_USBREMOVED_MASK |
+				NRF_POWER_INT_USBPWRRDY_MASK);
+}
+
+void nrf5_power_clock_remove_usb_cb(void)
+{
+	NRF_POWER->INTENCLR |= (NRF_POWER_INT_USBDETECTED_MASK |
+				NRF_POWER_INT_USBREMOVED_MASK |
+				NRF_POWER_INT_USBPWRRDY_MASK);
+	usb_event.cb = NULL;
 }
 
 static const struct clock_control_driver_api _m16src_clock_control_api = {

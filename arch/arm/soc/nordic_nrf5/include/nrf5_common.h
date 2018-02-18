@@ -62,6 +62,13 @@
 #define NRF52_IRQ_FPU_IRQn                     38
 
 /**
+ * @file Interrupt numbers specific to NRF52840 SoC
+ *
+ * The interrupt numbers below are specific to only NRF52840 SoC
+ */
+#define NRF52840_IRQ_USBD_IRQn                 39
+
+/**
  * @file UART baudrate divisors for NRF51/NRF52 family processors.
  *
  * Based on Nordic MDK included header file: nrf52_bitfields.h

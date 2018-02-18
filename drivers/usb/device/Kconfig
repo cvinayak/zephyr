@@ -62,6 +62,59 @@ config USB_DC_STM32_RAM_SIZE
 	  In case of USB-OTG-FS controller, datasheet defines a shared FIFO size.
 	  For USB device controller, datasheet defines USB packet SRAM size.
 
+config USB_NRF52840
+	bool
+	prompt "Nordic Semiconductor nRF52840 USB Device Controller Driver"
+	depends on SOC_SERIES_NRF52X
+	depends on BOARD_NRF52840_PCA10056
+	select USB_DEVICE_DRIVER
+	default n
+	help
+	  nRF52840 USB Device Controller Driver
+
+config USBD_NRF52840_IRQ_PRI
+	int
+	prompt "USBD Interrupt priority"
+	depends on USB_NRF52840
+	range 1 7
+	default 1
+	help
+	  nRF52840 USBD Interrupt priority level
+
+config USBD_NRF52840_EPIN_COUNT
+	int
+	prompt "BULK/INTERRUPT IN endpoints"
+	depends on USB_NRF52840
+	range 1 7
+	default 7
+	help
+	  Number of BULK/INTERRUPT IN endpoints
+
+config USBD_NRF52840_EPOUT_COUNT
+	int
+	prompt "BULK/INTERRUPT OUT endpoints"
+	depends on USB_NRF52840
+	range 1 7
+	default 7
+	help
+	  Number of BULK/INTERRUPT OUT endpoints
+
+config USBD_NRF52840_ISOIN
+	bool
+	prompt "ISO IN endpoint"
+	depends on USB_NRF52840
+	default y
+	help
+	  Enable ISO IN endpoint
+
+config USBD_NRF52840_ISOOUT
+	bool
+	prompt "ISO OUT endpoint"
+	depends on USB_NRF52840
+	default y
+	help
+	  Enable ISO OUT endpoint
+
 config SYS_LOG_USB_DRIVER_LEVEL
 	int
 	prompt "USB driver log level"
