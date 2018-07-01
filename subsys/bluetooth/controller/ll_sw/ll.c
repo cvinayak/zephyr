@@ -34,6 +34,7 @@
 #include "ticker/ticker.h"
 
 #include "pdu.h"
+#include "ull_types.h"
 #include "ctrl.h"
 #include "ctrl_internal.h"
 #include "ll.h"

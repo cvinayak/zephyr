@@ -9,8 +9,10 @@
 #include <bluetooth/hci.h>
 
 #include "util/util.h"
+#include "util/memq.h"
 
 #include "pdu.h"
+#include "ull_types.h"
 #include "ctrl.h"
 #include "ll.h"
 #include "ll_filter.h"

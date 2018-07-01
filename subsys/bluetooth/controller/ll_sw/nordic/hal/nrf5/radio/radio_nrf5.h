@@ -27,3 +27,4 @@
 #endif
 
 #include "radio_nrf5_ppi.h"
+#include "radio_nrf5_txp.h"

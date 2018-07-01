@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 Nordic Semiconductor ASA
+ * Copyright (c) 2016-2018 Nordic Semiconductor ASA
  * Copyright (c) 2016 Vinayak Kariappa Chettimada
  *
  * SPDX-License-Identifier: Apache-2.0
@@ -233,48 +233,6 @@ struct radio_pdu_node_tx {
 	u8_t pdu_data[1];
 };
 
-enum radio_pdu_node_rx_type {
-	NODE_RX_TYPE_NONE,
-	NODE_RX_TYPE_DC_PDU,
-	NODE_RX_TYPE_REPORT,
-
-#if defined(CONFIG_BT_CTLR_ADV_EXT)
-	NODE_RX_TYPE_EXT_1M_REPORT,
-	NODE_RX_TYPE_EXT_CODED_REPORT,
-#endif /* CONFIG_BT_CTLR_ADV_EXT */
-
-#if defined(CONFIG_BT_CTLR_SCAN_REQ_NOTIFY)
-	NODE_RX_TYPE_SCAN_REQ,
-#endif /* CONFIG_BT_CTLR_SCAN_REQ_NOTIFY */
-
-	NODE_RX_TYPE_CONNECTION,
-	NODE_RX_TYPE_TERMINATE,
-	NODE_RX_TYPE_CONN_UPDATE,
-	NODE_RX_TYPE_ENC_REFRESH,
-
-#if defined(CONFIG_BT_CTLR_LE_PING)
-	NODE_RX_TYPE_APTO,
-#endif /* CONFIG_BT_CTLR_LE_PING */
-
-	NODE_RX_TYPE_CHAN_SEL_ALGO,
-
-#if defined(CONFIG_BT_CTLR_PHY)
-	NODE_RX_TYPE_PHY_UPDATE,
-#endif /* CONFIG_BT_CTLR_PHY */
-
-#if defined(CONFIG_BT_CTLR_CONN_RSSI)
-	NODE_RX_TYPE_RSSI,
-#endif /* CONFIG_BT_CTLR_CONN_RSSI */
-
-#if defined(CONFIG_BT_CTLR_PROFILE_ISR)
-	NODE_RX_TYPE_PROFILE,
-#endif /* CONFIG_BT_CTLR_PROFILE_ISR */
-
-#if defined(CONFIG_BT_CTLR_ADV_INDICATION)
-	NODE_RX_TYPE_ADV_INDICATION,
-#endif /* CONFIG_BT_CTLR_ADV_INDICATION */
-};
-
 struct radio_le_conn_cmplt {
 	u8_t  status;
 	u8_t  role;
@@ -314,9 +272,9 @@ struct radio_pdu_node_rx_hdr {
 		void *next; /* used also by k_fifo once pulled */
 		void *link;
 		u8_t packet_release_last;
-	} onion;
+	};
 
-	enum radio_pdu_node_rx_type type;
+	enum node_rx_type type;
 	u16_t handle;
 };
 
@@ -341,6 +299,17 @@ void radio_ticks_active_to_start_set(u32_t ticks_active_to_start);
 struct radio_adv_data *radio_adv_data_get(void);
 struct radio_adv_data *radio_scan_data_get(void);
 
+#if defined(CONFIG_BT_HCI_MESH_EXT)
+#if defined(CONFIG_BT_CTLR_ADV_EXT)
+u32_t radio_adv_enable(u8_t phy_p, u16_t interval, u8_t chan_map,
+		       u8_t filter_policy, u8_t rl_idx,
+#else /* !CONFIG_BT_CTLR_ADV_EXT */
+u32_t radio_adv_enable(u16_t interval, u8_t chan_map, u8_t filter_policy,
+		       u8_t rl_idx,
+#endif /* !CONFIG_BT_CTLR_ADV_EXT */
+		       u8_t at_anchor, u32_t ticks_anchor, u8_t retry,
+		       u8_t scan_window, u8_t scan_delay);
+#else /* !CONFIG_BT_HCI_MESH_EXT */
 #if defined(CONFIG_BT_CTLR_ADV_EXT)
 u32_t radio_adv_enable(u8_t phy_p, u16_t interval, u8_t chan_map,
 		       u8_t filter_policy, u8_t rl_idx);
@@ -348,6 +317,7 @@ u32_t radio_adv_enable(u8_t phy_p, u16_t interval, u8_t chan_map,
 u32_t radio_adv_enable(u16_t interval, u8_t chan_map, u8_t filter_policy,
 		       u8_t rl_idx);
 #endif /* !CONFIG_BT_CTLR_ADV_EXT */
+#endif /* !CONFIG_BT_HCI_MESH_EXT */
 
 u32_t radio_adv_disable(void);
 u32_t ll_adv_is_enabled(void);

@@ -35,4 +35,9 @@ zephyr_library_sources_ifdef(CONFIG_SOC_FLASH_STM32
 	)
 endif()
 
-zephyr_include_directories_ifdef(CONFIG_SOC_FLASH_NRF_RADIO_SYNC ${ZEPHYR_BASE}/subsys/bluetooth)
+if(CONFIG_SOC_FLASH_NRF_RADIO_SYNC)
+  zephyr_library_include_directories(
+    ${ZEPHYR_BASE}/subsys/bluetooth
+    ${ZEPHYR_BASE}/subsys/bluetooth/controller/ll_sw/nordic
+  )
+endif()

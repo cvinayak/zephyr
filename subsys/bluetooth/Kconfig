@@ -50,6 +50,7 @@ config BT_HCI_RAW
 
 config BT_PERIPHERAL
 	bool "Peripheral Role support"
+	depends on !BT_LL_SW_SPLIT
 	select BT_BROADCASTER
 	select BT_CONN
 	default y if BT_HCI_RAW
@@ -58,6 +59,7 @@ config BT_PERIPHERAL
 
 config BT_CENTRAL
 	bool "Central Role support"
+	depends on !BT_LL_SW_SPLIT
 	select BT_OBSERVER
 	select BT_CONN
 	default y if BT_HCI_RAW

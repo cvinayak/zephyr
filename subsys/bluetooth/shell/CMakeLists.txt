@@ -1,6 +1,7 @@
 zephyr_library()
 zephyr_library_sources(
   bt.c
+  hci.c
   )
 zephyr_library_sources_ifdef(
   CONFIG_BT_CONN
@@ -15,3 +16,8 @@ zephyr_library_sources_ifdef(
   CONFIG_SOC_FLASH_NRF
   flash.c
   )
+if(CONFIG_SOC_FAMILY_NRF)
+  zephyr_library_include_directories(
+    ../controller/ll_sw/nordic
+  )
+endif()
