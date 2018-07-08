@@ -298,3 +298,10 @@ struct lll_conn {
 
 int lll_conn_init(void);
 int lll_conn_reset(void);
+int lll_conn_is_abort_cb(void *next, int prio, void *curr,
+			 lll_prepare_cb_t *resume_cb, int *resume_prio);
+void lll_conn_abort_cb(struct lll_prepare_param *prepare_param, void *param);
+void lll_conn_isr_rx(void *param);
+void lll_conn_isr_tx(void *param);
+void lll_conn_isr_abort(void *param);
+void lll_conn_rx_pkt_set(struct lll_conn *lll);

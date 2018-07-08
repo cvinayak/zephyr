@@ -976,12 +976,6 @@ static inline void _rx_demux_rx(memq_link_t *link, struct node_rx_hdr *rx)
 	}
 	break;
 
-	case NODE_RX_TYPE_DC_PDU:
-	{
-		/* TODO: process and pass through to thread */
-	}
-	break;
-
 #if defined(CONFIG_BT_OBSERVER) || \
 defined(CONFIG_BT_CTLR_SCAN_REQ_NOTIFY) || \
 defined(CONFIG_BT_CTLR_ADV_INDICATION) || \
@@ -1022,6 +1016,12 @@ defined(CONFIG_BT_CTLR_SCAN_INDICATION)
 	case NODE_RX_TYPE_CONNECTION:
 	{
 		ull_conn_setup(link, rx);
+	}
+	break;
+
+	case NODE_RX_TYPE_DC_PDU:
+	{
+		/* TODO: process and pass through to thread */
 	}
 	break;
 #endif /* CONFIG_BT_CONN */

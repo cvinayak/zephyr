@@ -2748,7 +2748,7 @@ static void le_conn_complete(u8_t status, struct node_rx_cc *node_rx,
 		leecc->interval = sys_cpu_to_le16(node_rx->interval);
 		leecc->latency = sys_cpu_to_le16(node_rx->latency);
 		leecc->supv_timeout = sys_cpu_to_le16(node_rx->timeout);
-		leecc->clock_accuracy = node_rx->mca;
+		leecc->clock_accuracy = node_rx->sca;
 		return;
 	}
 #endif /* CONFIG_BT_CTLR_PRIVACY */
@@ -2769,7 +2769,7 @@ static void le_conn_complete(u8_t status, struct node_rx_cc *node_rx,
 	lecc->interval = sys_cpu_to_le16(node_rx->interval);
 	lecc->latency = sys_cpu_to_le16(node_rx->latency);
 	lecc->supv_timeout = sys_cpu_to_le16(node_rx->timeout);
-	lecc->clock_accuracy = node_rx->mca;
+	lecc->clock_accuracy = node_rx->sca;
 }
 
 static void disconn_complete(struct pdu_data *pdu_data, u16_t handle,

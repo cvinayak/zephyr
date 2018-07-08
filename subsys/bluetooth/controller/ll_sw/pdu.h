@@ -9,9 +9,10 @@
 
 /* PDU Sizes */
 #define PDU_AC_PAYLOAD_SIZE_MAX 37
-#define PDU_AC_SIZE_MAX (offsetof(struct pdu_adv, payload) + \
-			 PDU_AC_PAYLOAD_SIZE_MAX)
-#define PDU_EM_SIZE_MAX offsetof(struct pdu_data, lldata)
+#define PDU_AC_SIZE_MAX         (offsetof(struct pdu_adv, payload) + \
+				PDU_AC_PAYLOAD_SIZE_MAX)
+#define PDU_DC_PAYLOAD_SIZE_MIN 27
+#define PDU_EM_SIZE_MAX         offsetof(struct pdu_data, lldata)
 
 /* Extra bytes for enqueued node_rx metadata: rssi (always), resolving
  * index, directed adv report, and mesh channel and instant.

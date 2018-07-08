@@ -571,7 +571,7 @@ static void chan_prepare(struct lll_adv *lll)
 
 	lll->chan_map_curr &= (lll->chan_map_curr - 1);
 
-	chan_set(36 + chan);
+	lll_chan_set(36 + chan);
 }
 
 static inline int isr_rx_pdu(struct lll_adv *lll,
@@ -637,7 +637,6 @@ static inline int isr_rx_pdu(struct lll_adv *lll,
 
 		node_rx = ull_pdu_rx_alloc();
 
-		/* Prepare the report (scan req) */
 		node_rx->hdr.type = NODE_RX_TYPE_CONNECTION;
 		node_rx->hdr.handle = 0xffff;
 

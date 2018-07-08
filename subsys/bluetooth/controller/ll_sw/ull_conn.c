@@ -18,6 +18,8 @@
 #include "lll.h"
 #include "lll_conn.h"
 #include "ull_conn_types.h"
+#include "ull_slave_internal.h"
+#include "ull_internal.h"
 
 static int _init_reset(void);
 
@@ -107,6 +109,11 @@ int ull_conn_reset(void)
 	}
 
 	return 0;
+}
+
+void ull_conn_setup(memq_link_t *link, struct node_rx_hdr *rx)
+{
+	ull_slave_setup(link, rx);
 }
 
 static int _init_reset(void)

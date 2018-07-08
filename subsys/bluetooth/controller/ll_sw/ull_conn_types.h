@@ -25,7 +25,7 @@ struct node_rx_cc {
 	u16_t interval;
 	u16_t latency;
 	u16_t timeout;
-	u8_t  mca;
+	u8_t  sca;
 };
 
 struct node_rx_cu {

@@ -141,7 +141,7 @@ static int prepare_cb(struct lll_prepare_param *prepare_param)
 	radio_crc_configure(((0x5bUL) | ((0x06UL) << 8) | ((0x00UL) << 16)),
 			    0x555555);
 
-	chan_set(37 + lll->chan);
+	lll_chan_set(37 + lll->chan);
 
 	radio_isr_set(isr_rx, lll);
 
@@ -273,7 +273,7 @@ static int is_abort_cb(void *next, int prio, void *curr,
 		lll->chan = 0;
 	}
 
-	chan_set(37 + lll->chan);
+	lll_chan_set(37 + lll->chan);
 
 	return 0;
 }

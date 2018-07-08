@@ -609,9 +609,8 @@ static void common_init(void)
 
 #if defined(CONFIG_BT_CTLR_DATA_LENGTH)
 	/* Initialize the DLE defaults */
-	_radio.default_tx_octets = RADIO_LL_LENGTH_OCTETS_RX_MIN;
-	_radio.default_tx_time = RADIO_PKT_TIME(RADIO_LL_LENGTH_OCTETS_RX_MIN,
-						0);
+	_radio.default_tx_octets = PDU_DC_PAYLOAD_SIZE_MIN;
+	_radio.default_tx_time = RADIO_PKT_TIME(PDU_DC_PAYLOAD_SIZE_MIN, 0);
 #endif /* CONFIG_BT_CTLR_DATA_LENGTH */
 
 #if defined(CONFIG_BT_CTLR_PHY)
@@ -2268,7 +2267,7 @@ static inline u8_t isr_rx_conn_pkt_ctrl_dle(struct pdu_data *pdu_data_rx,
 		/* use the minimal of our default_tx_octets and
 		 * peer max_rx_octets
 		 */
-		if (lr->max_rx_octets >= RADIO_LL_LENGTH_OCTETS_RX_MIN) {
+		if (lr->max_rx_octets >= PDU_DC_PAYLOAD_SIZE_MIN) {
 			eff_tx_octets = min(lr->max_rx_octets,
 					    _radio.conn_curr->default_tx_octets);
 		}
@@ -2276,7 +2275,7 @@ static inline u8_t isr_rx_conn_pkt_ctrl_dle(struct pdu_data *pdu_data_rx,
 		/* use the minimal of our max supported and
 		 * peer max_tx_octets
 		 */
-		if (lr->max_tx_octets >= RADIO_LL_LENGTH_OCTETS_RX_MIN) {
+		if (lr->max_tx_octets >= PDU_DC_PAYLOAD_SIZE_MIN) {
 			eff_rx_octets = min(lr->max_tx_octets,
 					    RADIO_LL_LENGTH_OCTETS_RX_MAX);
 		}
@@ -2286,7 +2285,7 @@ static inline u8_t isr_rx_conn_pkt_ctrl_dle(struct pdu_data *pdu_data_rx,
 		 * peer max_rx_time
 		 */
 		if (lr->max_rx_time >=
-		    RADIO_PKT_TIME(RADIO_LL_LENGTH_OCTETS_RX_MIN, 0)) {
+		    RADIO_PKT_TIME(PDU_DC_PAYLOAD_SIZE_MIN, 0)) {
 			eff_tx_time = min(lr->max_rx_time,
 					    _radio.conn_curr->default_tx_time);
 		}
@@ -2295,7 +2294,7 @@ static inline u8_t isr_rx_conn_pkt_ctrl_dle(struct pdu_data *pdu_data_rx,
 		 * peer max_tx_time
 		 */
 		if (lr->max_tx_time >=
-		    RADIO_PKT_TIME(RADIO_LL_LENGTH_OCTETS_RX_MIN, 0)) {
+		    RADIO_PKT_TIME(PDU_DC_PAYLOAD_SIZE_MIN, 0)) {
 			eff_rx_time = min(lr->max_tx_time,
 				RADIO_PKT_TIME(RADIO_LL_LENGTH_OCTETS_RX_MAX,
 					       BIT(2)));
@@ -8818,7 +8817,7 @@ static void rx_packet_set(struct connection *conn, struct pdu_data *pdu_data_rx)
 #if defined(CONFIG_BT_CTLR_DATA_LENGTH)
 	max_rx_octets = conn->max_rx_octets;
 #else /* !CONFIG_BT_CTLR_DATA_LENGTH */
-	max_rx_octets = RADIO_LL_LENGTH_OCTETS_RX_MIN;
+	max_rx_octets = PDU_DC_PAYLOAD_SIZE_MIN;
 #endif /* !CONFIG_BT_CTLR_DATA_LENGTH */
 
 #if defined(CONFIG_BT_CTLR_PHY)
@@ -9035,7 +9034,7 @@ static void tx_packet_set(struct connection *conn, struct pdu_data *pdu_data_tx)
 #if defined(CONFIG_BT_CTLR_DATA_LENGTH)
 	max_tx_octets = conn->max_tx_octets;
 #else /* !CONFIG_BT_CTLR_DATA_LENGTH */
-	max_tx_octets = RADIO_LL_LENGTH_OCTETS_RX_MIN;
+	max_tx_octets = PDU_DC_PAYLOAD_SIZE_MIN;
 #endif /* !CONFIG_BT_CTLR_DATA_LENGTH */
 
 #if defined(CONFIG_BT_CTLR_PHY)
@@ -9167,7 +9166,7 @@ static void prepare_pdu_data_tx(struct connection *conn,
 		max_tx_octets = conn->max_tx_octets;
 #endif /* !CONFIG_BT_CTLR_PHY */
 #else /* !CONFIG_BT_CTLR_DATA_LENGTH */
-		max_tx_octets = RADIO_LL_LENGTH_OCTETS_RX_MIN;
+		max_tx_octets = PDU_DC_PAYLOAD_SIZE_MIN;
 #endif /* !CONFIG_BT_CTLR_DATA_LENGTH */
 
 		if (_pdu_data_tx->len > max_tx_octets) {
@@ -10373,15 +10372,15 @@ u32_t radio_adv_enable(u16_t interval, u8_t chan_map, u8_t filter_policy,
 
 #if defined(CONFIG_BT_CTLR_DATA_LENGTH)
 		conn->default_tx_octets = _radio.default_tx_octets;
-		conn->max_tx_octets = RADIO_LL_LENGTH_OCTETS_RX_MIN;
-		conn->max_rx_octets = RADIO_LL_LENGTH_OCTETS_RX_MIN;
+		conn->max_tx_octets = PDU_DC_PAYLOAD_SIZE_MIN;
+		conn->max_rx_octets = PDU_DC_PAYLOAD_SIZE_MIN;
 
 #if defined(CONFIG_BT_CTLR_PHY)
 		conn->default_tx_time = _radio.default_tx_time;
 		conn->max_tx_time =
-			RADIO_PKT_TIME(RADIO_LL_LENGTH_OCTETS_RX_MIN, 0);
+			RADIO_PKT_TIME(PDU_DC_PAYLOAD_SIZE_MIN, 0);
 		conn->max_rx_time =
-			RADIO_PKT_TIME(RADIO_LL_LENGTH_OCTETS_RX_MIN, 0);
+			RADIO_PKT_TIME(PDU_DC_PAYLOAD_SIZE_MIN, 0);
 #endif /* CONFIG_BT_CTLR_PHY */
 #endif /* CONFIG_BT_CTLR_DATA_LENGTH */
 
@@ -10898,13 +10897,13 @@ u32_t radio_connect_enable(u8_t adv_addr_type, u8_t *adv_addr, u16_t interval,
 
 #if defined(CONFIG_BT_CTLR_DATA_LENGTH)
 	conn->default_tx_octets = _radio.default_tx_octets;
-	conn->max_tx_octets = RADIO_LL_LENGTH_OCTETS_RX_MIN;
-	conn->max_rx_octets = RADIO_LL_LENGTH_OCTETS_RX_MIN;
+	conn->max_tx_octets = PDU_DC_PAYLOAD_SIZE_MIN;
+	conn->max_rx_octets = PDU_DC_PAYLOAD_SIZE_MIN;
 
 #if defined(CONFIG_BT_CTLR_PHY)
 	conn->default_tx_time = _radio.default_tx_time;
-	conn->max_tx_time = RADIO_PKT_TIME(RADIO_LL_LENGTH_OCTETS_RX_MIN, 0);
-	conn->max_rx_time = RADIO_PKT_TIME(RADIO_LL_LENGTH_OCTETS_RX_MIN, 0);
+	conn->max_tx_time = RADIO_PKT_TIME(PDU_DC_PAYLOAD_SIZE_MIN, 0);
+	conn->max_rx_time = RADIO_PKT_TIME(PDU_DC_PAYLOAD_SIZE_MIN, 0);
 #endif /* CONFIG_BT_CTLR_PHY */
 #endif /* CONFIG_BT_CTLR_DATA_LENGTH */
 

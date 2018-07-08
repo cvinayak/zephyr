@@ -170,9 +170,6 @@
 /*****************************************************************************
  * Controller Reference Defines (compile time override-able)
  ****************************************************************************/
-/* Minimum LL Payload support (Dont change). */
-#define RADIO_LL_LENGTH_OCTETS_RX_MIN	27
-
 /* Maximum LL Payload support (27 to 251). */
 #ifndef RADIO_LL_LENGTH_OCTETS_RX_MAX
 #define RADIO_LL_LENGTH_OCTETS_RX_MAX	251
