@@ -45,15 +45,20 @@ void ull_slave_setup(memq_link_t *link, struct node_rx_hdr *rx)
 {
 	u32_t conn_offset_us, conn_interval_us;
 	u8_t ticker_id_adv, ticker_id_conn;
+	u8_t peer_addr[BDADDR_SIZE];
 	u32_t ticks_slot_overhead;
 	u32_t mayfly_was_enabled;
 	u32_t ticks_slot_offset;
 	struct pdu_adv *pdu_adv;
 	struct node_rx_ftr *ftr;
 	struct ll_adv_set *adv;
+	struct node_rx_cc *cc;
 	struct ll_conn *conn;
 	struct lll_conn *lll;
 	u32_t ticker_status;
+	u8_t peer_addr_type;
+	u16_t win_offset;
+	u16_t timeout;
 
 	ftr = (void *)((u8_t *)((struct node_rx_pdu *)rx)->pdu +
 		       (offsetof(struct pdu_adv, connect_ind) +
@@ -77,6 +82,7 @@ void ull_slave_setup(memq_link_t *link, struct node_rx_hdr *rx)
 	lll->conn_interval = pdu_adv->connect_ind.interval;
 	lll->latency = pdu_adv->connect_ind.latency;
 
+	win_offset = pdu_adv->connect_ind.win_offset;
 	conn_interval_us = pdu_adv->connect_ind.interval * 1250;
 
 	/* calculate the window widening */
@@ -111,6 +117,24 @@ void ull_slave_setup(memq_link_t *link, struct node_rx_hdr *rx)
 	memcpy((void *)&lll->slave.force, &lll->access_addr[0],
 	       sizeof(lll->slave.force));
 
+	peer_addr_type = pdu_adv->tx_addr;
+	memcpy(peer_addr, pdu_adv->connect_ind.init_addr, BDADDR_SIZE);
+	timeout = pdu_adv->connect_ind.timeout;
+
+	cc = (void *)((struct node_rx_pdu *)rx)->pdu;
+	cc->status = 0;
+	cc->role = 1;
+	cc->peer_addr_type = peer_addr_type;
+	memcpy(cc->peer_addr, peer_addr, BDADDR_SIZE);
+	cc->interval = lll->conn_interval;
+	cc->latency = lll->latency;
+	cc->timeout = timeout;
+	cc->sca = lll->slave.sca;
+
+	rx->handle = lll->handle;
+
+	ll_rx_put(link, rx);
+	ll_rx_sched();
 #if 0
 		/* Prepare the rx packet structure */
 		node_rx->hdr.handle = conn->handle;
@@ -220,7 +244,7 @@ void ull_slave_setup(memq_link_t *link, struct node_rx_hdr *rx)
 	conn_interval_us -= lll->slave.window_widening_periodic_us;
 
 	conn_offset_us = ftr->us_radio_end;
-	conn_offset_us += ((u64_t)pdu_adv->connect_ind.win_offset + 1) * 1250;
+	conn_offset_us += ((u64_t)win_offset + 1) * 1250;
 	conn_offset_us -= EVENT_OVERHEAD_START_US;
 	conn_offset_us -= EVENT_JITTER_US << 1;
 	conn_offset_us -= EVENT_JITTER_US;
@@ -282,6 +306,42 @@ void ull_slave_setup(memq_link_t *link, struct node_rx_hdr *rx)
 #else
 	ARG_UNUSED(mayfly_was_enabled);
 #endif
+}
+
+void ull_slave_done(struct node_rx_event_done *done, u32_t *ticks_drift_plus,
+		    u32_t *ticks_drift_minus)
+{
+	u32_t start_to_address_expected_us;
+	u32_t start_to_address_actual_us;
+	u32_t window_widening_event_us;
+	u32_t preamble_to_addr_us;
+
+	start_to_address_actual_us =
+		done->extra.slave.start_to_address_actual_us;
+	window_widening_event_us =
+		done->extra.slave.window_widening_event_us;
+	preamble_to_addr_us =
+		done->extra.slave.preamble_to_addr_us;
+
+	start_to_address_expected_us = EVENT_JITTER_US +
+				       (EVENT_JITTER_US << 1) +
+				       window_widening_event_us +
+				       preamble_to_addr_us;
+
+	if (start_to_address_actual_us <= start_to_address_expected_us) {
+		*ticks_drift_plus =
+			HAL_TICKER_US_TO_TICKS(window_widening_event_us);
+		*ticks_drift_minus =
+			HAL_TICKER_US_TO_TICKS((start_to_address_expected_us -
+					       start_to_address_actual_us));
+	} else {
+		*ticks_drift_plus =
+			HAL_TICKER_US_TO_TICKS(start_to_address_actual_us);
+		*ticks_drift_minus =
+			HAL_TICKER_US_TO_TICKS(EVENT_JITTER_US +
+					       (EVENT_JITTER_US << 1) +
+					       preamble_to_addr_us);
+	}
 }
 
 static void ticker_op_stop_adv_cb(u32_t status, void *params)

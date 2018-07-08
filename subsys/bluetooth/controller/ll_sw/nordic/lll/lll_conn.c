@@ -23,6 +23,7 @@
 
 #include "lll_internal.h"
 #include "lll_tim_internal.h"
+#include "lll_prof_internal.h"
 
 #include "common/log.h"
 #include <soc.h>
@@ -39,7 +40,7 @@ static struct pdu_data *empty_tx_enqueue(struct lll_conn *lll);
 
 static u16_t const sca_ppm_lut[] = {500, 250, 150, 100, 75, 50, 30, 20};
 static u8_t crc_expire;
-static u8_t trx_count;
+static u16_t trx_cnt;
 
 int lll_conn_init(void)
 {
@@ -73,6 +74,12 @@ u32_t lll_conn_ppm_local_get(void)
 u32_t lll_conn_ppm_get(u8_t sca)
 {
 	return sca_ppm_lut[sca];
+}
+
+void lll_conn_prepare_reset(void)
+{
+	trx_cnt = 0;
+	crc_expire = 0;
 }
 
 int lll_conn_is_abort_cb(void *next, int prio, void *curr,
@@ -150,7 +157,7 @@ void lll_conn_isr_rx(void *param)
 		return;
 	}
 
-	trx_count++;
+	trx_cnt++;
 
 	node_rx = ull_pdu_rx_alloc_peek(1);
 	LL_ASSERT(node_rx);
@@ -260,6 +267,11 @@ void lll_conn_isr_rx(void *param)
 	LL_ASSERT(!radio_is_ready());
 
 lll_conn_isr_rx_exit:
+	/* Save the AA captured for the first Rx in connection event */
+	if (!radio_tmr_aa_restore()) {
+		radio_tmr_aa_save(radio_tmr_aa_get());
+	}
+
 #if defined(CONFIG_BT_CTLR_PROFILE_ISR)
 	lll_prof_cputime_capture();
 #endif /* CONFIG_BT_CTLR_PROFILE_ISR */
@@ -461,6 +473,8 @@ static int init_reset(void)
 
 static void isr_done(void *param)
 {
+	struct event_done_extra *e;
+
 	/* TODO: MOVE to a common interface, isr_lll_radio_status? */
 	/* Clear radio status and events */
 	radio_status_reset();
@@ -474,6 +488,37 @@ static void isr_done(void *param)
 	radio_gpio_pa_lna_disable();
 #endif /* CONFIG_BT_CTLR_GPIO_PA_PIN || CONFIG_BT_CTLR_GPIO_LNA_PIN */
 	/* TODO: MOVE ^^ */
+
+	e = ull_event_done_extra_get();
+	e->type = EVENT_DONE_EXTRA_TYPE_CONN;
+	e->trx_cnt = trx_cnt;
+	if (trx_cnt) {
+		struct lll_conn *lll = param;
+
+		if (IS_ENABLED(CONFIG_BT_PERIPHERAL) && lll->role) {
+			u32_t preamble_to_addr_us;
+
+#if defined(CONFIG_BT_CTLR_PHY)
+			preamble_to_addr_us =
+				addr_us_get(lll->phy_rx);
+#else /* !CONFIG_BT_CTLR_PHY */
+			preamble_to_addr_us =
+				addr_us_get(0);
+#endif /* !CONFIG_BT_CTLR_PHY */
+
+			e->slave.start_to_address_actual_us =
+				radio_tmr_aa_restore() - radio_tmr_ready_get();
+			e->slave.window_widening_event_us =
+				lll->slave.window_widening_event_us;
+			e->slave.preamble_to_addr_us = preamble_to_addr_us;
+
+			/* Reset window widening, as anchor point sync-ed */
+			lll->slave.window_widening_event_us = 0;
+			lll->slave.window_size_event_us = 0;
+		}
+
+		/* TODO: event sync-ed */
+	}
 
 	isr_cleanup(param);
 }
@@ -517,6 +562,110 @@ static u32_t isr_rx_pdu(struct lll_conn *lll, struct pdu_data *pdu_data_rx,
 			LL_ASSERT(0);
 		} else {
 			lll->empty = 0;
+		}
+	}
+
+	/* process received data */
+	if ((pdu_data_rx->sn == lll->nesn) &&
+	    /* check so that we will NEVER use the rx buffer reserved for empty
+	     * packet and internal control enqueue
+	     */
+	    (ull_pdu_rx_alloc_peek(3) != 0)) {
+		u8_t ccm_rx_increment = 0;
+		u8_t nack = 0;
+
+		if (pdu_data_rx->len != 0) {
+#if 0
+			/* If required, wait for CCM to finish
+			 */
+			if (_radio.conn_curr->enc_rx) {
+				u32_t done;
+
+				done = radio_ccm_is_done();
+				LL_ASSERT(done);
+
+				ccm_rx_increment = 1;
+			}
+
+			/* MIC Failure Check or data rx during pause */
+			if ((_radio.conn_curr->enc_rx &&
+			     !radio_ccm_mic_is_valid()) ||
+			    (_radio.conn_curr->pause_rx &&
+			     isr_rx_conn_enc_unexpected(_radio.conn_curr,
+							pdu_data_rx))) {
+				_radio.state = STATE_CLOSE;
+				radio_disable();
+
+				/* assert if radio packet ptr is not set and
+				 * radio started tx
+				 */
+				LL_ASSERT(!radio_is_ready());
+
+				terminate_ind_rx_enqueue(_radio.conn_curr,
+							 0x3d);
+
+				connection_release(_radio.conn_curr);
+				_radio.conn_curr = NULL;
+
+				return 1; /* terminated */
+			}
+
+#if defined(CONFIG_BT_CTLR_LE_PING)
+			/* stop authenticated payload (pre) timeout */
+			_radio.conn_curr->appto_expire = 0;
+			_radio.conn_curr->apto_expire = 0;
+#endif /* CONFIG_BT_CTLR_LE_PING */
+
+			switch (pdu_data_rx->ll_id) {
+			case PDU_DATA_LLID_DATA_CONTINUE:
+			case PDU_DATA_LLID_DATA_START:
+				/* enqueue data packet */
+				*rx_enqueue = 1;
+				break;
+
+			case PDU_DATA_LLID_CTRL:
+				nack = isr_rx_conn_pkt_ctrl(node_rx,
+							    rx_enqueue);
+				break;
+			case PDU_DATA_LLID_RESV:
+			default:
+				/* Invalid LL id, drop it. */
+				break;
+			}
+#endif
+
+#if defined(CONFIG_BT_CTLR_LE_PING)
+		} else if ((_radio.conn_curr->enc_rx) ||
+			   (_radio.conn_curr->pause_rx)) {
+			struct connection *conn = _radio.conn_curr;
+			u16_t appto_reload_new;
+
+			/* check for change in apto */
+			appto_reload_new = (conn->apto_reload >
+					    (conn->latency + 6)) ?
+					   (conn->apto_reload -
+					    (conn->latency + 6)) :
+					   conn->apto_reload;
+			if (conn->appto_reload != appto_reload_new) {
+				conn->appto_reload = appto_reload_new;
+				conn->apto_expire = 0;
+			}
+
+			/* start authenticated payload (pre) timeout */
+			if (conn->apto_expire == 0) {
+				conn->appto_expire = conn->appto_reload;
+				conn->apto_expire = conn->apto_reload;
+			}
+#endif /* CONFIG_BT_CTLR_LE_PING */
+
+		}
+
+		if (!nack) {
+			lll->nesn++;
+
+			if (ccm_rx_increment) {
+				lll->ccm_rx.counter++;
+			}
 		}
 	}
 

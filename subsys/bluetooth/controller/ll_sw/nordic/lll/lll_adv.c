@@ -675,11 +675,11 @@ static inline int isr_rx_pdu(struct lll_adv *lll,
 			       (offsetof(struct pdu_adv, connect_ind) +
 			       sizeof(struct pdu_adv_connect_ind)));
 
+		ftr->param = lll;
 		ftr->ticks_anchor = radio_tmr_start_get();
 		ftr->us_radio_end = radio_tmr_end_get() -
 				    radio_tx_chain_delay_get(0, 0);
 		ftr->us_radio_rdy = radio_rx_ready_delay_get(0, 0);
-		ftr->param = lll;
 
 		ull_rx_put(rx->hdr.link, rx);
 		ull_rx_sched();

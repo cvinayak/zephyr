@@ -546,15 +546,28 @@ u32_t ll_adv_enable(u8_t enable)
 		}
 
 		conn_lll = &conn->lll;
+		conn_lll->role = 1;
 		conn_lll->handle = 0xFFFF;
 		conn_lll->data_chan_sel = 0;
 		conn_lll->data_chan_use = 0;
 		conn_lll->event_counter = 0;
-		conn_lll->latency_prepare = 0;
 
-		conn_lll->role = 1;
+		/* TODO: move to ull? */
+		conn_lll->latency_prepare = 0;
 		conn_lll->slave.window_widening_prepare_us = 0;
-		conn_lll->slave.window_widening_event_us = 0;
+		conn_lll->connect_expire = 6;
+		conn_lll->supervision_expire = 0;
+		conn_lll->procedure_expire = 0;
+
+#if defined(CONFIG_BT_CTLR_LE_PING)
+		conn_lll->apto_expire = 0;
+		conn_lll->appto_expire = 0;
+#endif /* CONFIG_BT_CTLR_LE_PING */
+
+		/* NOTE: use allocated link for generating dedicated
+		 * terminate ind rx node
+		 */
+		conn_lll->llcp_terminate.node_rx.hdr.link = link;
 
 #if 0
 		conn = &ull_conn->lll;
@@ -653,6 +666,7 @@ u32_t ll_adv_enable(u8_t enable)
 		conn->rssi_sample_count = 0;
 #endif /* CONFIG_BT_CTLR_CONN_RSSI */
 #endif
+		/* NOTE: using same link as supplied for terminate ind */
 		adv->link_cc_free = link;
 		adv->node_rx_cc_free = node_rx;
 		adv->lll.conn = &conn->lll;

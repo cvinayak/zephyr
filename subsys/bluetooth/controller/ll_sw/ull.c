@@ -140,6 +140,7 @@ static struct {
 static MFIFO_DEFINE(pdu_rx_free, sizeof(void *), PDU_RX_CNT);
 
 #define PDU_RX_SIZE_MIN MROUND(offsetof(struct node_rx_pdu, pdu) + \
+			       sizeof(struct node_rx_ftr) + \
 			       (PDU_AC_SIZE_MAX + PDU_AC_SIZE_EXTRA))
 
 #if defined(CONFIG_BT_RX_BUF_LEN)
@@ -149,9 +150,10 @@ static MFIFO_DEFINE(pdu_rx_free, sizeof(void *), PDU_RX_CNT);
 #endif
 
 #define PDU_RX_POOL_SIZE (MROUND(offsetof(struct node_rx_pdu, pdu) + \
+				 sizeof(struct node_rx_ftr) + \
 				 max((PDU_AC_SIZE_MAX + PDU_AC_SIZE_EXTRA), \
-				 (offsetof(struct pdu_data, lldata) + \
-				  PDU_RX_OCTETS_MAX))) * PDU_RX_CNT)
+				     (offsetof(struct pdu_data, lldata) + \
+				      PDU_RX_OCTETS_MAX))) * PDU_RX_CNT)
 
 static struct {
 	u8_t size; /* Runtime (re)sized info */
@@ -367,6 +369,7 @@ u8_t ll_rx_get(void **node_rx, u16_t *handle)
 void ll_rx_dequeue(void)
 {
 	struct node_rx_hdr *node_rx = NULL;
+	struct node_rx_cc *cc = NULL;
 	memq_link_t *link;
 
 	link = memq_dequeue(memq_ll_rx.tail, &memq_ll_rx.head,
@@ -381,7 +384,8 @@ void ll_rx_dequeue(void)
 	defined(CONFIG_BT_CTLR_SCAN_REQ_NOTIFY) || \
 	defined(CONFIG_BT_CTLR_PROFILE_ISR) || \
 	defined(CONFIG_BT_CTLR_ADV_INDICATION) || \
-	defined(CONFIG_BT_CTLR_SCAN_INDICATION)
+	defined(CONFIG_BT_CTLR_SCAN_INDICATION) || \
+	defined(CONFIG_BT_CONN)
 #if defined(CONFIG_BT_OBSERVER)
 	case NODE_RX_TYPE_REPORT:
 #endif /* CONFIG_BT_OBSERVER */
@@ -407,6 +411,16 @@ void ll_rx_dequeue(void)
 #if defined(CONFIG_BT_CTLR_SCAN_INDICATION)
 	case NODE_RX_TYPE_SCAN_INDICATION:
 #endif /* CONFIG_BT_CTLR_SCAN_INDICATION */
+
+#if defined(CONFIG_BT_CONN)
+	/* fallthrough */
+	case NODE_RX_TYPE_CONNECTION:
+		cc = (void *)((struct node_rx_pdu *)node_rx)->pdu;
+		if (cc->status != 0) {
+			break;
+		}
+#endif /* CONFIG_BT_CONN */
+
 		LL_ASSERT(mem_link_rx.quota_pdu < PDU_RX_CNT);
 
 		mem_link_rx.quota_pdu++;
@@ -415,11 +429,14 @@ void ll_rx_dequeue(void)
 	* CONFIG_BT_CTLR_SCAN_REQ_NOTIFY ||
 	* CONFIG_BT_CTLR_PROFILE_ISR ||
 	* CONFIG_BT_CTLR_ADV_INDICATION ||
-	* CONFIG_BT_CTLR_SCAN_INDICATION
+	* CONFIG_BT_CTLR_SCAN_INDICATION ||
+	* CONFIG_BT_CONN
 	*/
 
 #if defined(CONFIG_BT_CONN)
-	case NODE_RX_TYPE_CONNECTION:
+	/* fallthrough */
+	case NODE_RX_TYPE_TERMINATE:
+		/* Did not use data link quota */
 		break;
 #endif /* CONFIG_BT_CONN */
 
@@ -431,9 +448,6 @@ void ll_rx_dequeue(void)
 	if (0) {
 #if defined(CONFIG_BT_CONN)
 	} else if (node_rx->type == NODE_RX_TYPE_CONNECTION) {
-		struct node_rx_cc *cc;
-
-		cc = (void *)((struct node_rx_pdu *)node_rx)->pdu;
 		if ((cc->status == 0x3c) || cc->role) {
 			struct ll_adv_set *adv;
 
@@ -445,6 +459,16 @@ void ll_rx_dequeue(void)
 
 				ll_conn_release(adv->lll.conn->hdr.parent);
 				adv->lll.conn = NULL;
+			} else {
+				void *node_rx;
+
+				/* Release un-utilizaed node rx */
+				if (adv->node_rx_cc_free) {
+					node_rx = adv->node_rx_cc_free;
+					adv->node_rx_cc_free = NULL;
+
+					ll_rx_release(node_rx);
+				}
 			}
 
 			adv->is_enabled = 0;
@@ -548,16 +572,13 @@ void ll_rx_mem_release(void **node_rx)
 
 #if defined(CONFIG_BT_CONN)
 		case NODE_RX_TYPE_TERMINATE:
-			/* FIXME: */
-#if 0
-			struct connection *conn;
+		{
+			struct ll_conn *conn;
 
-			conn = mem_get(_radio.conn_pool, CONNECTION_T_SIZE,
-				       _node_rx_free->hdr.handle);
-
-			mem_release(conn, &_radio.conn_free);
-			break;
-#endif
+			conn = ll_conn_get(_node_rx_free->handle);
+			ll_conn_release(conn);
+		}
+		break;
 #endif /* CONFIG_BT_CONN */
 
 		case NODE_RX_TYPE_NONE:
@@ -771,6 +792,18 @@ void *ull_prepare_dequeue_get(void)
 void *ull_prepare_dequeue_iter(u8_t *idx)
 {
 	return MFIFO_DEQUEUE_ITER_GET(prep, idx);
+}
+
+void *ull_event_done_extra_get(void)
+{
+	struct node_rx_event_done *done;
+
+	done = MFIFO_DEQUEUE_PEEK(done);
+	if (!done) {
+		return NULL;
+	}
+
+	return &done->extra;
 }
 
 void *ull_event_done(void *param)
@@ -1056,7 +1089,23 @@ static inline void _rx_demux_event_done(memq_link_t *link,
 	/* Get the ull instance */
 	ull_hdr = done->param;
 
+	/* Process role dependent event done */
+	switch (done->extra.type) {
+	case EVENT_DONE_EXTRA_TYPE_CONN:
+		ull_conn_done(done);
+		break;
+
+	case EVENT_DONE_EXTRA_TYPE_NONE:
+		/* ignore */
+		break;
+
+	default:
+		LL_ASSERT(0);
+		break;
+	}
+
 	/* release done */
+	done->extra.type = 0;
 	_done_release(link, done);
 
 	/* dequeue prepare pipeline */

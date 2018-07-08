@@ -5,3 +5,5 @@
  */
 
 void ull_slave_setup(memq_link_t *link, struct node_rx_hdr *rx);
+void ull_slave_done(struct node_rx_event_done *done, u32_t *ticks_drift_plus,
+		    u32_t *ticks_drift_minus);

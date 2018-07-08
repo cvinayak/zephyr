@@ -115,6 +115,8 @@ static int prepare_cb(struct lll_prepare_param *prepare_param)
 
 	/* TODO: Do the above in ULL ?  */
 
+	/* Reset connection event global variables */
+	lll_conn_prepare_reset();
 
 	/* TODO: can we do something in ULL? */
 	lll->latency_event = lll->latency_prepare;
