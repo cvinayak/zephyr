@@ -662,17 +662,29 @@ static inline int isr_rx_pdu(struct lll_adv *lll,
 		   isr_rx_ci_check(lll, pdu_adv, pdu_rx, devmatch_ok,
 				   &rl_idx) &&
 		   lll->conn && ull_pdu_rx_alloc_peek(3)) {
-		struct node_rx_pdu *node_rx;
+		struct node_rx_ftr *ftr;
+		struct node_rx_pdu *rx;
 
 		radio_isr_set(isr_abort, lll);
 		radio_disable();
 
-		node_rx = ull_pdu_rx_alloc();
+		rx = ull_pdu_rx_alloc();
 
-		node_rx->hdr.type = NODE_RX_TYPE_CONNECTION;
-		node_rx->hdr.handle = 0xffff;
+		rx->hdr.type = NODE_RX_TYPE_CONNECTION;
+		rx->hdr.handle = 0xffff;
 
-		ull_rx_put(node_rx->hdr.link, node_rx);
+		memcpy(rx->pdu, pdu_rx, (offsetof(struct pdu_adv, connect_ind) +
+					 sizeof(struct pdu_adv_connect_ind)));
+
+		ftr = (void *)((u8_t *)rx->pdu +
+			       (offsetof(struct pdu_adv, connect_ind) +
+			       sizeof(struct pdu_adv_connect_ind)));
+
+		ftr->ticks_anchor = radio_tmr_start_get();
+		ftr->us_radio_end = radio_tmr_end_get();
+		ftr->param = lll;
+
+		ull_rx_put(rx->hdr.link, rx);
 		ull_rx_sched();
 
 		return 0;

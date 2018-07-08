@@ -41,6 +41,8 @@
 #include "hal/debug.h"
 
 inline struct ll_adv_set *ull_adv_set_get(u16_t handle);
+inline u16_t ll_adv_handle_get(struct ll_adv_set *adv);
+
 static int _init_reset(void);
 static inline struct ll_adv_set *is_disabled_get(u16_t handle);
 static void ticker_cb(u32_t ticks_at_expire, u32_t remainder, u16_t lazy,
@@ -56,7 +58,6 @@ static inline void _conn_release(struct ll_adv_set *adv);
 #endif /* CONFIG_BT_PERIPHERAL */
 
 static inline u8_t disable(u16_t handle);
-static inline u16_t handle_get(struct ll_adv_set *adv);
 
 static struct ll_adv_set ll_adv[CONFIG_BT_ADV_MAX];
 
@@ -857,6 +858,11 @@ inline struct ll_adv_set *ull_adv_is_enabled_get(u16_t handle)
 	return adv;
 }
 
+inline u16_t ll_adv_handle_get(struct ll_adv_set *adv)
+{
+	return ((u8_t *)adv - (u8_t *)ll_adv) / sizeof(*adv);
+}
+
 u32_t ull_adv_is_enabled(u16_t handle)
 {
 	struct ll_adv_set *adv;
@@ -946,7 +952,7 @@ static void ticker_cb(u32_t ticks_at_expire, u32_t remainder, u16_t lazy,
 		 */
 		ret = ticker_update(TICKER_INSTANCE_ID_CTLR,
 				    TICKER_USER_ID_ULL_HIGH,
-				    TICKER_ID_ADV_BASE + handle_get(adv),
+				    TICKER_ID_ADV_BASE + ll_adv_handle_get(adv),
 				    HAL_TICKER_US_TO_TICKS(random_delay * 1000),
 				    0, 0, 0, 0, 0,
 				    ticker_op_update_cb, adv);
@@ -988,7 +994,7 @@ static void ticker_stop_cb(u32_t ticks_at_expire, u32_t remainder, u16_t lazy,
 	}
 #endif
 
-	handle = handle_get(param);
+	handle = ll_adv_handle_get(param);
 	LL_ASSERT(handle < CONFIG_BT_ADV_MAX);
 
 	ret = ticker_stop(TICKER_INSTANCE_ID_CTLR, TICKER_USER_ID_ULL_HIGH,
@@ -1118,9 +1124,4 @@ static inline u8_t disable(u16_t handle)
 	adv->is_enabled = 0;
 
 	return 0;
-}
-
-static inline u16_t handle_get(struct ll_adv_set *adv)
-{
-	return ((u8_t *)adv - (u8_t *)ll_adv) / sizeof(*adv);
 }

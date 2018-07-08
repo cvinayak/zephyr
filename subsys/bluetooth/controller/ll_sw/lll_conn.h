@@ -298,6 +298,8 @@ struct lll_conn {
 
 int lll_conn_init(void);
 int lll_conn_reset(void);
+u32_t lll_conn_ppm_local_get(void);
+u32_t lll_conn_ppm_get(u8_t sca);
 int lll_conn_is_abort_cb(void *next, int prio, void *curr,
 			 lll_prepare_cb_t *resume_cb, int *resume_prio);
 void lll_conn_abort_cb(struct lll_prepare_param *prepare_param, void *param);

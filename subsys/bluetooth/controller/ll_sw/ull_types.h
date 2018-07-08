@@ -65,6 +65,13 @@ struct node_rx_hdr {
 	u16_t               handle;
 };
 
+struct node_rx_ftr {
+	u32_t ticks_anchor;
+	u32_t us_radio_end;
+	u32_t us_radio_rdy;
+	void  *param;
+};
+
 struct node_rx_pdu {
 	struct node_rx_hdr hdr;
 	u8_t               pdu[0];

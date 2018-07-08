@@ -9,6 +9,7 @@
 #include <toolchain.h>
 #include <zephyr/types.h>
 #include <misc/util.h>
+#include <drivers/clock_control/nrf5_clock_control.h>
 
 #include "util/memq.h"
 
@@ -34,6 +35,8 @@ static void isr_done(void *param);
 static void isr_cleanup(void *param);
 static void isr_race(void *param);
 
+static u16_t const sca_ppm_lut[] = {500, 250, 150, 100, 75, 50, 30, 20};
+
 int lll_conn_init(void)
 {
 	int err;
@@ -56,6 +59,16 @@ int lll_conn_reset(void)
 	}
 
 	return 0;
+}
+
+u32_t lll_conn_ppm_local_get(void)
+{
+	return sca_ppm_lut[CLOCK_CONTROL_NRF5_K32SRC_ACCURACY];
+}
+
+u32_t lll_conn_ppm_get(u8_t sca)
+{
+	return sca_ppm_lut[sca];
 }
 
 int lll_conn_is_abort_cb(void *next, int prio, void *curr,

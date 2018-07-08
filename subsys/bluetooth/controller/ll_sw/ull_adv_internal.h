@@ -15,6 +15,9 @@ struct ll_adv_set *ull_adv_set_get(u16_t handle);
 /* Return ll_adv_set context if enabled */
 struct ll_adv_set *ull_adv_is_enabled_get(u16_t handle);
 
+/* Return the adv set handle given the adv set instance */
+u16_t ll_adv_handle_get(struct ll_adv_set *adv);
+
 /* Return flags, for now just: enabled */
 u32_t ull_adv_is_enabled(u16_t handle);
 

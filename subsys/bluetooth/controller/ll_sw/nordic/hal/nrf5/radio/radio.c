@@ -779,6 +779,11 @@ u32_t radio_tmr_start_now(u8_t trx)
 	return start;
 }
 
+u32_t radio_tmr_start_get(void)
+{
+	return nrf_rtc_cc_get(NRF_RTC0, 2);
+}
+
 void radio_tmr_stop(void)
 {
 	nrf_timer_task_trigger(EVENT_TIMER, NRF_TIMER_TASK_STOP);

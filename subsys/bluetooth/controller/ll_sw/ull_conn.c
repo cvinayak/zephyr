@@ -36,6 +36,10 @@ void ll_conn_release(struct ll_conn *conn)
 	mem_release(conn, &_conn_free);
 }
 
+u16_t ll_conn_handle_get(struct ll_conn *conn)
+{
+	return mem_index_get(conn, _conn, sizeof(struct ll_conn));
+}
 
 void *ll_tx_mem_acquire(void)
 {

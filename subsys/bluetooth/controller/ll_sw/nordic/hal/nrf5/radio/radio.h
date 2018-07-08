@@ -67,6 +67,7 @@ void radio_tmr_tifs_set(u32_t tifs);
 u32_t radio_tmr_start(u8_t trx, u32_t ticks_start, u32_t remainder);
 void radio_tmr_start_us(u8_t trx, u32_t us);
 u32_t radio_tmr_start_now(u8_t trx);
+u32_t radio_tmr_start_get(void);
 void radio_tmr_stop(void);
 void radio_tmr_hcto_configure(u32_t hcto);
 void radio_tmr_aa_capture(void);

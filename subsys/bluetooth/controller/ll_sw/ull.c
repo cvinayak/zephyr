@@ -206,7 +206,6 @@ int ll_init(struct k_sem *sem_rx)
 		return -ENODEV;
 	}
 
-
 	/* Initialize counter */
 	/* TODO: Bind and use counter driver? */
 	cntr_init();

@@ -138,6 +138,8 @@ static int prepare_cb(struct lll_prepare_param *prepare_param)
 
 	lll_chan_set(data_chan_use);
 
+	radio_isr_set(lll_conn_isr_rx, lll);
+
 	radio_tmr_tifs_set(TIFS_US);
 
 #if defined(CONFIG_BT_CTLR_PHY)
