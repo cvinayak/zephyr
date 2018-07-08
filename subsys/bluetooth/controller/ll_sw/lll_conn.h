@@ -295,4 +295,6 @@ struct lll_conn {
 	u8_t  rssi_sample_count;
 #endif /* CONFIG_BT_CTLR_CONN_RSSI */
 };
-#define CONNECTION_T_SIZE MROUND(sizeof(struct connection))
+
+int lll_conn_init(void);
+int lll_conn_reset(void);

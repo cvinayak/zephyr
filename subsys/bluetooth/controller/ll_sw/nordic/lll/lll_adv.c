@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2018 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -460,7 +466,7 @@ static void isr_done(void *param)
 
 #if defined(CONFIG_BT_PERIPHERAL)
 	if (!lll->is_hdcd)
-#endif /* !CONFIG_BT_PERIPHERAL */
+#endif /* CONFIG_BT_PERIPHERAL */
 	{
 #if defined(CONFIG_BT_HCI_MESH_EXT)
 		if (_radio.advertiser.is_mesh) {

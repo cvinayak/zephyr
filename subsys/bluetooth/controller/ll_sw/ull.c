@@ -35,9 +35,11 @@
 #include "ull.h"
 #include "ull_adv_types.h"
 #include "ull_scan_types.h"
+#include "ull_conn_types.h"
 #include "ull_internal.h"
 #include "ull_adv_internal.h"
 #include "ull_scan_internal.h"
+#include "ull_conn_internal.h"
 #include "ull_tmp_internal.h"
 
 #include "common/log.h"
@@ -245,6 +247,42 @@ int ll_init(struct k_sem *sem_rx)
 		return err;
 	}
 
+#if defined(CONFIG_BT_BROADCASTER)
+	err = lll_adv_init();
+	if (err) {
+		return err;
+	}
+
+	err = ull_adv_init();
+	if (err) {
+		return err;
+	}
+#endif /* CONFIG_BT_BROADCASTER */
+
+#if defined(CONFIG_BT_OBSERVER)
+	err = lll_scan_init();
+	if (err) {
+		return err;
+	}
+
+	err = ull_scan_init();
+	if (err) {
+		return err;
+	}
+#endif /* CONFIG_BT_OBSERVER */
+
+#if defined(CONFIG_BT_CONN)
+	err = lll_conn_init();
+	if (err) {
+		return err;
+	}
+
+	err = ull_conn_init();
+	if (err) {
+		return err;
+	}
+#endif /* CONFIG_BT_CONN */
+
 	/* Initialize state/roles */
 #if defined(CONFIG_BT_TMP)
 	err = lll_tmp_init();
@@ -264,6 +302,24 @@ int ll_init(struct k_sem *sem_rx)
 void ll_reset(void)
 {
 	int err;
+
+#if defined(CONFIG_BT_BROADCASTER)
+	/* Reset adv state */
+	err = ull_adv_reset();
+	LL_ASSERT(!err);
+#endif /* CONFIG_BT_BROADCASTER */
+
+#if defined(CONFIG_BT_OBSERVER)
+	/* Reset scan state */
+	err = ull_scan_reset();
+	LL_ASSERT(!err);
+#endif /* CONFIG_BT_OBSERVER */
+
+#if defined(CONFIG_BT_CONN)
+	/* Reset conn role */
+	err = ull_conn_reset();
+	LL_ASSERT(!err);
+#endif /* CONFIG_BT_CONN */
 
 #if defined(CONFIG_BT_TMP)
 	/* Reset tmp */
@@ -376,12 +432,16 @@ void ll_rx_dequeue(void)
 		if ((cc->status == 0x3c) || cc->role) {
 			struct ll_adv_set *adv;
 
-			if (cc->status == 0x3c) {
-				/* TODO: release connection context */
-			}
-
 			adv = ull_adv_is_enabled_get(0);
 			LL_ASSERT(adv);
+
+			if (cc->status == 0x3c) {
+				LL_ASSERT(adv->conn);
+
+				ll_conn_release(adv->conn);
+				adv->conn = NULL;
+			}
+
 			adv->is_enabled = 0;
 		} else {
 			/* TODO: unset initiator enable flag */
@@ -521,6 +581,11 @@ void ll_rx_link_release(void *link)
 void *ll_rx_alloc(void)
 {
 	return mem_acquire(&mem_pdu_rx.free);
+}
+
+void ll_rx_release(void *node_rx)
+{
+	mem_release(node_rx, &mem_pdu_rx.free);
 }
 
 void ll_rx_put(memq_link_t *link, void *rx)

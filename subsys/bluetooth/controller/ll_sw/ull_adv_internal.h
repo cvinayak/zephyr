@@ -6,6 +6,9 @@
 
 /* NOTE: Definitions used internal to ULL implementations */
 
+int ull_adv_init(void);
+int ull_adv_reset(void);
+
 /* Return ll_adv_set context (unconditional) */
 struct ll_adv_set *ull_adv_set_get(u16_t handle);
 

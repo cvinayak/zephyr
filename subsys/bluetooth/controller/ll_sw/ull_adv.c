@@ -24,23 +24,24 @@
 #include "ull_types.h"
 #include "lll.h"
 #include "lll_vendor.h"
-#include "lll_conn.h"
 #include "lll_adv.h"
+#include "lll_conn.h"
 #include "lll_filter.h"
 
 #include "ull.h"
-#include "ull_internal.h"
 #include "ull_adv_types.h"
+#include "ull_conn_types.h"
 #include "ull_adv_internal.h"
 #include "ull_scan_internal.h"
+#include "ull_conn_internal.h"
+#include "ull_internal.h"
 
 #include "common/log.h"
 #include <soc.h>
 #include "hal/debug.h"
 
-static struct ll_adv_set ll_adv[CONFIG_BT_ADV_MAX];
-
 inline struct ll_adv_set *ull_adv_set_get(u16_t handle);
+static int _init_reset(void);
 static inline struct ll_adv_set *is_disabled_get(u16_t handle);
 static void ticker_cb(u32_t ticks_at_expire, u32_t remainder, u16_t lazy,
 		      void *param);
@@ -51,10 +52,13 @@ static void ticker_stop_cb(u32_t ticks_at_expire, u32_t remainder, u16_t lazy,
 			   void *param);
 static void ticker_op_stop_cb(u32_t status, void *params);
 static void disabled_cb(void *param);
+static inline void _conn_release(struct ll_adv_set *adv);
 #endif /* CONFIG_BT_PERIPHERAL */
 
 static inline u8_t disable(u16_t handle);
 static inline u16_t handle_get(struct ll_adv_set *adv);
+
+static struct ll_adv_set ll_adv[CONFIG_BT_ADV_MAX];
 
 #if defined(CONFIG_BT_CTLR_ADV_EXT)
 u8_t ll_adv_params_set(u8_t handle, u16_t evt_prop, u32_t interval,
@@ -420,7 +424,6 @@ u32_t ll_adv_enable(u8_t enable)
 	struct pdu_adv *pdu_adv;
 	u32_t ticks_slot_offset;
 	struct ll_adv_set *adv;
-	struct lll_conn *conn;
 	struct lll_adv *lll;
 	u16_t interval;
 	u32_t slot_us;
@@ -513,6 +516,7 @@ u32_t ll_adv_enable(u8_t enable)
 	if ((pdu_adv->type == PDU_ADV_TYPE_ADV_IND) ||
 	    (pdu_adv->type == PDU_ADV_TYPE_DIRECT_IND)) {
 		struct node_rx_pdu *node_rx;
+		struct ll_conn *conn;
 		void *link;
 
 		if (lll->conn) {
@@ -524,6 +528,7 @@ u32_t ll_adv_enable(u8_t enable)
 			return BT_HCI_ERR_MEM_CAPACITY_EXCEEDED;
 		}
 
+		/* FIXME: use dedicated rx node for only directed adv timeout */
 		node_rx = ll_rx_alloc();
 		if (!node_rx) {
 			ll_rx_link_release(link);
@@ -531,10 +536,16 @@ u32_t ll_adv_enable(u8_t enable)
 			return BT_HCI_ERR_MEM_CAPACITY_EXCEEDED;
 		}
 
-		adv->link_cc_free = link;
-		adv->node_rx_cc_free = node_rx;
+		conn = ll_conn_acquire();
+		if (!conn) {
+			ll_rx_release(node_rx);
+			ll_rx_link_release(link);
 
-#if 0 /* TODO: Peripheral */
+			return BT_HCI_ERR_MEM_CAPACITY_EXCEEDED;
+		}
+
+#if 0
+		conn = &ull_conn->lll;
 		conn->handle = 0xFFFF;
 		conn->llcp_features = RADIO_BLE_FEAT;
 		conn->data_chan_sel = 0;
@@ -629,15 +640,12 @@ u32_t ll_adv_enable(u8_t enable)
 		conn->rssi_reported = 0x7F;
 		conn->rssi_sample_count = 0;
 #endif /* CONFIG_BT_CTLR_CONN_RSSI */
-
-		_radio.advertiser.conn = conn;
-#endif /* 0, Peripheral */
-	} else {
-		conn = NULL;
+#endif
+		adv->link_cc_free = link;
+		adv->node_rx_cc_free = node_rx;
+		adv->conn = conn;
 	}
-#else /* !CONFIG_BT_PERIPHERAL */
-	ARG_UNUSED(conn);
-#endif /* !CONFIG_BT_PERIPHERAL */
+#endif /* CONFIG_BT_PERIPHERAL */
 
 #if defined(CONFIG_BT_CTLR_PRIVACY)
 	_radio.advertiser.rl_idx = rl_idx;
@@ -753,7 +761,7 @@ u32_t ll_adv_enable(u8_t enable)
 				   ticker_stop_cb, adv,
 				   ull_ticker_status_give, (void *)&ret_cb);
 	} else
-#endif /* !CONFIG_BT_PERIPHERAL */
+#endif /* CONFIG_BT_PERIPHERAL */
 	{
 		ret = ticker_start(TICKER_INSTANCE_ID_CTLR,
 				   TICKER_USER_ID_THREAD,
@@ -793,14 +801,36 @@ u32_t ll_adv_enable(u8_t enable)
 failure_cleanup:
 
 #if defined(CONFIG_BT_PERIPHERAL)
-	if (conn) {
-		mem_release(conn->llcp_terminate.radio_pdu_node_rx.hdr.link,
-			    &_radio.link_rx_free);
-		mem_release(conn, &_radio.conn_free);
+	if (adv->conn) {
+		_conn_release(adv);
 	}
 #endif /* CONFIG_BT_PERIPHERAL */
 
 	return BT_HCI_ERR_CMD_DISALLOWED;
+}
+
+int ull_adv_init(void)
+{
+	int err;
+
+	err = _init_reset();
+	if (err) {
+		return err;
+	}
+
+	return 0;
+}
+
+int ull_adv_reset(void)
+{
+	int err;
+
+	err = _init_reset();
+	if (err) {
+		return err;
+	}
+
+	return 0;
 }
 
 inline struct ll_adv_set *ull_adv_set_get(u16_t handle)
@@ -846,6 +876,11 @@ u32_t ull_adv_filter_pol_get(u16_t handle)
 	}
 
 	return adv->lll.filter_policy;
+}
+
+static int _init_reset(void)
+{
+	return 0;
 }
 
 static inline struct ll_adv_set *is_disabled_get(u16_t handle)
@@ -929,11 +964,12 @@ static void ticker_op_update_cb(u32_t status, void *param)
 static void ticker_stop_cb(u32_t ticks_at_expire, u32_t remainder, u16_t lazy,
 			   void *param)
 {
-	struct ll_adv_set *adv;
 	u16_t handle;
 	u32_t ret;
 
 #if 0
+	struct ll_adv_set *adv;
+
 	/* NOTE: abort the event, so as to permit ticker_job execution, if
 	 *       disabled inside events.
 	 */
@@ -1028,6 +1064,16 @@ static void disabled_cb(void *param)
 	ll_rx_put(link, node_rx);
 	ll_rx_sched();
 }
+
+static inline void _conn_release(struct ll_adv_set *adv)
+{
+	ll_conn_release(adv->conn);
+	adv->conn = NULL;
+	ll_rx_release(adv->node_rx_cc_free);
+	adv->node_rx_cc_free = NULL;
+	ll_rx_link_release(adv->link_cc_free);
+	adv->link_cc_free = NULL;
+}
 #endif /* CONFIG_BT_PERIPHERAL */
 
 static inline u8_t disable(u16_t handle)
@@ -1059,6 +1105,12 @@ static inline u8_t disable(u16_t handle)
 
 	mark = ull_disable_unmark(adv);
 	LL_ASSERT(mark == adv);
+
+#if defined(CONFIG_BT_PERIPHERAL)
+	if (adv->conn) {
+		_conn_release(adv);
+	}
+#endif /* CONFIG_BT_PERIPHERAL */
 
 	adv->is_enabled = 0;
 

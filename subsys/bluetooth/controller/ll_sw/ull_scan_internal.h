@@ -6,6 +6,9 @@
 
 /* NOTE: Definitions used internal to ULL implementations */
 
+int ull_scan_init(void);
+int ull_scan_reset(void);
+
 /* Return ll_scan_set context (unconditional) */
 struct ll_scan_set *ull_scan_set_get(u16_t handle);
 

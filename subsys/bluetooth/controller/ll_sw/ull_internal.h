@@ -18,6 +18,7 @@ static inline void ull_hdr_init(struct ull_hdr *hdr)
 void *ll_rx_link_alloc(void);
 void ll_rx_link_release(void *link);
 void *ll_rx_alloc(void);
+void ll_rx_release(void *node_rx);
 void ll_rx_put(memq_link_t *link, void *rx);
 void ll_rx_sched(void);
 void ull_ticker_status_give(u32_t status, void *param);

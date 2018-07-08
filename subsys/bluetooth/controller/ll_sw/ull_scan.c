@@ -36,13 +36,14 @@
 #include <soc.h>
 #include "hal/debug.h"
 
-#define CONFIG_BT_SCAN_MAX 1
-static struct ll_scan_set ll_scan[CONFIG_BT_SCAN_MAX];
-
+static int _init_reset(void);
 static inline struct ll_scan_set *is_disabled_get(u16_t handle);
 static void ticker_cb(u32_t ticks_at_expire, u32_t remainder, u16_t lazy,
 		      void *param);
 static inline u8_t disable(u16_t handle);
+
+#define CONFIG_BT_SCAN_MAX 1
+static struct ll_scan_set ll_scan[CONFIG_BT_SCAN_MAX];
 
 u32_t ll_scan_params_set(u8_t type, u16_t interval, u16_t window,
 			 u8_t own_addr_type, u8_t filter_policy)
@@ -158,7 +159,7 @@ u32_t ll_scan_enable(u8_t enable)
 
 	ticks_anchor = ticker_ticks_now_get();
 
-#if defined(CONFIG_BT_CONN) && defined(CONFIG_BT_CTLR_SCHED_ADVANCED)
+#if defined(CONFIG_BT_CENTRAL) && defined(CONFIG_BT_CTLR_SCHED_ADVANCED)
 	if (!lll->conn) {
 		u32_t ticks_ref = 0;
 		u32_t offset_us = 0;
@@ -176,7 +177,7 @@ u32_t ll_scan_enable(u8_t enable)
 				       HAL_TICKER_US_TO_TICKS(offset_us);
 		}
 	}
-#endif /* CONFIG_BT_CONN && CONFIG_BT_CTLR_SCHED_ADVANCED */
+#endif /* CONFIG_BT_CENTRAL && CONFIG_BT_CTLR_SCHED_ADVANCED */
 
 	ret = ticker_start(TICKER_INSTANCE_ID_CTLR,
 			   TICKER_USER_ID_THREAD, TICKER_ID_SCAN_BASE,
@@ -227,6 +228,30 @@ inline struct ll_scan_set *ull_scan_is_enabled_get(u16_t handle)
 	return scan;
 }
 
+int ull_scan_init(void)
+{
+	int err;
+
+	err = _init_reset();
+	if (err) {
+		return err;
+	}
+
+	return 0;
+}
+
+int ull_scan_reset(void)
+{
+	int err;
+
+	err = _init_reset();
+	if (err) {
+		return err;
+	}
+
+	return 0;
+}
+
 u32_t ull_scan_is_enabled(u16_t handle)
 {
 	struct ll_scan_set *scan;
@@ -257,6 +282,11 @@ u32_t ull_scan_filter_pol_get(u16_t handle)
 	}
 
 	return scan->lll.filter_policy;
+}
+
+static int _init_reset(void)
+{
+	return 0;
 }
 
 static inline struct ll_scan_set *is_disabled_get(u16_t handle)

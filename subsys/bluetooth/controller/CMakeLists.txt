@@ -82,6 +82,15 @@ if(CONFIG_BT_LL_SW_SPLIT)
       ll_sw/nordic/lll/lll_scan.c
       )
   endif()
+  if(CONFIG_BT_CONN)
+    zephyr_library_sources(
+      ll_sw/ull_conn.c
+    )
+    zephyr_library_sources_ifdef(
+      CONFIG_BT_LLL_VENDOR_NORDIC
+      ll_sw/nordic/lll/lll_conn.c
+      )
+  endif()
   zephyr_library_sources_ifdef(
     CONFIG_BT_CTLR_FILTER
     ll_sw/nordic/lll/lll_filter.c

@@ -902,6 +902,7 @@ fail:
 }
 
 #if defined(CONFIG_BT_CONN)
+#if defined(CONFIG_BT_CENTRAL)
 static int cmd_connect_le(int argc, char *argv[])
 {
 	int err;
@@ -932,6 +933,35 @@ static int cmd_connect_le(int argc, char *argv[])
 
 	return 0;
 }
+
+static int cmd_auto_conn(int argc, char *argv[])
+{
+	bt_addr_le_t addr;
+	int err;
+
+	if (argc < 3) {
+		return -EINVAL;
+	}
+
+	err = str2bt_addr_le(argv[1], argv[2], &addr);
+	if (err) {
+		printk("Invalid peer address (err %d)\n", err);
+		return 0;
+	}
+
+	if (argc < 4) {
+		bt_le_set_auto_conn(&addr, BT_LE_CONN_PARAM_DEFAULT);
+	} else if (!strcmp(argv[3], "on")) {
+		bt_le_set_auto_conn(&addr, BT_LE_CONN_PARAM_DEFAULT);
+	} else if (!strcmp(argv[3], "off")) {
+		bt_le_set_auto_conn(&addr, NULL);
+	} else {
+		return -EINVAL;
+	}
+
+	return 0;
+}
+#endif /* CONFIG_BT_CENTRAL */
 
 static int cmd_disconnect(int argc, char *argv[])
 {
@@ -971,29 +1001,25 @@ static int cmd_disconnect(int argc, char *argv[])
 	return 0;
 }
 
-static int cmd_auto_conn(int argc, char *argv[])
+static int cmd_conn_update(int argc, char *argv[])
 {
-	bt_addr_le_t addr;
+	struct bt_le_conn_param param;
 	int err;
 
-	if (argc < 3) {
+	if (argc < 5) {
 		return -EINVAL;
 	}
 
-	err = str2bt_addr_le(argv[1], argv[2], &addr);
+	param.interval_min = strtoul(argv[1], NULL, 16);
+	param.interval_max = strtoul(argv[2], NULL, 16);
+	param.latency = strtoul(argv[3], NULL, 16);
+	param.timeout = strtoul(argv[4], NULL, 16);
+
+	err = bt_conn_le_param_update(default_conn, &param);
 	if (err) {
-		printk("Invalid peer address (err %d)\n", err);
-		return 0;
-	}
-
-	if (argc < 4) {
-		bt_le_set_auto_conn(&addr, BT_LE_CONN_PARAM_DEFAULT);
-	} else if (!strcmp(argv[3], "on")) {
-		bt_le_set_auto_conn(&addr, BT_LE_CONN_PARAM_DEFAULT);
-	} else if (!strcmp(argv[3], "off")) {
-		bt_le_set_auto_conn(&addr, NULL);
+		printk("conn update failed (err %d).\n", err);
 	} else {
-		return -EINVAL;
+		printk("conn update initiated.\n");
 	}
 
 	return 0;
@@ -1026,30 +1052,6 @@ static int cmd_select(int argc, char *argv[])
 	}
 
 	default_conn = conn;
-
-	return 0;
-}
-
-static int cmd_conn_update(int argc, char *argv[])
-{
-	struct bt_le_conn_param param;
-	int err;
-
-	if (argc < 5) {
-		return -EINVAL;
-	}
-
-	param.interval_min = strtoul(argv[1], NULL, 16);
-	param.interval_max = strtoul(argv[2], NULL, 16);
-	param.latency = strtoul(argv[3], NULL, 16);
-	param.timeout = strtoul(argv[4], NULL, 16);
-
-	err = bt_conn_le_param_update(default_conn, &param);
-	if (err) {
-		printk("conn update failed (err %d).\n", err);
-	} else {
-		printk("conn update initiated.\n");
-	}
 
 	return 0;
 }
@@ -2175,11 +2177,13 @@ static const struct shell_cmd bt_commands[] = {
 	{ "advertise", cmd_advertise,
 	  "<type: off, on, scan, nconn> <mode: discov, non_discov>" },
 #if defined(CONFIG_BT_CONN)
+#if defined(CONFIG_BT_CENTRAL)
 	{ "connect", cmd_connect_le, HELP_ADDR_LE },
-	{ "disconnect", cmd_disconnect, HELP_NONE },
 	{ "auto-conn", cmd_auto_conn, HELP_ADDR_LE },
-	{ "select", cmd_select, HELP_ADDR_LE },
+#endif /* CONFIG_BT_CENTRAL */
+	{ "disconnect", cmd_disconnect, HELP_NONE },
 	{ "conn-update", cmd_conn_update, "<min> <max> <latency> <timeout>" },
+	{ "select", cmd_select, HELP_ADDR_LE },
 	{ "oob", cmd_oob },
 	{ "clear", cmd_clear },
 #if defined(CONFIG_BT_SMP) || defined(CONFIG_BT_BREDR)

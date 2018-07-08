@@ -14,6 +14,7 @@ struct ll_adv_set {
 #if defined(CONFIG_BT_PERIPHERAL)
 	memq_link_t        *link_cc_free;
 	struct node_rx_pdu *node_rx_cc_free;
+	struct ll_conn     *conn;
 #endif /* CONFIG_BT_PERIPHERAL */
 
 #if defined(CONFIG_BT_CTLR_ADV_EXT)

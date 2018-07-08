@@ -37,6 +37,9 @@ struct lll_adv {
 	struct lll_adv_pdu scan_rsp;
 };
 
+int lll_adv_init(void);
+int lll_adv_reset(void);
+
 void lll_adv_prepare(void *param);
 
 static inline struct pdu_adv *lll_adv_pdu_alloc(struct lll_adv_pdu *pdu,

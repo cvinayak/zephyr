@@ -30,6 +30,7 @@
 #include "ll_sw/ull_types.h"
 #include "ll_sw/lll.h"
 #include "ll_sw/lll_conn.h"
+#include "ll_sw/ull_conn_types.h"
 #include "ll.h"
 #include "ll_feat.h"
 #include "hci_internal.h"

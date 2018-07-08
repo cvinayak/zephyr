@@ -39,4 +39,7 @@ struct lll_scan {
 #endif /* CONFIG_BT_CENTRAL */
 };
 
+int lll_scan_init(void);
+int lll_scan_reset(void);
+
 void lll_scan_prepare(void *param);
