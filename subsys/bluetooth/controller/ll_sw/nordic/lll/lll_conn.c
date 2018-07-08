@@ -34,8 +34,14 @@ static int init_reset(void);
 static void isr_done(void *param);
 static void isr_cleanup(void *param);
 static void isr_race(void *param);
+static u32_t isr_rx_pdu(struct lll_conn *lll, struct pdu_data *pdu_data_rx,
+			struct node_tx **tx_release, u8_t *is_rx_enqueue);
+static void prep_pdu_tx(struct lll_conn *lll, struct pdu_data **pdu_data_tx);
+static struct pdu_data *empty_tx_enqueue(struct lll_conn *lll);
 
 static u16_t const sca_ppm_lut[] = {500, 250, 150, 100, 75, 50, 30, 20};
+static u8_t crc_expire;
+static u8_t trx_count;
 
 int lll_conn_init(void)
 {
@@ -103,21 +109,26 @@ void lll_conn_abort_cb(struct lll_prepare_param *prepare_param, void *param)
 
 void lll_conn_isr_rx(void *param)
 {
-	u8_t trx_done;
-	u8_t crc_ok;
+	struct lll_conn *lll = param;
+	struct pdu_data *pdu_data_rx;
+	struct pdu_data *pdu_data_tx;
+	struct node_rx_pdu *node_rx;
+	struct node_tx *tx_release;
+	u8_t is_empty_pdu_tx_retry;
+	u8_t is_crc_backoff = 0;
+	u8_t is_rx_enqueue = 0;
 	u8_t rssi_ready;
+	u8_t trx_done;
+	u8_t is_done;
+	u8_t crc_ok;
+
+#if defined(CONFIG_BT_CTLR_PROFILE_ISR)
+	lll_prof_latency_capture();
+#endif /* CONFIG_BT_CTLR_PROFILE_ISR */
 
 	/* Read radio status and events */
 	trx_done = radio_is_done();
 	if (trx_done) {
-
-#if defined(CONFIG_BT_CTLR_PROFILE_ISR)
-		/* sample the packet timer here, use it to calculate ISR latency
-		 * and generate the profiling event at the end of the ISR.
-		 */
-		radio_tmr_sample();
-#endif /* CONFIG_BT_CTLR_PROFILE_ISR */
-
 		crc_ok = radio_crc_is_valid();
 		rssi_ready = radio_rssi_is_ready();
 	} else {
@@ -141,7 +152,164 @@ void lll_conn_isr_rx(void *param)
 		return;
 	}
 
-	/* TODO: coming soon... */
+	trx_count++;
+
+	node_rx = ull_pdu_rx_alloc_peek(1);
+	LL_ASSERT(node_rx);
+
+	pdu_data_rx = (void *)node_rx->pdu;
+
+	if (crc_ok) {
+		u32_t err;
+
+		err = isr_rx_pdu(lll, pdu_data_rx, &tx_release, &is_rx_enqueue);
+		if (err) {
+			goto lll_conn_isr_rx_exit;
+		}
+
+		/* Reset CRC expiry counter */
+		crc_expire = 0;
+
+		/* Reset supervision counter */
+		lll->supervision_expire = 0;
+	} else {
+		/* Start CRC error countdown, if not already started */
+		if (crc_expire == 0) {
+			crc_expire = 2;
+		}
+
+		/* CRC error countdown */
+		crc_expire--;
+		is_crc_backoff = (crc_expire == 0);
+	}
+
+	/* prepare tx packet */
+	is_empty_pdu_tx_retry = lll->empty;
+	prep_pdu_tx(lll, &pdu_data_tx);
+
+	/* Decide on event continuation and hence Radio Shorts to use */
+	is_done = is_crc_backoff || ((crc_ok) && (pdu_data_rx->md == 0) &&
+				     (pdu_data_tx->len == 0));
+
+	if (is_done) {
+		radio_isr_set(isr_done, param);
+
+		if (0) {
+#if defined(CONFIG_BT_CENTRAL)
+		/* Event done for master */
+		} else if (!lll->role) {
+			radio_disable();
+
+			/* assert if radio packet ptr is not set and radio
+			 * started tx.
+			 */
+			LL_ASSERT(!radio_is_ready());
+
+			/* Restore state if last transmitted was empty PDU */
+			lll->empty = is_empty_pdu_tx_retry;
+
+			goto lll_conn_isr_rx_exit;
+#elif defined(CONFIG_BT_PERIPHERAL)
+		/* Event done for slave */
+		} else {
+			radio_switch_complete_and_disable();
+#endif /* CONFIG_BT_PERIPHERAL */
+		}
+	} else {
+		radio_isr_set(lll_conn_isr_tx, param);
+		radio_tmr_tifs_set(TIFS_US);
+
+#if defined(CONFIG_BT_CTLR_PHY)
+		radio_switch_complete_and_rx(lll->phy_rx);
+#else /* !CONFIG_BT_CTLR_PHY */
+		radio_switch_complete_and_rx(0);
+#endif /* !CONFIG_BT_CTLR_PHY */
+
+		/* capture end of Tx-ed PDU, used to calculate HCTO. */
+		radio_tmr_end_capture();
+	}
+
+	/* Fill sn and nesn */
+	pdu_data_tx->sn = lll->sn;
+	pdu_data_tx->nesn = lll->nesn;
+
+	/* setup the radio tx packet buffer */
+	lll_conn_tx_pkt_set(lll, pdu_data_tx);
+
+#if defined(CONFIG_BT_CTLR_GPIO_PA_PIN)
+
+#if defined(CONFIG_BT_CTLR_PROFILE_ISR)
+	/* PA enable is overwriting packet end used in ISR profiling, hence
+	 * back it up for later use.
+	 */
+	lll_prof_radio_end_backup();
+#endif /* CONFIG_BT_CTLR_PROFILE_ISR */
+
+	radio_gpio_pa_setup();
+
+#if defined(CONFIG_BT_CTLR_PHY)
+	radio_gpio_pa_lna_enable(radio_tmr_tifs_base_get() + TIFS_US -
+				 radio_rx_chain_delay_get(lll->phy_rx, 1) -
+				 CONFIG_BT_CTLR_GPIO_PA_OFFSET);
+#else /* !CONFIG_BT_CTLR_PHY */
+	radio_gpio_pa_lna_enable(radio_tmr_tifs_base_get() + TIFS_US -
+				 radio_rx_chain_delay_get(0, 0) -
+				 CONFIG_BT_CTLR_GPIO_PA_OFFSET);
+#endif /* !CONFIG_BT_CTLR_PHY */
+#endif /* CONFIG_BT_CTLR_GPIO_PA_PIN */
+
+	/* assert if radio packet ptr is not set and radio started tx */
+	LL_ASSERT(!radio_is_ready());
+
+lll_conn_isr_rx_exit:
+#if defined(CONFIG_BT_CTLR_PROFILE_ISR)
+	lll_prof_cputime_capture();
+#endif /* CONFIG_BT_CTLR_PROFILE_ISR */
+
+	/* TODO: */
+	#if 0
+	/* release tx node and generate event for num complete */
+	if (tx_release) {
+		pdu_node_tx_release(_radio.conn_curr->handle, tx_release);
+	}
+
+	/* enqueue any rx packet/event towards application */
+	if (rx_enqueue) {
+		/* set data flow control lock on currently rx-ed connection */
+		rx_fc_lock(_radio.conn_curr->handle);
+
+		/* set the connection handle and enqueue */
+		node_rx->hdr.handle = _radio.conn_curr->handle;
+		packet_rx_enqueue();
+	}
+	#endif
+
+#if defined(CONFIG_BT_CTLR_CONN_RSSI)
+	/* Collect RSSI for connection */
+	if (rssi_ready) {
+		u8_t rssi = radio_rssi_get();
+
+		_radio.conn_curr->rssi_latest = rssi;
+
+		if (((_radio.conn_curr->rssi_reported - rssi) & 0xFF) >
+		    RADIO_RSSI_THRESHOLD) {
+			if (_radio.conn_curr->rssi_sample_count) {
+				_radio.conn_curr->rssi_sample_count--;
+			}
+		} else {
+			_radio.conn_curr->rssi_sample_count =
+				RADIO_RSSI_SAMPLE_COUNT;
+		}
+	}
+#else /* !CONFIG_BT_CTLR_CONN_RSSI */
+	ARG_UNUSED(rssi_ready);
+#endif /* !CONFIG_BT_CTLR_CONN_RSSI */
+
+#if defined(CONFIG_BT_CTLR_PROFILE_ISR)
+	lll_prof_send();
+#endif /* CONFIG_BT_CTLR_PROFILE_ISR */
+
+	return;
 }
 
 void lll_conn_isr_tx(void *param)
@@ -192,14 +360,16 @@ void lll_conn_isr_tx(void *param)
 
 	radio_tmr_hcto_configure(hcto);
 
-	/* capture end of CONNECT_IND PDU, used for calculating first
-	 * slave event.
-	 */
-	radio_tmr_end_capture();
+#if defined(CONFIG_BT_CENTRAL) && defined(CONFIG_BT_CTLR_CONN_RSSI)
+	if (!lll->role) {
+		radio_rssi_measure();
+	}
+#endif /* iCONFIG_BT_CENTRAL && CONFIG_BT_CTLR_CONN_RSSI */
 
-#if defined(CONFIG_BT_CTLR_SCAN_REQ_RSSI)
-	radio_rssi_measure();
-#endif /* CONFIG_BT_CTLR_SCAN_REQ_RSSI */
+#if defined(CONFIG_BT_CTLR_PROFILE_ISR) || \
+	defined(CONFIG_BT_CTLR_GPIO_PA_PIN)
+	radio_tmr_end_capture();
+#endif /* CONFIG_BT_CTLR_PROFILE_ISR */
 
 #if defined(CONFIG_BT_CTLR_GPIO_LNA_PIN)
 	radio_gpio_lna_setup();
@@ -256,6 +426,39 @@ void lll_conn_rx_pkt_set(struct lll_conn *lll)
 	}
 }
 
+void lll_conn_tx_pkt_set(struct lll_conn *lll, struct pdu_data *pdu_data_tx)
+{
+	u16_t max_tx_octets;
+	u8_t phy, flags;
+
+#if defined(CONFIG_BT_CTLR_DATA_LENGTH)
+	max_tx_octets = lll->max_tx_octets;
+#else /* !CONFIG_BT_CTLR_DATA_LENGTH */
+	max_tx_octets = PDU_DC_PAYLOAD_SIZE_MIN;
+#endif /* !CONFIG_BT_CTLR_DATA_LENGTH */
+
+#if defined(CONFIG_BT_CTLR_PHY)
+	phy = lll->phy_tx;
+	flags = lll->phy_flags;
+#else /* !CONFIG_BT_CTLR_PHY */
+	phy = 0;
+	flags = 0;
+#endif /* !CONFIG_BT_CTLR_PHY */
+
+	radio_phy_set(phy, flags);
+
+	if (lll->enc_tx) {
+		radio_pkt_configure(8, (max_tx_octets + 4), (phy << 1) | 0x01);
+
+		radio_pkt_tx_set(radio_ccm_tx_pkt_set(&lll->ccm_tx,
+						      pdu_data_tx));
+	} else {
+		radio_pkt_configure(8, max_tx_octets, (phy << 1) | 0x01);
+
+		radio_pkt_tx_set(pdu_data_tx);
+	}
+}
+
 static int init_reset(void)
 {
 	return 0;
@@ -277,12 +480,6 @@ static void isr_done(void *param)
 #endif /* CONFIG_BT_CTLR_GPIO_PA_PIN || CONFIG_BT_CTLR_GPIO_LNA_PIN */
 	/* TODO: MOVE ^^ */
 
-	/* Local initiated terminate happened */
-	if (!param) {
-		goto isr_done_cleanup;
-	}
-
-isr_done_cleanup:
 	isr_cleanup(param);
 }
 
@@ -303,4 +500,58 @@ static void isr_race(void *param)
 {
 	/* NOTE: lll_disable could have a race with ... */
 	radio_status_reset();
+}
+
+static u32_t isr_rx_pdu(struct lll_conn *lll, struct pdu_data *pdu_data_rx,
+			struct node_tx **tx_release, u8_t *is_rx_enqueue)
+{
+	/* Ack for tx-ed data */
+	if (pdu_data_rx->nesn != lll->sn) {
+		/* Increment serial number */
+		lll->sn++;
+
+		/* First ack (and redundantly any other ack) enable use of
+		 * slave latency.
+		 */
+		if (IS_ENABLED(CONFIG_BT_PERIPHERAL) && lll->role) {
+			lll->slave.latency_enabled = 1;
+		}
+
+		if (!lll->empty) {
+			/* TODO: */
+			LL_ASSERT(0);
+		} else {
+			lll->empty = 0;
+		}
+	}
+
+	return 0;
+}
+
+static void prep_pdu_tx(struct lll_conn *lll, struct pdu_data **pdu_data_tx)
+{
+	struct pdu_data *p;
+
+	/* TODO: */
+	p = empty_tx_enqueue(lll);
+
+	*pdu_data_tx = p;
+}
+
+static struct pdu_data *empty_tx_enqueue(struct lll_conn *lll)
+{
+	struct pdu_data *p;
+
+	lll->empty = 1;
+
+	p = (void *)radio_pkt_empty_get();
+	p->ll_id = PDU_DATA_LLID_DATA_CONTINUE;
+	p->len = 0;
+	if (lll->pkt_tx_head) {
+		p->md = 1;
+	} else {
+		p->md = 0;
+	}
+
+	return p;
 }

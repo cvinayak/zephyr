@@ -16,6 +16,8 @@
 
 #include "util/memq.h"
 
+#include "pdu.h"
+
 #include "ull_types.h"
 
 #include "lll.h"

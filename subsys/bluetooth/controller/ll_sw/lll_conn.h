@@ -307,3 +307,4 @@ void lll_conn_isr_rx(void *param);
 void lll_conn_isr_tx(void *param);
 void lll_conn_isr_abort(void *param);
 void lll_conn_rx_pkt_set(struct lll_conn *lll);
+void lll_conn_tx_pkt_set(struct lll_conn *lll, struct pdu_data *pdu_data_tx);
