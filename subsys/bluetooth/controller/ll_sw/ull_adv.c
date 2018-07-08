@@ -643,7 +643,10 @@ u32_t ll_adv_enable(u8_t enable)
 #endif
 		adv->link_cc_free = link;
 		adv->node_rx_cc_free = node_rx;
-		adv->conn = conn;
+		adv->lll.conn = &conn->lll;
+
+		ull_hdr_init(&conn->ull);
+		lll_hdr_init(&conn->lll, conn);
 	}
 #endif /* CONFIG_BT_PERIPHERAL */
 
@@ -801,7 +804,7 @@ u32_t ll_adv_enable(u8_t enable)
 failure_cleanup:
 
 #if defined(CONFIG_BT_PERIPHERAL)
-	if (adv->conn) {
+	if (adv->lll.conn) {
 		_conn_release(adv);
 	}
 #endif /* CONFIG_BT_PERIPHERAL */
@@ -1067,8 +1070,8 @@ static void disabled_cb(void *param)
 
 static inline void _conn_release(struct ll_adv_set *adv)
 {
-	ll_conn_release(adv->conn);
-	adv->conn = NULL;
+	ll_conn_release(adv->lll.conn->hdr.parent);
+	adv->lll.conn = NULL;
 	ll_rx_release(adv->node_rx_cc_free);
 	adv->node_rx_cc_free = NULL;
 	ll_rx_link_release(adv->link_cc_free);
@@ -1107,7 +1110,7 @@ static inline u8_t disable(u16_t handle)
 	LL_ASSERT(mark == adv);
 
 #if defined(CONFIG_BT_PERIPHERAL)
-	if (adv->conn) {
+	if (adv->lll.conn) {
 		_conn_release(adv);
 	}
 #endif /* CONFIG_BT_PERIPHERAL */

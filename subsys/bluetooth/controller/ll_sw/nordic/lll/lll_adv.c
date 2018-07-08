@@ -64,6 +64,13 @@ static inline bool isr_rx_sr_adva_check(struct pdu_adv *adv,
 static inline u32_t isr_rx_sr_report(struct pdu_adv *pdu_adv_rx,
 				     u8_t rssi_ready);
 #endif /* CONFIG_BT_CTLR_SCAN_REQ_NOTIFY */
+static inline bool isr_rx_ci_check(struct lll_adv *lll, struct pdu_adv *adv,
+				   struct pdu_adv *ci, u8_t devmatch_ok,
+				   u8_t *rl_idx);
+static inline bool isr_rx_ci_tgta_check(struct pdu_adv *adv, struct pdu_adv *ci,
+					u8_t rl_idx);
+static inline bool isr_rx_ci_adva_check(struct pdu_adv *adv,
+					struct pdu_adv *ci);
 
 int lll_adv_init(void)
 {
@@ -617,237 +624,25 @@ static inline int isr_rx_pdu(struct lll_adv *lll,
 
 		return 0;
 
-#if defined(CONFIG_BT_PERIPHERAL) && 0
+#if defined(CONFIG_BT_PERIPHERAL)
 	} else if ((pdu_rx->type == PDU_ADV_TYPE_CONNECT_IND) &&
 		   (pdu_rx->len == sizeof(struct pdu_adv_connect_ind)) &&
-		   isr_adv_ci_check(pdu_adv, pdu_rx, devmatch_ok, &rl_idx) &&
-		   ((_radio.fc_ena == 0) || (_radio.fc_req == _radio.fc_ack)) &&
-		   (_radio.advertiser.conn)) {
-		struct radio_le_conn_cmplt *radio_le_conn_cmplt;
-		struct pdu_data *pdu_data;
-		struct connection *conn;
-		u32_t ticks_slot_offset;
-		u32_t conn_interval_us;
-		u32_t conn_offset_us;
-		u32_t rx_ready_delay;
-		u32_t ticker_status;
+		   isr_rx_ci_check(lll, pdu_adv, pdu_rx, devmatch_ok,
+				   &rl_idx) &&
+		   lll->conn && ull_pdu_rx_alloc_peek(3)) {
+		struct node_rx_pdu *node_rx;
 
-		if (IS_ENABLED(CONFIG_BT_CTLR_CHAN_SEL_2)) {
-			node_rx = packet_rx_reserve_get(4);
-		} else {
-			node_rx = packet_rx_reserve_get(3);
-		}
-
-		if (!node_rx) {
-			return 1;
-		}
-
-		_radio.state = STATE_STOP;
+		radio_isr_set(isr_abort, lll);
 		radio_disable();
 
-		/* acquire the slave context from advertiser */
-		conn = _radio.advertiser.conn;
-		_radio.advertiser.conn = NULL;
+		node_rx = ull_pdu_rx_alloc();
 
-		/* Populate the slave context */
-		conn->handle = mem_index_get(conn, _radio.conn_pool,
-			CONNECTION_T_SIZE);
-		memcpy(&conn->crc_init[0],
-		       &pdu_rx->connect_ind.crc_init[0],
-		       3);
-		memcpy(&conn->access_addr[0],
-		       &pdu_rx->connect_ind.access_addr[0],
-		       4);
-		memcpy(&conn->data_chan_map[0],
-		       &pdu_rx->connect_ind.chan_map[0],
-		       sizeof(conn->data_chan_map));
-		conn->data_chan_count =
-			util_ones_count_get(&conn->data_chan_map[0],
-					    sizeof(conn->data_chan_map));
-		conn->data_chan_hop = pdu_rx->connect_ind.hop;
-		conn->conn_interval =
-			pdu_rx->connect_ind.interval;
-		conn_interval_us =
-			pdu_rx->connect_ind.interval * 1250;
-		conn->latency = pdu_rx->connect_ind.latency;
-		memcpy((void *)&conn->slave.force, &conn->access_addr[0],
-		       sizeof(conn->slave.force));
-		conn->supervision_reload =
-			RADIO_CONN_EVENTS((pdu_rx->connect_ind.timeout
-					   * 10 * 1000), conn_interval_us);
-		conn->procedure_reload = RADIO_CONN_EVENTS((40 * 1000 * 1000),
-							   conn_interval_us);
-
-#if defined(CONFIG_BT_CTLR_LE_PING)
-		/* APTO in no. of connection events */
-		conn->apto_reload = RADIO_CONN_EVENTS((30 * 1000 * 1000),
-						      conn_interval_us);
-		/* Dispatch LE Ping PDU 6 connection events (that peer would
-		 * listen to) before 30s timeout
-		 * TODO: "peer listens to" is greater than 30s due to latency
-		 */
-		conn->appto_reload = (conn->apto_reload > (conn->latency + 6)) ?
-				     (conn->apto_reload - (conn->latency + 6)) :
-				     conn->apto_reload;
-#endif /* CONFIG_BT_CTLR_LE_PING */
-
-		/* Prepare the rx packet structure */
-		node_rx->hdr.handle = conn->handle;
+		/* Prepare the report (scan req) */
 		node_rx->hdr.type = NODE_RX_TYPE_CONNECTION;
+		node_rx->hdr.handle = 0xffff;
 
-		/* prepare connection complete structure */
-		pdu_data = (void *)node_rx->pdu_data;
-		radio_le_conn_cmplt = (void *)pdu_data->lldata;
-		radio_le_conn_cmplt->status = 0x00;
-		radio_le_conn_cmplt->role = 0x01;
-#if defined(CONFIG_BT_CTLR_PRIVACY)
-		radio_le_conn_cmplt->own_addr_type = pdu_rx->rx_addr;
-		memcpy(&radio_le_conn_cmplt->own_addr[0],
-		       &pdu_rx->connect_ind.adv_addr[0], BDADDR_SIZE);
-		if (rl_idx != FILTER_IDX_NONE) {
-			/* TODO: store rl_idx instead if safe */
-			/* Store identity address */
-			ll_rl_id_addr_get(rl_idx,
-					  &radio_le_conn_cmplt->peer_addr_type,
-					  &radio_le_conn_cmplt->peer_addr[0]);
-			/* Mark it as identity address from RPA (0x02, 0x03) */
-			radio_le_conn_cmplt->peer_addr_type += 2;
-
-			/* Store peer RPA */
-			memcpy(&radio_le_conn_cmplt->peer_rpa[0],
-			       &pdu_rx->connect_ind.init_addr[0],
-			       BDADDR_SIZE);
-		} else {
-			memset(&radio_le_conn_cmplt->peer_rpa[0], 0x0,
-			       BDADDR_SIZE);
-#else
-		if (1) {
-#endif /* CONFIG_BT_CTLR_PRIVACY */
-			radio_le_conn_cmplt->peer_addr_type = pdu_rx->tx_addr;
-			memcpy(&radio_le_conn_cmplt->peer_addr[0],
-			       &pdu_rx->connect_ind.init_addr[0],
-			       BDADDR_SIZE);
-		}
-
-		radio_le_conn_cmplt->interval =
-			pdu_rx->connect_ind.interval;
-		radio_le_conn_cmplt->latency =
-			pdu_rx->connect_ind.latency;
-		radio_le_conn_cmplt->timeout =
-			pdu_rx->connect_ind.timeout;
-		radio_le_conn_cmplt->mca =
-			pdu_rx->connect_ind.sca;
-
-		/* enqueue connection complete structure into queue */
-		rx_fc_lock(conn->handle);
-		packet_rx_enqueue();
-
-		/* Use Channel Selection Algorithm #2 if peer too supports it */
-		if (IS_ENABLED(CONFIG_BT_CTLR_CHAN_SEL_2)) {
-			struct radio_le_chan_sel_algo *le_chan_sel_algo;
-
-			/* Generate LE Channel Selection Algorithm event */
-			node_rx = packet_rx_reserve_get(3);
-			LL_ASSERT(node_rx);
-
-			node_rx->hdr.handle = conn->handle;
-			node_rx->hdr.type = NODE_RX_TYPE_CHAN_SEL_ALGO;
-
-			pdu_data = (void *)node_rx->pdu_data;
-			le_chan_sel_algo = (void *)pdu_data->lldata;
-
-			if (pdu_rx->chan_sel) {
-				u16_t aa_ls =
-					((u16_t)conn->access_addr[1] << 8) |
-					conn->access_addr[0];
-				u16_t aa_ms =
-					((u16_t)conn->access_addr[3] << 8) |
-					 conn->access_addr[2];
-
-				conn->data_chan_sel = 1;
-				conn->data_chan_id = aa_ms ^ aa_ls;
-
-				le_chan_sel_algo->chan_sel_algo = 0x01;
-			} else {
-				le_chan_sel_algo->chan_sel_algo = 0x00;
-			}
-
-			packet_rx_enqueue();
-		}
-
-		/* calculate the window widening */
-		conn->slave.sca = pdu_rx->connect_ind.sca;
-		conn->slave.window_widening_periodic_us =
-			(((gc_lookup_ppm[_radio.sca] +
-			   gc_lookup_ppm[conn->slave.sca]) *
-			  conn_interval_us) + (1000000 - 1)) / 1000000;
-		conn->slave.window_widening_max_us =
-			(conn_interval_us >> 1) - RADIO_TIFS;
-		conn->slave.window_size_event_us =
-			pdu_rx->connect_ind.win_size * 1250;
-		conn->slave.window_size_prepare_us = 0;
-
-		rx_ready_delay = radio_rx_ready_delay_get(0, 0);
-
-		/* calculate slave slot */
-		conn->hdr.ticks_slot =
-			HAL_TICKER_US_TO_TICKS(RADIO_TICKER_START_PART_US +
-					       rx_ready_delay + 328 +
-					       RADIO_TIFS + 328);
-		conn->hdr.ticks_active_to_start = _radio.ticks_active_to_start;
-		conn->hdr.ticks_xtal_to_start =
-			HAL_TICKER_US_TO_TICKS(RADIO_TICKER_XTAL_OFFSET_US);
-		conn->hdr.ticks_preempt_to_start = HAL_TICKER_US_TO_TICKS(
-			RADIO_TICKER_PREEMPT_PART_MIN_US);
-		ticks_slot_offset =
-			(conn->hdr.ticks_active_to_start <
-			 conn->hdr.ticks_xtal_to_start) ?
-			conn->hdr.ticks_xtal_to_start :
-			conn->hdr.ticks_active_to_start;
-		conn_interval_us -=
-			conn->slave.window_widening_periodic_us;
-
-		conn_offset_us = radio_tmr_end_get();
-		conn_offset_us +=
-			((u64_t)pdu_rx->connect_ind.win_offset +
-			 1) * 1250;
-		conn_offset_us -= radio_tx_chain_delay_get(0, 0);
-		conn_offset_us -= rx_ready_delay;
-		conn_offset_us -= RADIO_TICKER_JITTER_US << 1;
-		conn_offset_us -= RADIO_TICKER_JITTER_US;
-
-		/* Stop Advertiser */
-		ticker_status = ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO,
-					    RADIO_TICKER_USER_ID_WORKER,
-					    RADIO_TICKER_ID_ADV,
-					    ticker_stop_adv_assert,
-					    (void *)__LINE__);
-		ticker_stop_adv_assert(ticker_status, (void *)__LINE__);
-
-		/* Stop Direct Adv Stopper */
-		if (pdu_adv->type == PDU_ADV_TYPE_DIRECT_IND) {
-			/* Advertiser stop can expire while here in this ISR.
-			 * Deferred attempt to stop can fail as it would have
-			 * expired, hence ignore failure.
-			 */
-			ticker_stop(RADIO_TICKER_INSTANCE_ID_RADIO,
-				    RADIO_TICKER_USER_ID_WORKER,
-				    RADIO_TICKER_ID_ADV_STOP, NULL, NULL);
-		}
-
-		/* Start Slave */
-		ticker_status = ticker_start(RADIO_TICKER_INSTANCE_ID_RADIO,
-		     RADIO_TICKER_USER_ID_WORKER,
-		     RADIO_TICKER_ID_FIRST_CONNECTION + conn->handle,
-		     (_radio.ticks_anchor - ticks_slot_offset),
-		     HAL_TICKER_US_TO_TICKS(conn_offset_us),
-		     HAL_TICKER_US_TO_TICKS(conn_interval_us),
-		     HAL_TICKER_REMAINDER(conn_interval_us), TICKER_NULL_LAZY,
-		     (ticks_slot_offset + conn->hdr.ticks_slot),
-		     event_slave_prepare, conn, ticker_success_assert,
-		     (void *)__LINE__);
-		LL_ASSERT((ticker_status == TICKER_STATUS_SUCCESS) ||
-			  (ticker_status == TICKER_STATUS_BUSY));
+		ull_rx_put(node_rx->hdr.link, node_rx);
+		ull_rx_sched();
 
 		return 0;
 #endif /* CONFIG_BT_PERIPHERAL */
@@ -913,3 +708,58 @@ static inline u32_t isr_rx_sr_report(struct pdu_adv *pdu_adv_rx,
 	return 0;
 }
 #endif /* CONFIG_BT_CTLR_SCAN_REQ_NOTIFY */
+
+static inline bool isr_rx_ci_check(struct lll_adv *lll, struct pdu_adv *adv,
+				   struct pdu_adv *ci, u8_t devmatch_ok,
+				   u8_t *rl_idx)
+{
+	/* LL 4.3.2: filter policy shall be ignored for directed adv */
+	if (adv->type == PDU_ADV_TYPE_DIRECT_IND) {
+#if defined(CONFIG_BT_CTLR_PRIVACY)
+		return ctrl_rl_addr_allowed(ci->tx_addr,
+					    ci->connect_ind.init_addr,
+					    rl_idx) &&
+#else
+		return (1) &&
+#endif
+		       isr_rx_ci_adva_check(adv, ci) &&
+		       isr_rx_ci_tgta_check(adv, ci, *rl_idx);
+	}
+
+#if defined(CONFIG_BT_CTLR_PRIVACY)
+	return ((((_radio.advertiser.filter_policy & 0x02) == 0) &&
+		 ctrl_rl_addr_allowed(ci->tx_addr, ci->connect_ind.init_addr,
+				      rl_idx)) ||
+		(((_radio.advertiser.filter_policy & 0x02) != 0) &&
+		 (devmatch_ok || ctrl_irk_whitelisted(*rl_idx)))) &&
+	       isr_rx_ci_adva_check(adv, ci);
+#else
+	return (((lll->filter_policy & 0x02) == 0) ||
+		(devmatch_ok)) &&
+	       isr_rx_ci_adva_check(adv, ci);
+#endif /* CONFIG_BT_CTLR_PRIVACY */
+}
+
+static inline bool isr_rx_ci_tgta_check(struct pdu_adv *adv, struct pdu_adv *ci,
+					u8_t rl_idx)
+{
+#if defined(CONFIG_BT_CTLR_PRIVACY)
+	if (rl_idx != FILTER_IDX_NONE) {
+		return rl_idx == _radio.advertiser.rl_idx;
+	}
+#endif /* CONFIG_BT_CTLR_PRIVACY */
+	return (adv->rx_addr == ci->tx_addr) &&
+	       !memcmp(adv->direct_ind.tgt_addr, ci->connect_ind.init_addr,
+		       BDADDR_SIZE);
+}
+
+static inline bool isr_rx_ci_adva_check(struct pdu_adv *adv,
+					struct pdu_adv *ci)
+{
+	return (adv->tx_addr == ci->rx_addr) &&
+		(((adv->type == PDU_ADV_TYPE_DIRECT_IND) &&
+		 !memcmp(adv->direct_ind.adv_addr, ci->connect_ind.adv_addr,
+			 BDADDR_SIZE)) ||
+		 (!memcmp(adv->adv_ind.addr, ci->connect_ind.adv_addr,
+			  BDADDR_SIZE)));
+}

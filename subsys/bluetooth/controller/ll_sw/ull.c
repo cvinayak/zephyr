@@ -436,10 +436,10 @@ void ll_rx_dequeue(void)
 			LL_ASSERT(adv);
 
 			if (cc->status == 0x3c) {
-				LL_ASSERT(adv->conn);
+				LL_ASSERT(adv->lll.conn);
 
-				ll_conn_release(adv->conn);
-				adv->conn = NULL;
+				ll_conn_release(adv->lll.conn->hdr.parent);
+				adv->lll.conn = NULL;
 			}
 
 			adv->is_enabled = 0;
@@ -1016,6 +1016,15 @@ defined(CONFIG_BT_CTLR_SCAN_INDICATION)
 	* CONFIG_BT_CTLR_ADV_INDICATION ||
 	* CONFIG_BT_CTLR_SCAN_INDICATION
 	*/
+
+#if defined(CONFIG_BT_CONN)
+	/* fallthrough */
+	case NODE_RX_TYPE_CONNECTION:
+	{
+		ull_conn_setup(link, rx);
+	}
+	break;
+#endif /* CONFIG_BT_CONN */
 
 	default:
 	{
