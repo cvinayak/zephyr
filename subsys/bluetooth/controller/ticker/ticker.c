@@ -66,10 +66,10 @@ struct ticker_user_op_start {
 };
 
 struct ticker_user_op_update {
-	u16_t ticks_drift_plus;
-	u16_t ticks_drift_minus;
-	u16_t ticks_slot_plus;
-	u16_t ticks_slot_minus;
+	u32_t ticks_drift_plus;
+	u32_t ticks_drift_minus;
+	u32_t ticks_slot_plus;
+	u32_t ticks_slot_minus;
 	u16_t lazy;
 	u8_t  force;
 };
@@ -1267,8 +1267,8 @@ u32_t ticker_start(u8_t instance_index, u8_t user_id, u8_t ticker_id,
 }
 
 u32_t ticker_update(u8_t instance_index, u8_t user_id, u8_t ticker_id,
-		    u16_t ticks_drift_plus, u16_t ticks_drift_minus,
-		    u16_t ticks_slot_plus, u16_t ticks_slot_minus, u16_t lazy,
+		    u32_t ticks_drift_plus, u32_t ticks_drift_minus,
+		    u32_t ticks_slot_plus, u32_t ticks_slot_minus, u16_t lazy,
 		    u8_t force, ticker_op_func fp_op_func, void *op_context)
 {
 	struct ticker_instance *instance = &_instance[instance_index];

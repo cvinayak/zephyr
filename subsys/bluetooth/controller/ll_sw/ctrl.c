@@ -4193,8 +4193,8 @@ static inline u32_t isr_close_scan(void)
 #if defined(CONFIG_BT_CONN)
 static inline void isr_close_conn(void)
 {
-	u16_t ticks_drift_plus;
-	u16_t ticks_drift_minus;
+	u32_t ticks_drift_plus;
+	u32_t ticks_drift_minus;
 	u16_t latency_event;
 	u16_t elapsed_event;
 	u8_t reason_peer;
