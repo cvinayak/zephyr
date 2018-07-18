@@ -21,7 +21,6 @@
  * Defines
  ****************************************************************************/
 #define DOUBLE_BUFFER_SIZE 2
-#define COUNTER_CMP_OFFSET_MIN 3
 
 /*****************************************************************************
  * Types
@@ -384,7 +383,7 @@ void ticker_worker(void *param)
 			ticks_at_expire = (instance->ticks_current +
 					   ticks_expired -
 					   ticker->ticks_to_expire_minus) &
-					  0x00FFFFFF;
+					   HAL_TICKER_CNTR_MASK;
 
 			DEBUG_TICKER_TASK(1);
 			ticker->timeout_func(ticks_at_expire,
@@ -420,7 +419,7 @@ static void ticks_to_expire_prep(struct ticker_node *ticker,
 	u32_t ticks_to_expire_minus = ticker->ticks_to_expire_minus;
 
 	/* Calculate ticks to expire for this new node */
-	if (!((ticks_at_start - ticks_current) & BIT(HAL_TICKER_MSBIT))) {
+	if (!((ticks_at_start - ticks_current) & BIT(HAL_TICKER_CNTR_MSBIT))) {
 		ticks_to_expire += ticker_ticks_diff_get(ticks_at_start,
 							 ticks_current);
 	} else {
@@ -452,27 +451,35 @@ static void ticks_to_expire_prep(struct ticker_node *ticker,
 
 static u8_t ticker_remainder_inc(struct ticker_node *ticker)
 {
+#ifdef HAL_TICKER_REMAINDER_RANGE
 	ticker->remainder_current += ticker->remainder_periodic;
 	if ((ticker->remainder_current < BIT(31)) &&
-	    (ticker->remainder_current > (30517578UL / 2))) {
-		ticker->remainder_current -= 30517578UL;
+	    (ticker->remainder_current > (HAL_TICKER_REMAINDER_RANGE >> 1))) {
+		ticker->remainder_current -= HAL_TICKER_REMAINDER_RANGE;
 		return 1;
 	}
 	return 0;
+#else
+	return 0;
+#endif
 }
 
 static u8_t ticker_remainder_dec(struct ticker_node *ticker)
 {
+#ifdef HAL_TICKER_REMAINDER_RANGE
 	u8_t decrement = 0;
 
 	if ((ticker->remainder_current >= BIT(31)) ||
-	    (ticker->remainder_current <= (30517578UL / 2))) {
+	    (ticker->remainder_current <= (HAL_TICKER_REMAINDER_RANGE >> 1))) {
 		decrement++;
-		ticker->remainder_current += 30517578UL;
+		ticker->remainder_current += HAL_TICKER_REMAINDER_RANGE;
 	}
 	ticker->remainder_current -= ticker->remainder_periodic;
 
 	return decrement;
+#else
+	return 0;
+#endif
 }
 
 static void ticker_job_op_cb(struct ticker_user_op *user_op, u32_t status)
@@ -1030,15 +1037,17 @@ static inline void ticker_job_compare_update(struct ticker_instance *instance,
 		ctr = cntr_cnt_get();
 		cc = instance->ticks_current;
 		ticks_elapsed = ticker_ticks_diff_get(ctr, cc) +
-				COUNTER_CMP_OFFSET_MIN;
+				HAL_TICKER_CNTR_CMP_OFFSET_MIN +
+				HAL_TICKER_CNTR_SET_LATENCY;
 		cc += max(ticks_elapsed, ticks_to_expire);
-		cc &= 0x00FFFFFF;
+		cc &= HAL_TICKER_CNTR_MASK;
 
 		instance->trigger_set_cb(cc);
 
 		ctr_post = cntr_cnt_get();
 	} while ((ticker_ticks_diff_get(ctr_post, ctr) +
-		  COUNTER_CMP_OFFSET_MIN) > ticker_ticks_diff_get(cc, ctr));
+		  HAL_TICKER_CNTR_CMP_OFFSET_MIN) >
+		  ticker_ticks_diff_get(cc, ctr));
 }
 
 void ticker_job(void *param)
@@ -1057,7 +1066,6 @@ void ticker_job(void *param)
 	/* Defer worker, as job is now running */
 	if (instance->worker_trigger) {
 		DEBUG_TICKER_JOB(0);
-
 		return;
 	}
 	instance->job_guard = 1;
@@ -1079,7 +1087,7 @@ void ticker_job(void *param)
 		    instance->ticks_elapsed[instance->ticks_elapsed_first];
 
 		instance->ticks_current += ticks_elapsed;
-		instance->ticks_current &= 0x00FFFFFF;
+		instance->ticks_current &= HAL_TICKER_CNTR_MASK;
 
 		flag_elapsed = 1;
 	} else {
@@ -1429,5 +1437,5 @@ u32_t ticker_ticks_now_get(void)
 
 u32_t ticker_ticks_diff_get(u32_t ticks_now, u32_t ticks_old)
 {
-	return ((ticks_now - ticks_old) & 0x00FFFFFF);
+	return ((ticks_now - ticks_old) & HAL_TICKER_CNTR_MASK);
 }
