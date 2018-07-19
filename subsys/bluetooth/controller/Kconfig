@@ -572,11 +572,13 @@ endif # BT_CONN
 
 config BT_CTLR_ADV_INDICATION
 	bool "Advertisement indications"
+	depends on BT_BROADCASTER
 	help
 	  Generate events indicating on air advertisement events.
 
 config BT_CTLR_SCAN_REQ_NOTIFY
 	bool "Scan Request Notifications"
+	depends on BT_BROADCASTER
 	help
 	  Generate events notifying the on air scan requests received.
 
@@ -588,6 +590,7 @@ config BT_CTLR_SCAN_REQ_RSSI
 
 config BT_CTLR_SCAN_INDICATION
 	bool "Scanner indications"
+	depends on BT_OBSERVER
 	help
 	  Generate events indicating on air scanner events.
 
