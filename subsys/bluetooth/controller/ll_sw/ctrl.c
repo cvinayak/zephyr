@@ -5261,7 +5261,7 @@ static void sched_after_mstr_free_offset_get(u16_t conn_interval,
 	}
 
 	LL_ASSERT(!((ticks_anchor_offset - ticks_anchor) &
-		    BIT(HAL_TICKER_MSBIT)));
+		    BIT(HAL_TICKER_CNTR_MSBIT)));
 
 	*win_offset_us += HAL_TICKER_TICKS_TO_US(
 		ticker_ticks_diff_get(ticks_anchor_offset,
