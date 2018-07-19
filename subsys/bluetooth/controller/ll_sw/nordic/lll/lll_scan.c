@@ -721,8 +721,10 @@ static inline u32_t isr_rx_scan(struct lll_scan *lll, u8_t devmatch_ok,
 		pdu_adv_tx->connect_ind.sca = _radio.sca;
 
 		radio_switch_complete_and_disable();
-
 		radio_pkt_tx_set(pdu_adv_tx);
+
+		/* assert if radio packet ptr is not set and radio started tx */
+		LL_ASSERT(!radio_is_ready());
 
 #if defined(CONFIG_BT_CTLR_GPIO_PA_PIN)
 		radio_gpio_pa_setup();
@@ -731,9 +733,6 @@ static inline u32_t isr_rx_scan(struct lll_scan *lll, u8_t devmatch_ok,
 					 radio_rx_chain_delay_get(0, 0) -
 					 CONFIG_BT_CTLR_GPIO_PA_OFFSET);
 #endif /* CONFIG_BT_CTLR_GPIO_PA_PIN */
-
-		/* assert if radio packet ptr is not set and radio started tx */
-		LL_ASSERT(!radio_is_ready());
 
 		/* block CPU so that there is no CRC error on pdu tx,
 		 * this is only needed if we want the CPU to sleep.
@@ -924,6 +923,9 @@ static inline u32_t isr_rx_scan(struct lll_scan *lll, u8_t devmatch_ok,
 		radio_switch_complete_and_rx(0);
 		radio_pkt_tx_set(pdu_adv_tx);
 
+		/* assert if radio packet ptr is not set and radio started tx */
+		LL_ASSERT(!radio_is_ready());
+
 		/* capture end of Tx-ed PDU, used to calculate HCTO. */
 		radio_tmr_end_capture();
 
@@ -933,9 +935,6 @@ static inline u32_t isr_rx_scan(struct lll_scan *lll, u8_t devmatch_ok,
 					 radio_rx_chain_delay_get(0, 0) -
 					 CONFIG_BT_CTLR_GPIO_PA_OFFSET);
 #endif /* CONFIG_BT_CTLR_GPIO_PA_PIN */
-
-		/* assert if radio packet ptr is not set and radio started tx */
-		LL_ASSERT(!radio_is_ready());
 
 		return 0;
 	}

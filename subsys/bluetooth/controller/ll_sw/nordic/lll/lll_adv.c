@@ -330,7 +330,6 @@ static void isr_tx(void *param)
 	hcto += radio_rx_chain_delay_get(0, 0);
 	hcto += addr_us_get(0);
 	hcto -= radio_tx_chain_delay_get(0, 0);
-
 	radio_tmr_hcto_configure(hcto);
 
 	/* capture end of CONNECT_IND PDU, used for calculating first
@@ -612,15 +611,15 @@ static inline int isr_rx_pdu(struct lll_adv *lll,
 		radio_switch_complete_and_disable();
 		radio_pkt_tx_set(lll_adv_scan_rsp_curr_get(lll));
 
+		/* assert if radio packet ptr is not set and radio started tx */
+		LL_ASSERT(!radio_is_ready());
+
 #if defined(CONFIG_BT_CTLR_GPIO_PA_PIN)
 		radio_gpio_pa_setup();
 		radio_gpio_pa_lna_enable(radio_tmr_tifs_base_get() + TIFS_US -
 					 radio_rx_chain_delay_get(0, 0) -
 					 CONFIG_BT_CTLR_GPIO_PA_OFFSET);
 #endif /* CONFIG_BT_CTLR_GPIO_PA_PIN */
-
-		/* assert if radio packet ptr is not set and radio started tx */
-		LL_ASSERT(!radio_is_ready());
 
 		return 0;
 
