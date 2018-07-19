@@ -48,9 +48,9 @@ static void isr_race(void *param);
 
 static inline bool isr_rx_scan_check(struct lll_scan *lll, u8_t irkmatch_ok,
 				     u8_t devmatch_ok, u8_t rl_idx);
-static inline u32_t isr_rx_scan(struct lll_scan *lll, u8_t devmatch_ok,
-				u8_t devmatch_id, u8_t irkmatch_ok,
-				u8_t irkmatch_id, u8_t rl_idx, u8_t rssi_ready);
+static inline u32_t isr_rx_pdu(struct lll_scan *lll, u8_t devmatch_ok,
+			       u8_t devmatch_id, u8_t irkmatch_ok,
+			       u8_t irkmatch_id, u8_t rl_idx, u8_t rssi_ready);
 static inline bool isr_scan_init_check(struct lll_scan *lll,
 				       struct pdu_adv *pdu, u8_t rl_idx);
 static inline bool isr_scan_init_adva_check(struct lll_scan *lll,
@@ -378,8 +378,8 @@ static void isr_rx(void *param)
 					rl_idx)) {
 		u32_t err;
 
-		err = isr_rx_scan(param, devmatch_ok, devmatch_id, irkmatch_ok,
-				  irkmatch_id, rl_idx, rssi_ready);
+		err = isr_rx_pdu(param, devmatch_ok, devmatch_id, irkmatch_ok,
+				 irkmatch_id, rl_idx, rssi_ready);
 		if (!err) {
 			return;
 		}
@@ -581,9 +581,9 @@ static inline bool isr_rx_scan_check(struct lll_scan *lll, u8_t irkmatch_ok,
 #endif /* CONFIG_BT_CTLR_PRIVACY */
 }
 
-static inline u32_t isr_rx_scan(struct lll_scan *lll, u8_t devmatch_ok,
-				u8_t devmatch_id, u8_t irkmatch_ok,
-				u8_t irkmatch_id, u8_t rl_idx, u8_t rssi_ready)
+static inline u32_t isr_rx_pdu(struct lll_scan *lll, u8_t devmatch_ok,
+			       u8_t devmatch_id, u8_t irkmatch_ok,
+			       u8_t irkmatch_id, u8_t rl_idx, u8_t rssi_ready)
 {
 	struct node_rx_pdu *node_rx;
 	struct pdu_adv *pdu_adv_rx;
