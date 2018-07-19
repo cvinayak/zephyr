@@ -34,6 +34,7 @@
 #include "lll_tim_internal.h"
 #include "lll_chan_internal.h"
 #include "lll_adv_internal.h"
+#include "lll_prof_internal.h"
 
 #include "common/log.h"
 #include <soc.h>
@@ -296,6 +297,11 @@ static void isr_tx(void *param)
 	u32_t hcto;
 
 	/* TODO: MOVE to a common interface, isr_lll_radio_status? */
+
+#if defined(CONFIG_BT_CTLR_PROFILE_ISR)
+	lll_prof_latency_capture();
+#endif /* CONFIG_BT_CTLR_PROFILE_ISR */
+
 	/* Clear radio status and events */
 	radio_status_reset();
 	radio_tmr_status_reset();
@@ -316,6 +322,10 @@ static void isr_tx(void *param)
 
 	/* assert if radio packet ptr is not set and radio started rx */
 	LL_ASSERT(!radio_is_ready());
+
+#if defined(CONFIG_BT_CTLR_PROFILE_ISR)
+	lll_prof_cputime_capture();
+#endif /* CONFIG_BT_CTLR_PROFILE_ISR */
 
 #if defined(CONFIG_BT_CTLR_PRIVACY)
 	if (ctrl_rl_enabled()) {
@@ -342,11 +352,25 @@ static void isr_tx(void *param)
 #endif /* CONFIG_BT_CTLR_SCAN_REQ_RSSI */
 
 #if defined(CONFIG_BT_CTLR_GPIO_LNA_PIN)
+#if defined(CONFIG_BT_CTLR_PROFILE_ISR)
+	/* PA/LNA enable is overwriting packet end used in ISR profiling,
+	 * hence back it up for later use.
+	 */
+	lll_prof_radio_end_backup();
+#endif /* CONFIG_BT_CTLR_PROFILE_ISR */
+
 	radio_gpio_lna_setup();
 	radio_gpio_pa_lna_enable(radio_tmr_tifs_base_get() + TIFS_US - 4 -
 				 radio_tx_chain_delay_get(0, 0) -
 				 CONFIG_BT_CTLR_GPIO_LNA_OFFSET);
 #endif /* CONFIG_BT_CTLR_GPIO_LNA_PIN */
+
+#if defined(CONFIG_BT_CTLR_PROFILE_ISR)
+	/* NOTE: as scratch packet is used to receive, it is safe to
+	 * generate profile event using rx nodes.
+	 */
+	lll_prof_send();
+#endif /* CONFIG_BT_CTLR_PROFILE_ISR */
 }
 
 static void isr_rx(void *param)
@@ -359,17 +383,13 @@ static void isr_rx(void *param)
 	u8_t irkmatch_id;
 	u8_t rssi_ready;
 
+#if defined(CONFIG_BT_CTLR_PROFILE_ISR)
+	lll_prof_latency_capture();
+#endif /* CONFIG_BT_CTLR_PROFILE_ISR */
+
 	/* Read radio status and events */
 	trx_done = radio_is_done();
 	if (trx_done) {
-
-#if defined(CONFIG_BT_CTLR_PROFILE_ISR)
-		/* sample the packet timer here, use it to calculate ISR latency
-		 * and generate the profiling event at the end of the ISR.
-		 */
-		radio_tmr_sample();
-#endif /* CONFIG_BT_CTLR_PROFILE_ISR */
-
 		crc_ok = radio_crc_is_valid();
 		devmatch_ok = radio_filter_has_match();
 		devmatch_id = radio_filter_match_get();
@@ -403,6 +423,10 @@ static void isr_rx(void *param)
 		err = isr_rx_pdu(param, devmatch_ok, devmatch_id, irkmatch_ok,
 				 irkmatch_id, rssi_ready);
 		if (!err) {
+#if defined(CONFIG_BT_CTLR_PROFILE_ISR)
+			lll_prof_send();
+#endif /* CONFIG_BT_CTLR_PROFILE_ISR */
+
 			return;
 		}
 	}
@@ -614,7 +638,18 @@ static inline int isr_rx_pdu(struct lll_adv *lll,
 		/* assert if radio packet ptr is not set and radio started tx */
 		LL_ASSERT(!radio_is_ready());
 
+#if defined(CONFIG_BT_CTLR_PROFILE_ISR)
+		lll_prof_cputime_capture();
+#endif /* CONFIG_BT_CTLR_PROFILE_ISR */
+
 #if defined(CONFIG_BT_CTLR_GPIO_PA_PIN)
+#if defined(CONFIG_BT_CTLR_PROFILE_ISR)
+		/* PA/LNA enable is overwriting packet end used in ISR
+		 * profiling, hence back it up for later use.
+		 */
+		lll_prof_radio_end_backup();
+#endif /* CONFIG_BT_CTLR_PROFILE_ISR */
+
 		radio_gpio_pa_setup();
 		radio_gpio_pa_lna_enable(radio_tmr_tifs_base_get() + TIFS_US -
 					 radio_rx_chain_delay_get(0, 0) -

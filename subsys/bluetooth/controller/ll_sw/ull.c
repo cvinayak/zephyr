@@ -380,9 +380,10 @@ void ll_rx_dequeue(void)
 	/* handle object specific clean up */
 	switch (node_rx->type) {
 #if defined(CONFIG_BT_OBSERVER) || \
-    defined(CONFIG_BT_CTLR_SCAN_REQ_NOTIFY) || \
-    defined(CONFIG_BT_CTLR_ADV_INDICATION) || \
-    defined(CONFIG_BT_CTLR_SCAN_INDICATION)
+	defined(CONFIG_BT_CTLR_SCAN_REQ_NOTIFY) || \
+	defined(CONFIG_BT_CTLR_PROFILE_ISR) || \
+	defined(CONFIG_BT_CTLR_ADV_INDICATION) || \
+	defined(CONFIG_BT_CTLR_SCAN_INDICATION)
 #if defined(CONFIG_BT_OBSERVER)
 	case NODE_RX_TYPE_REPORT:
 #endif /* CONFIG_BT_OBSERVER */
@@ -395,6 +396,11 @@ void ll_rx_dequeue(void)
 #if defined(CONFIG_BT_CTLR_SCAN_REQ_NOTIFY)
 	case NODE_RX_TYPE_SCAN_REQ:
 #endif /* CONFIG_BT_CTLR_SCAN_REQ_NOTIFY */
+
+#if defined(CONFIG_BT_CTLR_PROFILE_ISR)
+	/* fallthrough */
+	case NODE_RX_TYPE_PROFILE:
+#endif /* CONFIG_BT_CTLR_PROFILE_ISR */
 
 #if defined(CONFIG_BT_CTLR_ADV_INDICATION)
 	case NODE_RX_TYPE_ADV_INDICATION:
@@ -409,8 +415,9 @@ void ll_rx_dequeue(void)
 		break;
 #endif /* CONFIG_BT_OBSERVER ||
 	* CONFIG_BT_CTLR_SCAN_REQ_NOTIFY ||
+	* CONFIG_BT_CTLR_PROFILE_ISR ||
 	* CONFIG_BT_CTLR_ADV_INDICATION ||
-	*  CONFIG_BT_CTLR_SCAN_INDICATION
+	* CONFIG_BT_CTLR_SCAN_INDICATION
 	*/
 
 #if defined(CONFIG_BT_CONN)
@@ -977,9 +984,10 @@ static inline void _rx_demux_rx(memq_link_t *link, struct node_rx_hdr *rx)
 	break;
 
 #if defined(CONFIG_BT_OBSERVER) || \
-defined(CONFIG_BT_CTLR_SCAN_REQ_NOTIFY) || \
-defined(CONFIG_BT_CTLR_ADV_INDICATION) || \
-defined(CONFIG_BT_CTLR_SCAN_INDICATION)
+	defined(CONFIG_BT_CTLR_SCAN_REQ_NOTIFY) || \
+	defined(CONFIG_BT_CTLR_PROFILE_ISR) || \
+	defined(CONFIG_BT_CTLR_ADV_INDICATION) || \
+	defined(CONFIG_BT_CTLR_SCAN_INDICATION)
 #if defined(CONFIG_BT_OBSERVER)
 	case NODE_RX_TYPE_REPORT:
 #endif /* CONFIG_BT_OBSERVER */
@@ -992,6 +1000,11 @@ defined(CONFIG_BT_CTLR_SCAN_INDICATION)
 #if defined(CONFIG_BT_CTLR_SCAN_REQ_NOTIFY)
 	case NODE_RX_TYPE_SCAN_REQ:
 #endif /* CONFIG_BT_CTLR_SCAN_REQ_NOTIFY */
+
+#if defined(CONFIG_BT_CTLR_PROFILE_ISR)
+	/* fallthrough */
+	case NODE_RX_TYPE_PROFILE:
+#endif /* CONFIG_BT_CTLR_PROFILE_ISR */
 
 #if defined(CONFIG_BT_CTLR_ADV_INDICATION)
 	case NODE_RX_TYPE_ADV_INDICATION:
@@ -1007,6 +1020,7 @@ defined(CONFIG_BT_CTLR_SCAN_INDICATION)
 	break;
 #endif /* CONFIG_BT_OBSERVER ||
 	* CONFIG_BT_CTLR_SCAN_REQ_NOTIFY ||
+	* CONFIG_BT_CTLR_PROFILE_ISR ||
 	* CONFIG_BT_CTLR_ADV_INDICATION ||
 	* CONFIG_BT_CTLR_SCAN_INDICATION
 	*/

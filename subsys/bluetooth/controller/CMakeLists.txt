@@ -125,6 +125,10 @@ if(CONFIG_BT_LL_SW_SPLIT)
     zephyr_library_include_directories(
       ll_sw/nordic/lll
       )
+    zephyr_library_sources_ifdef(
+      CONFIG_BT_CTLR_PROFILE_ISR
+      ll_sw/nordic/lll/lll_prof.c
+      )
   endif()
 endif()
 
