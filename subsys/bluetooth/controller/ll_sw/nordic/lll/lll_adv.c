@@ -616,6 +616,16 @@ static inline int isr_rx_pdu(struct lll_adv *lll,
 	if ((pdu_rx->type == PDU_ADV_TYPE_SCAN_REQ) &&
 	    (pdu_rx->len == sizeof(struct pdu_adv_scan_req)) &&
 	    isr_rx_sr_check(lll, pdu_adv, pdu_rx, devmatch_ok, &rl_idx)) {
+		radio_isr_set(isr_done, lll);
+		radio_switch_complete_and_disable();
+		radio_pkt_tx_set(lll_adv_scan_rsp_curr_get(lll));
+
+		/* assert if radio packet ptr is not set and radio started tx */
+		LL_ASSERT(!radio_is_ready());
+
+#if defined(CONFIG_BT_CTLR_PROFILE_ISR)
+		lll_prof_cputime_capture();
+#endif /* CONFIG_BT_CTLR_PROFILE_ISR */
 
 #if defined(CONFIG_BT_CTLR_SCAN_REQ_NOTIFY)
 		if (!IS_ENABLED(CONFIG_BT_CTLR_ADV_EXT) ||
@@ -631,17 +641,6 @@ static inline int isr_rx_pdu(struct lll_adv *lll,
 		}
 #endif /* CONFIG_BT_CTLR_SCAN_REQ_NOTIFY */
 
-		radio_isr_set(isr_done, lll);
-		radio_switch_complete_and_disable();
-		radio_pkt_tx_set(lll_adv_scan_rsp_curr_get(lll));
-
-		/* assert if radio packet ptr is not set and radio started tx */
-		LL_ASSERT(!radio_is_ready());
-
-#if defined(CONFIG_BT_CTLR_PROFILE_ISR)
-		lll_prof_cputime_capture();
-#endif /* CONFIG_BT_CTLR_PROFILE_ISR */
-
 #if defined(CONFIG_BT_CTLR_GPIO_PA_PIN)
 #if defined(CONFIG_BT_CTLR_PROFILE_ISR)
 		/* PA/LNA enable is overwriting packet end used in ISR
@@ -655,7 +654,6 @@ static inline int isr_rx_pdu(struct lll_adv *lll,
 					 radio_rx_chain_delay_get(0, 0) -
 					 CONFIG_BT_CTLR_GPIO_PA_OFFSET);
 #endif /* CONFIG_BT_CTLR_GPIO_PA_PIN */
-
 		return 0;
 
 #if defined(CONFIG_BT_PERIPHERAL)
