@@ -88,8 +88,8 @@ int cmd_test_end(int argc, char *argv[])
 
 #if defined(CONFIG_BT_CTLR_ADV_EXT)
 #include "../controller/ll_sw/ull_adv_aux.h"
-
 #include "../controller/ll_sw/ll_adv_aux.h"
+#include "../controller/ll_sw/lll.h"
 
 #define OWN_ADDR_TYPE 1
 #define PEER_ADDR_TYPE 0
@@ -116,9 +116,9 @@ int cmd_test_end(int argc, char *argv[])
 int cmd_advx(int argc, char *argv[])
 {
 	u16_t adv_interval = 0x20;
+	u16_t handle = 0;
 	u16_t evt_prop;
 	u8_t adv_type;
-	u16_t handle;
 	u8_t enable;
 	u8_t phy_p;
 	s32_t err;
@@ -133,19 +133,19 @@ int cmd_advx(int argc, char *argv[])
 			adv_type = 0x05; /* Adv. Ext. */
 			enable = 1;
 		} else if (!strcmp(argv[1], "hdcd")) {
+			handle = 0;
 			evt_prop = 0;
 			adv_type = 0x01; /* Directed */
 			adv_interval = 0; /* High Duty Cycle */
+			phy_p = BIT(0);
 			enable = 1;
-			handle = 0;
+			goto do_enable;
 		} else if (!strcmp(argv[1], "ldcd")) {
 			evt_prop = 0;
-			adv_type = 0x01; /* Directed */
+			adv_type = 0x04; /* Directed */
 			enable = 1;
-			handle = 0;
 		} else if (!strcmp(argv[1], "off")) {
 			enable = 0;
-			goto disable;
 		} else {
 			return -EINVAL;
 		}
@@ -162,7 +162,10 @@ int cmd_advx(int argc, char *argv[])
 			evt_prop |= BIT(6);
 		} else if (!strcmp(argv[2], "ad")) {
 		} else {
-			return -EINVAL;
+			handle = strtoul(argv[2], NULL, 16);
+			if (handle >= CONFIG_BT_ADV_MAX) {
+				return -EINVAL;
+			}
 		}
 	}
 
@@ -173,7 +176,10 @@ int cmd_advx(int argc, char *argv[])
 			evt_prop |= BIT(6);
 		} else if (!strcmp(argv[3], "ad")) {
 		} else {
-			return -EINVAL;
+			handle = strtoul(argv[3], NULL, 16);
+			if (handle >= CONFIG_BT_ADV_MAX) {
+				return -EINVAL;
+			}
 		}
 	}
 
@@ -182,17 +188,37 @@ int cmd_advx(int argc, char *argv[])
 			evt_prop |= BIT(6);
 		} else if (!strcmp(argv[4], "ad")) {
 		} else {
-			return -EINVAL;
+			handle = strtoul(argv[4], NULL, 16);
+			if (handle >= CONFIG_BT_ADV_MAX) {
+				return -EINVAL;
+			}
 		}
 	}
 
 	if (argc > 5) {
 		if (!strcmp(argv[5], "ad")) {
 		} else {
-			return -EINVAL;
+			handle = strtoul(argv[5], NULL, 16);
+			if (handle >= CONFIG_BT_ADV_MAX) {
+				return -EINVAL;
+			}
 		}
 	}
 
+	if (argc > 6) {
+		} else {
+			handle = strtoul(argv[6], NULL, 16);
+			if (handle >= CONFIG_BT_ADV_MAX) {
+				return -EINVAL;
+			}
+		}
+	}
+
+	if (!enable) {
+		goto disable;
+	}
+
+do_enable:
 	printk("adv param set...");
 	err = ll_adv_params_set(handle, evt_prop, adv_interval, adv_type,
 				OWN_ADDR_TYPE, PEER_ADDR_TYPE, PEER_ADDR,
