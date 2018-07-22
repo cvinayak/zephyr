@@ -991,7 +991,7 @@ static void ticker_stop_cb(u32_t ticks_at_expire, u32_t remainder, u16_t lazy,
 	handle = handle_get(param);
 	LL_ASSERT(handle < CONFIG_BT_ADV_MAX);
 
-	ret = ticker_stop(TICKER_INSTANCE_ID_CTLR, TICKER_USER_ID_THREAD,
+	ret = ticker_stop(TICKER_INSTANCE_ID_CTLR, TICKER_USER_ID_ULL_HIGH,
 			  TICKER_ID_ADV_BASE + handle,
 			  ticker_op_stop_cb, param);
 	LL_ASSERT((ret == TICKER_STATUS_SUCCESS) ||
