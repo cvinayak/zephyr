@@ -358,7 +358,7 @@ static void ticker_cb(u32_t ticks_at_expire, u32_t remainder, u16_t lazy,
 		s_mfy_sched_after_mstr_free_offset_get.param =
 			(void *)ticks_at_expire_normal;
 
-		retval = mayfly_enqueue(TICKER_USER_ID_LLL,
+		retval = mayfly_enqueue(TICKER_USER_ID_ULL_HIGH,
 				TICKER_USER_ID_ULL_LOW, 1,
 				&s_mfy_sched_after_mstr_free_offset_get);
 		LL_ASSERT(!retval);
