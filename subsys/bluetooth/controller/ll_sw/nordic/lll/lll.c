@@ -18,10 +18,6 @@
 #include "lll.h"
 #include "lll_internal.h"
 
-#if defined(CONFIG_SOC_FAMILY_NRF)
-#define CLOCK_CONTROL_DRV_NAME CONFIG_CLOCK_CONTROL_NRF5_M16SRC_DRV_NAME
-#endif /* CONFIG_SOC_FAMILY_NRF */
-
 #include "common/log.h"
 #include <soc.h>
 #include "hal/debug.h"
@@ -121,7 +117,6 @@ int lll_init(void)
 	}
 
 	/* Connect ISRs */
-#if defined(CONFIG_SOC_FAMILY_NRF)
 	IRQ_DIRECT_CONNECT(NRF5_IRQ_RADIO_IRQn, CONFIG_BT_CTLR_LLL_PRIO,
 			   radio_nrf5_isr, 0);
 	IRQ_CONNECT(NRF5_IRQ_RTC0_IRQn, CONFIG_BT_CTLR_ULL_HIGH_PRIO,
@@ -133,7 +128,6 @@ int lll_init(void)
 	irq_enable(NRF5_IRQ_RADIO_IRQn);
 	irq_enable(NRF5_IRQ_RTC0_IRQn);
 	irq_enable(NRF5_IRQ_SWI4_IRQn);
-#endif /* CONFIG_SOC_FAMILY_NRF */
 
 	return 0;
 }
