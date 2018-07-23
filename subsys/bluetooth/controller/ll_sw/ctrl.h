@@ -244,24 +244,24 @@ struct radio_le_conn_cmplt {
 	u16_t latency;
 	u16_t timeout;
 	u8_t  mca;
-} __packed;
+};
 
 struct radio_le_conn_update_cmplt {
 	u8_t  status;
 	u16_t interval;
 	u16_t latency;
 	u16_t timeout;
-} __packed;
+};
 
 struct radio_le_chan_sel_algo {
 	u8_t chan_sel_algo;
-} __packed;
+};
 
 struct radio_le_phy_upd_cmplt {
 	u8_t status;
 	u8_t tx;
 	u8_t rx;
-} __packed;
+};
 
 struct radio_pdu_node_rx_hdr {
 	union {
