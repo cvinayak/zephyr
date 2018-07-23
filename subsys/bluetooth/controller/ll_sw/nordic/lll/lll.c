@@ -362,8 +362,8 @@ static int prepare(lll_is_abort_cb_t is_abort_cb, lll_abort_cb_t abort_cb,
 #endif /* CONFIG_BT_CTLR_LOW_LAT */
 
 		/* Store the next prepare for deferred call */
-		ret = ull_prepare_enqueue(is_abort_cb, abort_cb,
-					  prepare_param, prepare_cb, prio, 0);
+		ret = ull_prepare_enqueue(is_abort_cb, abort_cb, prepare_param,
+					  prepare_cb, prio, is_resume);
 		LL_ASSERT(!ret);
 
 		if (is_resume) {

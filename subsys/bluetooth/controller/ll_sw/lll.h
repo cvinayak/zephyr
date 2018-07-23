@@ -6,7 +6,7 @@
 #define TICKER_USER_ID_ULL_LOW  MAYFLY_CALL_ID_2
 #define TICKER_USER_ID_THREAD   MAYFLY_CALL_ID_PROGRAM
 
-#define EVENT_PIPELINE_MAX            4
+#define EVENT_PIPELINE_MAX            5
 
 #define ULL_HDR(p) ((void *)((u8_t *)(p) + sizeof(struct evt_hdr)))
 #define EVT_HDR(lll) ((void *)((struct lll_hdr *)(lll))->parent)
