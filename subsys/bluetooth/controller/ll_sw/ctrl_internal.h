@@ -319,7 +319,7 @@ struct pdu_data_q_tx {
 					   pdu_data) + \
 				  max((PDU_AC_SIZE_MAX + PDU_AC_SIZE_EXTRA), \
 				      (offsetof(struct pdu_data, lldata) + \
-				       RADIO_LL_LENGTH_OCTETS_RX_MAX))) * \
+				       LL_LENGTH_OCTETS_RX_MAX))) * \
 			   (RADIO_PACKET_COUNT_RX_MAX + 3))
 
 #define LL_MEM_RX_LINK_POOL (sizeof(void *) * 2 * ((RADIO_PACKET_COUNT_RX_MAX +\

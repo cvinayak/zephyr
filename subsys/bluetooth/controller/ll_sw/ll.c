@@ -38,6 +38,7 @@
 #include "ctrl.h"
 #include "ctrl_internal.h"
 #include "ll.h"
+#include "ll_feat.h"
 #include "ll_filter.h"
 
 /* Global singletons */
@@ -166,7 +167,7 @@ int ll_init(struct k_sem *sem_rx)
 			 RADIO_CONNECTION_CONTEXT_MAX,
 			 RADIO_PACKET_COUNT_RX_MAX,
 			 RADIO_PACKET_COUNT_TX_MAX,
-			 RADIO_LL_LENGTH_OCTETS_RX_MAX,
+			 LL_LENGTH_OCTETS_RX_MAX,
 			 RADIO_PACKET_TX_DATA_SIZE, &_radio[0], sizeof(_radio));
 	if (err) {
 		BT_ERR("Required RAM size: %d, supplied: %u.", err,

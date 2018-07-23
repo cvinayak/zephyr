@@ -18,6 +18,7 @@
 #include <misc/byteorder.h>
 
 #include "ll.h"
+#include "ll_feat.h"
 
 #if defined(CONFIG_SOC_FAMILY_NRF)
 #include <drivers/clock_control/nrf5_clock_control.h>
@@ -1964,9 +1965,9 @@ static inline u32_t feat_get(u8_t *features)
 {
 	u32_t feat;
 
-	feat = ~RADIO_BLE_FEAT_BIT_MASK_VALID | features[0] |
+	feat = ~LL_FEAT_BIT_MASK_VALID | features[0] |
 	       (features[1] << 8) | (features[2] << 16);
-	feat &= RADIO_BLE_FEAT_BIT_MASK;
+	feat &= LL_FEAT_BIT_MASK;
 
 	return feat;
 }
@@ -2277,7 +2278,7 @@ static inline u8_t isr_rx_conn_pkt_ctrl_dle(struct pdu_data *pdu_data_rx,
 		 */
 		if (lr->max_tx_octets >= PDU_DC_PAYLOAD_SIZE_MIN) {
 			eff_rx_octets = min(lr->max_tx_octets,
-					    RADIO_LL_LENGTH_OCTETS_RX_MAX);
+					    LL_LENGTH_OCTETS_RX_MAX);
 		}
 
 #if defined(CONFIG_BT_CTLR_PHY)
@@ -2286,8 +2287,9 @@ static inline u8_t isr_rx_conn_pkt_ctrl_dle(struct pdu_data *pdu_data_rx,
 		 */
 		if (lr->max_rx_time >=
 		    RADIO_PKT_TIME(PDU_DC_PAYLOAD_SIZE_MIN, 0)) {
-			eff_tx_time = min(lr->max_rx_time,
-					    _radio.conn_curr->default_tx_time);
+			eff_tx_time =
+				min(lr->max_rx_time,
+				    _radio.conn_curr->default_tx_time);
 		}
 
 		/* use the minimal of our max supported and
@@ -2295,9 +2297,10 @@ static inline u8_t isr_rx_conn_pkt_ctrl_dle(struct pdu_data *pdu_data_rx,
 		 */
 		if (lr->max_tx_time >=
 		    RADIO_PKT_TIME(PDU_DC_PAYLOAD_SIZE_MIN, 0)) {
-			eff_rx_time = min(lr->max_tx_time,
-				RADIO_PKT_TIME(RADIO_LL_LENGTH_OCTETS_RX_MAX,
-					       BIT(2)));
+			eff_rx_time =
+				min(lr->max_tx_time,
+				    RADIO_PKT_TIME(LL_LENGTH_OCTETS_RX_MAX,
+						   BIT(2)));
 		}
 #endif /* CONFIG_BT_CTLR_PHY */
 
@@ -7395,7 +7398,7 @@ static inline void event_fex_prep(struct connection *conn)
 		conn->llcp_ack = conn->llcp_req;
 
 		/* use initial feature bitmap */
-		conn->llcp_features = RADIO_BLE_FEAT;
+		conn->llcp_features = LL_FEAT;
 
 		/* place the feature exchange req packet as next in tx queue */
 		pdu_ctrl_tx->ll_id = PDU_DATA_LLID_CTRL;
@@ -7450,11 +7453,11 @@ static inline void event_vex_prep(struct connection *conn)
 			pdu_ctrl_tx->llctrl.opcode =
 				PDU_DATA_LLCTRL_TYPE_VERSION_IND;
 			pdu_ctrl_tx->llctrl.version_ind.version_number =
-				RADIO_BLE_VERSION_NUMBER;
+				LL_VERSION_NUMBER;
 			pdu_ctrl_tx->llctrl.version_ind.company_id =
-				RADIO_BLE_COMPANY_ID;
+				CONFIG_BT_CTLR_COMPANY_ID;
 			pdu_ctrl_tx->llctrl.version_ind.sub_version_number =
-				RADIO_BLE_SUB_VERSION_NUMBER;
+				CONFIG_BT_CTLR_SUBVERSION_NUMBER;
 
 			ctrl_tx_enqueue(conn, node_tx);
 
@@ -7839,9 +7842,9 @@ static inline void event_len_prep(struct connection *conn)
 		pdu_ctrl_tx->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_LENGTH_REQ;
 
 		lr = &pdu_ctrl_tx->llctrl.length_req;
-		lr->max_rx_octets = RADIO_LL_LENGTH_OCTETS_RX_MAX;
+		lr->max_rx_octets = LL_LENGTH_OCTETS_RX_MAX;
 		lr->max_tx_octets = conn->default_tx_octets;
-		lr->max_rx_time = RADIO_PKT_TIME(RADIO_LL_LENGTH_OCTETS_RX_MAX,
+		lr->max_rx_time = RADIO_PKT_TIME(LL_LENGTH_OCTETS_RX_MAX,
 						 BIT(2));
 #if !defined(CONFIG_BT_CTLR_PHY)
 		lr->max_tx_time = RADIO_PKT_TIME(conn->default_tx_octets, 0);
@@ -9834,9 +9837,9 @@ static u8_t version_ind_send(struct connection *conn,
 			sizeof(struct pdu_data_llctrl_version_ind);
 		pdu_ctrl_tx->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_VERSION_IND;
 		v = &pdu_ctrl_tx->llctrl.version_ind;
-		v->version_number = RADIO_BLE_VERSION_NUMBER;
-		v->company_id =	RADIO_BLE_COMPANY_ID;
-		v->sub_version_number =	RADIO_BLE_SUB_VERSION_NUMBER;
+		v->version_number = LL_VERSION_NUMBER;
+		v->company_id =	CONFIG_BT_CTLR_COMPANY_ID;
+		v->sub_version_number =	CONFIG_BT_CTLR_SUBVERSION_NUMBER;
 
 		ctrl_tx_sec_enqueue(conn, node_tx);
 
@@ -10363,7 +10366,7 @@ u32_t radio_adv_enable(u16_t interval, u8_t chan_map, u8_t filter_policy,
 		}
 
 		conn->handle = 0xFFFF;
-		conn->llcp_features = RADIO_BLE_FEAT;
+		conn->llcp_features = LL_FEAT;
 		conn->data_chan_sel = 0;
 		conn->data_chan_use = 0;
 		conn->event_counter = 0;
@@ -10879,7 +10882,7 @@ u32_t radio_connect_enable(u8_t adv_addr_type, u8_t *adv_addr, u16_t interval,
 		328 + RADIO_TIFS + 328);
 
 	conn->handle = 0xFFFF;
-	conn->llcp_features = RADIO_BLE_FEAT;
+	conn->llcp_features = LL_FEAT;
 	access_addr = access_addr_get();
 	memcpy(&conn->access_addr[0], &access_addr, sizeof(conn->access_addr));
 	bt_rand(&conn->crc_init[0], 3);
@@ -11426,10 +11429,10 @@ u32_t ll_length_default_set(u16_t max_tx_octets, u16_t max_tx_time)
 void ll_length_max_get(u16_t *max_tx_octets, u16_t *max_tx_time,
 		       u16_t *max_rx_octets, u16_t *max_rx_time)
 {
-	*max_tx_octets = RADIO_LL_LENGTH_OCTETS_RX_MAX;
-	*max_tx_time = RADIO_PKT_TIME(RADIO_LL_LENGTH_OCTETS_RX_MAX, BIT(2));
-	*max_rx_octets = RADIO_LL_LENGTH_OCTETS_RX_MAX;
-	*max_rx_time = RADIO_PKT_TIME(RADIO_LL_LENGTH_OCTETS_RX_MAX, BIT(2));
+	*max_tx_octets = LL_LENGTH_OCTETS_RX_MAX;
+	*max_tx_time = RADIO_PKT_TIME(LL_LENGTH_OCTETS_RX_MAX, BIT(2));
+	*max_rx_octets = LL_LENGTH_OCTETS_RX_MAX;
+	*max_rx_time = RADIO_PKT_TIME(LL_LENGTH_OCTETS_RX_MAX, BIT(2));
 }
 #endif /* CONFIG_BT_CTLR_DATA_LENGTH */
 

@@ -501,9 +501,9 @@ static void read_local_version_info(struct net_buf *buf, struct net_buf **evt)
 	rp = cmd_complete(evt, sizeof(*rp));
 
 	rp->status = 0x00;
-	rp->hci_version = BT_HCI_VERSION_5_0;
+	rp->hci_version = LL_VERSION_NUMBER;
 	rp->hci_revision = sys_cpu_to_le16(0);
-	rp->lmp_version = BT_HCI_VERSION_5_0;
+	rp->lmp_version = LL_VERSION_NUMBER;
 	rp->manufacturer = sys_cpu_to_le16(CONFIG_BT_CTLR_COMPANY_ID);
 	rp->lmp_subversion = sys_cpu_to_le16(CONFIG_BT_CTLR_SUBVERSION_NUMBER);
 }
