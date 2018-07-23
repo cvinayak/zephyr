@@ -234,10 +234,25 @@ config BT_CTLR_LE_ENC
 
 config BT_CTLR_CONN_PARAM_REQ
 	bool "Connection Parameter Request"
+	select BT_CTLR_EXT_REJ_IND
 	default y
 	help
 	  Enable support for Bluetooth v4.1 Connection Parameter Request feature
 	  in the Controller.
+
+config BT_CTLR_EXT_REJ_IND
+	bool "Extended Reject Indication"
+	default y
+	help
+	  Enable support for Bluetooth v4.1 Extended Reject Indication feature
+	  in the Controller.
+
+config BT_CTLR_SLAVE_FEAT_REQ
+	bool "Slave-initiated Features Exchange"
+	default y
+	help
+	  Enable support for Bluetooth v4.1 Slave-initiated Features Exchange
+	  feature in the Controller.
 
 config BT_CTLR_LE_PING
 	bool "LE Ping"
@@ -290,6 +305,7 @@ config BT_CTLR_DATA_LENGTH_MAX
 
 config BT_CTLR_PHY
 	bool "PHY Update"
+	select BT_CTLR_EXT_REJ_IND
 	default y if SOC_SERIES_NRF52X
 	help
 	  Enable support for Bluetooth 5.0 PHY Update Procedure in the
