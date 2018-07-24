@@ -49,15 +49,14 @@ For each level following set of macros are available:
 There are two configuration categories: configurations per module and global
 configuration. When logging is enabled globally, it works for modules. However,
 modules can disable logging locally. Every module can specify its own logging
-level. The module must define the :c:macro:`LOG_LEVEL` macro before including
-the :file:`include/logging/log.h` header file to do so. Unless a global
-override is set, the module logging level will be honored. The global override
-can only increase the logging level. It cannot be used to lower module logging
-levels that were previously set higher. It is also possible to globally limit
-logs by providing maximal severity level present in the system, where maximal
-means lowest severity (e.g. if maximal level in the system is set to info, it
-means that errors, warnings and info levels are present but debug messages are
-excluded).
+level. The module must define the :c:macro:`LOG_LEVEL` macro before using the
+API. Unless a global override is set, the module logging level will be honored.
+The global override can only increase the logging level. It cannot be used to
+lower module logging levels that were previously set higher. It is also possible
+to globally limit logs by providing maximal severity level present in the
+system, where maximal means lowest severity (e.g. if maximal level in the system
+is set to info, it means that errors, warnings and info levels are present but
+debug messages are excluded).
 
 Each module which is using the logger must specify its unique name and
 register itself to the logger. If module consists of more than one file,
@@ -108,6 +107,14 @@ be processed by printk. Longer strings are trimmed.
 :option:`CONFIG_LOG_INPLACE_PROCESS`: Messages are processed in the context of
 the log macro call. Note that it can lead to errors when logger is used in the
 interrupt context.
+
+:option:`CONFIG_LOG_PROCESS_TRIGGER_THRESHOLD`: When number of buffered log
+messages reaches the threshold dedicated thread (see :cpp:func:`log_thread_set`)
+is waken up. If :option:`CONFIG_LOG_PROCESS_THREAD` is enabled then this
+threshold is used by the internal thread.
+
+:option:`CONFIG_LOG_PROCESS_THREAD`: When enabled, logger is creating own thread
+which handles log processing.
 
 :option:`CONFIG_LOG_BUFFER_SIZE`: Number of bytes dedicated for the logger
 message pool. Single message capable of storing standard log with up to 3
@@ -220,6 +227,13 @@ the logger. If run time filtering is enabled the :cpp:func:`log_filter_set` can
 be used to change maximal severity level for given module. Module is identified
 by source ID and domain ID. Source ID can be retrieved if source name is known
 by iterating through all registered sources.
+
+If logger is processed from a thread then it is possible to enable a feature
+which will wake up processing thread when certain amount of log messages are
+buffered (see :option:`CONFIG_LOG_PROCESS_TRIGGER_THRESHOLD`). It is also
+possible to enable internal logger thread (see
+:option:`CONFIG_LOG_PROCESS_THREAD`). In that case logger thread is initialized
+and log messages are processed implicitly.
 
 .. _log_panic:
 

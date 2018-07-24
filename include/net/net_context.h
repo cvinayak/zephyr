@@ -184,6 +184,8 @@ struct net_tcp;
 
 struct net_conn_handle;
 
+struct tls_context;
+
 /**
  * Note that we do not store the actual source IP address in the context
  * because the address is already be set in the network interface struct.
@@ -275,7 +277,17 @@ struct net_context {
 		struct k_fifo recv_q;
 		struct k_fifo accept_q;
 	};
+
+#if defined(CONFIG_NET_SOCKETS_SOCKOPT_TLS)
+	/** TLS context information */
+	struct tls_context *tls;
+#endif /* CONFIG_NET_SOCKETS_SOCKOPT_TLS */
 #endif /* CONFIG_NET_SOCKETS */
+
+#if defined(CONFIG_NET_OFFLOAD)
+	/** context for use by offload drivers */
+	void *offload_context;
+#endif /* CONFIG_NET_OFFLOAD */
 };
 
 static inline bool net_context_is_used(struct net_context *context)
