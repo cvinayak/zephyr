@@ -2290,6 +2290,12 @@ static inline u8_t isr_rx_conn_pkt_ctrl_dle(struct pdu_data *pdu_data_rx,
 			eff_tx_time =
 				min(lr->max_rx_time,
 				    _radio.conn_curr->default_tx_time);
+#if defined(CONFIG_BT_CTLR_PHY_CODED)
+			eff_tx_time =
+				max(eff_tx_time,
+				    RADIO_PKT_TIME(PDU_DC_PAYLOAD_SIZE_MIN,
+						   _radio.conn_curr->phy_tx));
+#endif /* CONFIG_BT_CTLR_PHY_CODED */
 		}
 
 		/* use the minimal of our max supported and
@@ -2301,6 +2307,12 @@ static inline u8_t isr_rx_conn_pkt_ctrl_dle(struct pdu_data *pdu_data_rx,
 				min(lr->max_tx_time,
 				    RADIO_PKT_TIME(LL_LENGTH_OCTETS_RX_MAX,
 						   BIT(2)));
+#if defined(CONFIG_BT_CTLR_PHY_CODED)
+			eff_rx_time =
+				max(eff_rx_time,
+				    RADIO_PKT_TIME(PDU_DC_PAYLOAD_SIZE_MIN,
+						   _radio.conn_curr->phy_rx));
+#endif /* CONFIG_BT_CTLR_PHY_CODED */
 		}
 #endif /* CONFIG_BT_CTLR_PHY */
 
