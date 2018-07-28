@@ -223,9 +223,10 @@ void ull_slave_setup(memq_link_t *link, struct node_rx_hdr *rx)
 
 	conn_offset_us = ftr->us_radio_end;
 	conn_offset_us += ((u64_t)pdu_adv->connect_ind.win_offset + 1) * 1250;
-	conn_offset_us -= ftr->us_radio_rdy;
+	conn_offset_us -= EVENT_OVERHEAD_START_US;
 	conn_offset_us -= EVENT_JITTER_US << 1;
 	conn_offset_us -= EVENT_JITTER_US;
+	conn_offset_us -= ftr->us_radio_rdy;
 
 	/* Stop Advertiser */
 	ticker_id_adv = TICKER_ID_ADV_BASE + ll_adv_handle_get(adv);
@@ -253,7 +254,7 @@ void ull_slave_setup(memq_link_t *link, struct node_rx_hdr *rx)
 	ticker_status = ticker_start(TICKER_INSTANCE_ID_CTLR,
 				     TICKER_USER_ID_ULL_HIGH,
 				     ticker_id_conn,
-				     ftr->ticks_anchor,
+				     ftr->ticks_anchor - ticks_slot_offset,
 				     HAL_TICKER_US_TO_TICKS(conn_offset_us),
 				     HAL_TICKER_US_TO_TICKS(conn_interval_us),
 				     HAL_TICKER_REMAINDER(conn_interval_us),
