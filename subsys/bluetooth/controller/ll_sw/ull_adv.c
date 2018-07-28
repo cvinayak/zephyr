@@ -518,6 +518,7 @@ u32_t ll_adv_enable(u8_t enable)
 	    (pdu_adv->type == PDU_ADV_TYPE_DIRECT_IND)) {
 		struct node_rx_pdu *node_rx;
 		struct ll_conn *conn;
+		struct lll_conn *conn_lll;
 		void *link;
 
 		if (lll->conn) {
@@ -544,6 +545,17 @@ u32_t ll_adv_enable(u8_t enable)
 
 			return BT_HCI_ERR_MEM_CAPACITY_EXCEEDED;
 		}
+
+		conn_lll = &conn->lll;
+		conn_lll->handle = 0xFFFF;
+		conn_lll->data_chan_sel = 0;
+		conn_lll->data_chan_use = 0;
+		conn_lll->event_counter = 0;
+		conn_lll->latency_prepare = 0;
+
+		conn_lll->role = 1;
+		conn_lll->slave.window_widening_prepare_us = 0;
+		conn_lll->slave.window_widening_event_us = 0;
 
 #if 0
 		conn = &ull_conn->lll;

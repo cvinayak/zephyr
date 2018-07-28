@@ -80,12 +80,41 @@ static int prepare_cb(struct lll_prepare_param *prepare_param)
 	struct lll_conn *lll = prepare_param->param;
 	u32_t ticks_at_event;
 	struct evt_hdr *evt;
+	u16_t event_counter;
 	u32_t remainder_us;
 	u8_t data_chan_use;
 	u32_t remainder;
 	u32_t hcto;
+	u16_t lazy;
 
 	DEBUG_RADIO_START_S(1);
+
+	/* TODO: Do the below in ULL ?  */
+
+	lazy = prepare_param->lazy;
+
+	/* Calc window widening */
+	if (lll->role) {
+		lll->slave.window_widening_prepare_us +=
+		    lll->slave.window_widening_periodic_us * (lazy + 1);
+		if (lll->slave.window_widening_prepare_us >
+		    lll->slave.window_widening_max_us) {
+			lll->slave.window_widening_prepare_us =
+				lll->slave.window_widening_max_us;
+		}
+	}
+
+	/* save the latency for use in event */
+	lll->latency_prepare += lazy;
+
+	/* calc current event counter value */
+	event_counter = lll->event_counter + lll->latency_prepare;
+
+	/* store the next event counter value */
+	lll->event_counter = event_counter + 1;
+
+	/* TODO: Do the above in ULL ?  */
+
 
 	/* TODO: can we do something in ULL? */
 	lll->latency_event = lll->latency_prepare;

@@ -88,7 +88,6 @@ void ull_slave_setup(memq_link_t *link, struct node_rx_hdr *rx)
 		  conn_interval_us) + (1000000 - 1)) / 1000000;
 	lll->slave.window_widening_max_us = (conn_interval_us >> 1) - TIFS_US;
 	lll->slave.window_size_event_us = pdu_adv->connect_ind.win_size * 1250;
-	lll->slave.window_size_prepare_us = 0;
 
 	/* procedure timeouts */
 	lll->supervision_reload =
