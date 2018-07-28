@@ -52,7 +52,7 @@
 #else
 #define TICKER_USER_LLL_OPS      (2 + 1)
 #endif /* CONFIG_BT_CTLR_LOW_LAT */
-#define TICKER_USER_ULL_HIGH_OPS (1 + 1)
+#define TICKER_USER_ULL_HIGH_OPS (3 + 1)
 #define TICKER_USER_ULL_LOW_OPS  (1 + 1)
 #define TICKER_USER_THREAD_OPS   (1 + 1)
 
