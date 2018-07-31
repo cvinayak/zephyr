@@ -321,9 +321,6 @@ void lll_conn_isr_tx(void *param)
 	/* Clear radio status and events */
 	radio_status_reset();
 	radio_tmr_status_reset();
-	radio_filter_status_reset();
-	radio_ar_status_reset();
-	radio_rssi_status_reset();
 
 #if defined(CONFIG_BT_CTLR_GPIO_PA_PIN) || \
 	defined(CONFIG_BT_CTLR_GPIO_LNA_PIN)
