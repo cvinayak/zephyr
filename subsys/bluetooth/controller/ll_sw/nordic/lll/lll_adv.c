@@ -663,6 +663,13 @@ static inline int isr_rx_pdu(struct lll_adv *lll,
 		radio_isr_set(isr_abort, lll);
 		radio_disable();
 
+		/* assert if radio started tx */
+		LL_ASSERT(!radio_is_ready());
+
+#if defined(CONFIG_BT_CTLR_PROFILE_ISR)
+		lll_prof_cputime_capture();
+#endif /* CONFIG_BT_CTLR_PROFILE_ISR */
+
 		rx = ull_pdu_rx_alloc();
 
 		rx->hdr.type = NODE_RX_TYPE_CONNECTION;
