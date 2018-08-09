@@ -123,7 +123,8 @@ struct ticker_instance {
 /*****************************************************************************
  * Global instances
  ****************************************************************************/
-static struct ticker_instance _instance[2];
+#define TICKER_INSTANCE_MAX 1
+static struct ticker_instance _instance[TICKER_INSTANCE_MAX];
 
 /*****************************************************************************
  * Static Functions
@@ -1172,7 +1173,8 @@ u32_t ticker_init(u8_t instance_index, u8_t count_node, void *node,
 
 	if ((sizeof(struct ticker_node) != TICKER_NODE_T_SIZE) ||
 	    (sizeof(struct ticker_user) != TICKER_USER_T_SIZE) ||
-	    (sizeof(struct ticker_user_op) != TICKER_USER_OP_T_SIZE)) {
+	    (sizeof(struct ticker_user_op) != TICKER_USER_OP_T_SIZE) ||
+	    (instance_index >= TICKER_INSTANCE_MAX)) {
 		return TICKER_STATUS_FAILURE;
 	}
 
