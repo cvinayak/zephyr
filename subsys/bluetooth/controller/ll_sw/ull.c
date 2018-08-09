@@ -67,6 +67,12 @@
 #define BT_SCAN_TICKER_NODES 0
 #endif
 
+#if defined(CONFIG_BT_CONN)
+#define BT_CONN_TICKER_NODES ((TICKER_ID_CONN_LAST) - (TICKER_ID_CONN_BASE) + 1)
+#else
+#define BT_CONN_TICKER_NODES 0
+#endif
+
 #if defined(CONFIG_BT_TMP)
 #define BT_TMP_TICKER_NODES ((TICKER_ID_TMP_LAST) - (TICKER_ID_TMP_BASE) + 1)
 #else
@@ -84,6 +90,7 @@
 #define TICKER_NODES              (TICKER_ID_ULL_BASE + \
 				   BT_ADV_TICKER_NODES + \
 				   BT_SCAN_TICKER_NODES + \
+				   BT_CONN_TICKER_NODES + \
 				   BT_TMP_TICKER_NODES + \
 				   FLASH_TICKER_NODES)
 #define TICKER_USER_APP_OPS       (TICKER_USER_THREAD_OPS + \

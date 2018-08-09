@@ -46,6 +46,8 @@ enum {
 
 #if defined(CONFIG_BT_CONN)
 	TICKER_ID_CONN_BASE,
+	TICKER_ID_CONN_LAST = ((TICKER_ID_CONN_BASE) + (CONFIG_BT_MAX_CONN) -
+			       1),
 #endif /* CONFIG_BT_CONN */
 
 	TICKER_ID_MAX,
