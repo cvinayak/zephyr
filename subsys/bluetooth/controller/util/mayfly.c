@@ -21,6 +21,7 @@ static struct {
 } mft[MAYFLY_CALLEE_COUNT][MAYFLY_CALLER_COUNT];
 
 static memq_link_t mfl[MAYFLY_CALLEE_COUNT][MAYFLY_CALLER_COUNT];
+static u8_t mfp[MAYFLY_CALLEE_COUNT];
 
 #if defined(CONFIG_MAYFLY_UT)
 static u8_t _state;
@@ -84,10 +85,7 @@ u32_t mayfly_enqueue(u8_t caller_id, u8_t callee_id, u8_t chain,
 				/* mark as ready in queue */
 				m->_req = ack + 1;
 
-				/* pend the callee for execution */
-				mayfly_pend(caller_id, callee_id);
-
-				return 0;
+				goto mayfly_enqueue_pend;
 			}
 
 			/* already ready */
@@ -109,6 +107,10 @@ u32_t mayfly_enqueue(u8_t caller_id, u8_t callee_id, u8_t chain,
 	/* new, add as ready in the queue */
 	m->_req = ack + 1;
 	memq_enqueue(m->_link, m, &mft[callee_id][caller_id].tail);
+
+mayfly_enqueue_pend:
+	/* set mayfly callee pending */
+	mfp[callee_id] = 1;
 
 	/* pend the callee for execution */
 	mayfly_pend(caller_id, callee_id);
@@ -168,6 +170,11 @@ void mayfly_run(u8_t callee_id)
 	u8_t disable = 0;
 	u8_t enable = 0;
 	u8_t caller_id;
+
+	if (!mfp[callee_id]) {
+		return;
+	}
+	mfp[callee_id] = 1;
 
 	/* iterate through each caller queue to this callee_id */
 	caller_id = MAYFLY_CALLER_COUNT;
