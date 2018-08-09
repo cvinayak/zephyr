@@ -8,8 +8,9 @@
 
 #define EVENT_PIPELINE_MAX            5
 
-#define ULL_HDR(p) ((void *)((u8_t *)(p) + sizeof(struct evt_hdr)))
-#define EVT_HDR(lll) ((void *)((struct lll_hdr *)(lll))->parent)
+#define HDR_ULL(p)     ((void *)((u8_t *)(p) + sizeof(struct evt_hdr)))
+#define HDR_ULL2LLL(p) ((void *)((u8_t *)(p) + sizeof(struct ull_hdr)))
+#define HDR_LLL2EVT(p) ((void *)((struct lll_hdr *)(p))->parent)
 
 #if defined(CONFIG_BT_CTLR_XTAL_ADVANCED)
 #define XON_BITMASK BIT(31) /* XTAL has been retained from previous prepare */

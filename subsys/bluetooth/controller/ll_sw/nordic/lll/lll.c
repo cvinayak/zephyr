@@ -246,7 +246,7 @@ int lll_done(void *param)
 		event.curr.param = NULL;
 
 		if (param) {
-			ull = ULL_HDR(((struct lll_hdr *)param)->parent);
+			ull = HDR_ULL(((struct lll_hdr *)param)->parent);
 		}
 
 #if defined(CONFIG_BT_CTLR_LOW_LAT) && \
@@ -256,7 +256,7 @@ int lll_done(void *param)
 
 		DEBUG_RADIO_CLOSE(0);
 	} else {
-		ull = ULL_HDR(((struct lll_hdr *)param)->parent);
+		ull = HDR_ULL(((struct lll_hdr *)param)->parent);
 	}
 
 	/* Let ULL know about LLL event done */
@@ -380,7 +380,7 @@ static int prepare(lll_is_abort_cb_t is_abort_cb, lll_abort_cb_t abort_cb,
 
 #if !defined(CONFIG_BT_CTLR_LOW_LAT)
 		/* Calc the preempt timeout */
-		evt = EVT_HDR(prepare_param->param);
+		evt = HDR_LLL2EVT(prepare_param->param);
 		preempt_anchor = prepare_param->ticks_at_expire;
 		preempt_to = max(evt->ticks_active_to_start,
 				 evt->ticks_xtal_to_start) -

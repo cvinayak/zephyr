@@ -179,7 +179,7 @@ static int prepare_cb(struct lll_prepare_param *prepare_param)
 #endif /* !CONFIG_BT_CTLR_PHY */
 
 	ticks_at_event = prepare_param->ticks_at_expire;
-	evt = EVT_HDR(lll);
+	evt = HDR_LLL2EVT(lll);
 	ticks_at_event += lll_evt_offset_get(evt);
 	ticks_at_event += HAL_TICKER_US_TO_TICKS(EVENT_OVERHEAD_START_US);
 

@@ -174,7 +174,7 @@ static int prepare_cb(struct lll_prepare_param *prepare_param)
 #endif /* CONFIG_BT_CTLR_FILTER */
 
 	ticks_at_event = prepare_param->ticks_at_expire;
-	evt = EVT_HDR(lll);
+	evt = HDR_LLL2EVT(lll);
 	ticks_at_event += lll_evt_offset_get(evt);
 	ticks_at_event += HAL_TICKER_US_TO_TICKS(EVENT_OVERHEAD_START_US);
 
@@ -216,7 +216,7 @@ static int prepare_cb(struct lll_prepare_param *prepare_param)
 #if defined(CONFIG_BT_PERIPHERAL)
 static int resume_prepare_cb(struct lll_prepare_param *p)
 {
-	struct evt_hdr *evt = EVT_HDR(p->param);
+	struct evt_hdr *evt = HDR_LLL2EVT(p->param);
 
 	p->ticks_at_expire = ticker_ticks_now_get() - lll_evt_offset_get(evt);
 	p->remainder = 0;
