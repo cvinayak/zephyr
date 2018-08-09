@@ -33,9 +33,9 @@ void mayfly_enable_cb(u8_t caller_id, u8_t callee_id, u8_t enable)
 	LL_ASSERT(callee_id == MAYFLY_CALL_ID_JOB);
 
 	if (enable) {
-		irq_enable(SWI4_IRQn);
+		irq_enable(SWI5_IRQn);
 	} else {
-		irq_disable(SWI4_IRQn);
+		irq_disable(SWI5_IRQn);
 	}
 }
 
@@ -46,14 +46,14 @@ u32_t mayfly_is_enabled(u8_t caller_id, u8_t callee_id)
 	switch (callee_id) {
 #if defined(CONFIG_BT_LL_SW_SPLIT)
 	case MAYFLY_CALL_ID_LLL:
-		return irq_is_enabled(RADIO_IRQn);
+		return irq_is_enabled(SWI4_IRQn);
 #endif /* CONFIG_BT_LL_SW_SPLIT */
 
 	case MAYFLY_CALL_ID_WORKER:
 		return irq_is_enabled(RTC0_IRQn);
 
 	case MAYFLY_CALL_ID_JOB:
-		return irq_is_enabled(SWI4_IRQn);
+		return irq_is_enabled(SWI5_IRQn);
 
 	default:
 		LL_ASSERT(0);
@@ -103,7 +103,7 @@ void mayfly_pend(u8_t caller_id, u8_t callee_id)
 	switch (callee_id) {
 #if defined(CONFIG_BT_LL_SW_SPLIT)
 	case MAYFLY_CALL_ID_LLL:
-		NVIC_SetPendingIRQ(RADIO_IRQn);
+		NVIC_SetPendingIRQ(SWI4_IRQn);
 		break;
 #endif /* CONFIG_BT_LL_SW_SPLIT */
 
@@ -112,7 +112,7 @@ void mayfly_pend(u8_t caller_id, u8_t callee_id)
 		break;
 
 	case MAYFLY_CALL_ID_JOB:
-		NVIC_SetPendingIRQ(SWI4_IRQn);
+		NVIC_SetPendingIRQ(SWI5_IRQn);
 		break;
 
 	default:

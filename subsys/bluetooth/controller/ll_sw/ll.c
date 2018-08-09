@@ -108,7 +108,7 @@ static void rtc0_nrf5_isr(void *arg)
 	DEBUG_TICKER_ISR(0);
 }
 
-static void swi4_nrf5_isr(void *arg)
+static void swi5_nrf5_isr(void *arg)
 {
 	DEBUG_TICKER_JOB(1);
 
@@ -180,12 +180,12 @@ int ll_init(struct k_sem *sem_rx)
 			   radio_nrf5_isr, 0);
 	IRQ_CONNECT(NRF5_IRQ_RTC0_IRQn, CONFIG_BT_CTLR_WORKER_PRIO,
 		    rtc0_nrf5_isr, NULL, 0);
-	IRQ_CONNECT(NRF5_IRQ_SWI4_IRQn, CONFIG_BT_CTLR_JOB_PRIO, swi4_nrf5_isr,
+	IRQ_CONNECT(NRF5_IRQ_SWI5_IRQn, CONFIG_BT_CTLR_JOB_PRIO, swi5_nrf5_isr,
 		    NULL, 0);
 
 	irq_enable(NRF5_IRQ_RADIO_IRQn);
 	irq_enable(NRF5_IRQ_RTC0_IRQn);
-	irq_enable(NRF5_IRQ_SWI4_IRQn);
+	irq_enable(NRF5_IRQ_SWI5_IRQn);
 
 	return 0;
 }

@@ -56,8 +56,6 @@ ISR_DIRECT_DECLARE(radio_nrf5_isr)
 
 	isr_radio();
 
-	mayfly_run(TICKER_USER_ID_LLL);
-
 	ISR_DIRECT_PM();
 
 	DEBUG_RADIO_ISR(0);
@@ -75,19 +73,21 @@ static void rtc0_nrf5_isr(void *arg)
 		ticker_trigger(0);
 	}
 
-	/* On compare1 run ticker worker instance1 */
-	if (NRF_RTC0->EVENTS_COMPARE[1]) {
-		NRF_RTC0->EVENTS_COMPARE[1] = 0;
-
-		ticker_trigger(1);
-	}
-
 	mayfly_run(TICKER_USER_ID_ULL_HIGH);
 
 	DEBUG_TICKER_ISR(0);
 }
 
 static void swi4_nrf5_isr(void *arg)
+{
+	DEBUG_RADIO_ISR(1);
+
+	mayfly_run(TICKER_USER_ID_LLL);
+
+	DEBUG_RADIO_ISR(0);
+}
+
+static void swi5_nrf5_isr(void *arg)
 {
 	DEBUG_TICKER_JOB(1);
 
@@ -127,15 +127,18 @@ int lll_init(void)
 	/* Connect ISRs */
 	IRQ_DIRECT_CONNECT(NRF5_IRQ_RADIO_IRQn, CONFIG_BT_CTLR_LLL_PRIO,
 			   radio_nrf5_isr, 0);
+	IRQ_CONNECT(NRF5_IRQ_SWI4_IRQn, CONFIG_BT_CTLR_LLL_PRIO,
+		    swi4_nrf5_isr, NULL, 0);
 	IRQ_CONNECT(NRF5_IRQ_RTC0_IRQn, CONFIG_BT_CTLR_ULL_HIGH_PRIO,
 		    rtc0_nrf5_isr, NULL, 0);
-	IRQ_CONNECT(NRF5_IRQ_SWI4_IRQn, CONFIG_BT_CTLR_ULL_LOW_PRIO,
-		    swi4_nrf5_isr, NULL, 0);
+	IRQ_CONNECT(NRF5_IRQ_SWI5_IRQn, CONFIG_BT_CTLR_ULL_LOW_PRIO,
+		    swi5_nrf5_isr, NULL, 0);
 
 	/* Enable IRQs */
 	irq_enable(NRF5_IRQ_RADIO_IRQn);
-	irq_enable(NRF5_IRQ_RTC0_IRQn);
 	irq_enable(NRF5_IRQ_SWI4_IRQn);
+	irq_enable(NRF5_IRQ_RTC0_IRQn);
+	irq_enable(NRF5_IRQ_SWI5_IRQn);
 
 	return 0;
 }
