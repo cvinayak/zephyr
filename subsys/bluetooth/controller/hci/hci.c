@@ -2866,7 +2866,7 @@ static void le_chan_sel_algo(struct pdu_data *pdu_data, u16_t handle,
 		return;
 	}
 
-	cs = (void *)pdu_data->lldata;
+	cs = (void *)pdu_data;
 
 	sep = meta_evt(buf, BT_HCI_EVT_LE_CHAN_SEL_ALGO, sizeof(*sep));
 
@@ -2948,7 +2948,7 @@ static void encode_control(struct node_rx_pdu *node_rx,
 		{
 			struct node_rx_cc *cc;
 
-			cc = (void *)pdu_data->lldata;
+			cc = (void *)pdu_data;
 			le_conn_complete(cc->status, cc, handle, buf);
 		}
 		break;

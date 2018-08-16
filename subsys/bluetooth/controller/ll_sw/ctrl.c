@@ -995,7 +995,6 @@ static inline u32_t isr_rx_adv(u8_t devmatch_ok, u8_t devmatch_id,
 		   (_radio.advertiser.conn)) {
 		struct radio_le_conn_cmplt *radio_le_conn_cmplt;
 		struct radio_pdu_node_rx *node_rx;
-		struct pdu_data *pdu_data;
 		struct connection *conn;
 		u32_t ticks_slot_offset;
 		u32_t conn_interval_us;
@@ -1067,8 +1066,7 @@ static inline u32_t isr_rx_adv(u8_t devmatch_ok, u8_t devmatch_id,
 		node_rx->hdr.type = NODE_RX_TYPE_CONNECTION;
 
 		/* prepare connection complete structure */
-		pdu_data = (void *)node_rx->pdu_data;
-		radio_le_conn_cmplt = (void *)pdu_data->lldata;
+		radio_le_conn_cmplt = (void *)node_rx->pdu_data;
 		radio_le_conn_cmplt->status = 0x00;
 		radio_le_conn_cmplt->role = 0x01;
 #if defined(CONFIG_BT_CTLR_PRIVACY)
@@ -1124,8 +1122,7 @@ static inline u32_t isr_rx_adv(u8_t devmatch_ok, u8_t devmatch_id,
 			node_rx->hdr.handle = conn->handle;
 			node_rx->hdr.type = NODE_RX_TYPE_CHAN_SEL_ALGO;
 
-			pdu_data = (void *)node_rx->pdu_data;
-			le_chan_sel_algo = (void *)pdu_data->lldata;
+			le_chan_sel_algo = (void *)node_rx->pdu_data;
 
 			if (pdu_adv->chan_sel) {
 				u16_t aa_ls =
@@ -1408,7 +1405,6 @@ static inline u32_t isr_rx_scan(u8_t devmatch_ok, u8_t devmatch_id,
 		struct radio_le_conn_cmplt *radio_le_conn_cmplt;
 		struct radio_pdu_node_rx *node_rx;
 		struct pdu_adv *pdu_adv_tx;
-		struct pdu_data *pdu_data;
 		struct connection *conn;
 		u32_t ticks_slot_offset;
 		u32_t conn_interval_us;
@@ -1553,8 +1549,7 @@ static inline u32_t isr_rx_scan(u8_t devmatch_ok, u8_t devmatch_id,
 		node_rx->hdr.type = NODE_RX_TYPE_CONNECTION;
 
 		/* prepare connection complete structure */
-		pdu_data = (void *)node_rx->pdu_data;
-		radio_le_conn_cmplt = (void *)pdu_data->lldata;
+		radio_le_conn_cmplt = (void *)node_rx->pdu_data;
 		radio_le_conn_cmplt->status = 0x00;
 		radio_le_conn_cmplt->role = 0x00;
 #if defined(CONFIG_BT_CTLR_PRIVACY)
@@ -1610,8 +1605,7 @@ static inline u32_t isr_rx_scan(u8_t devmatch_ok, u8_t devmatch_id,
 			node_rx->hdr.handle = conn->handle;
 			node_rx->hdr.type = NODE_RX_TYPE_CHAN_SEL_ALGO;
 
-			pdu_data = (void *)node_rx->pdu_data;
-			le_chan_sel_algo = (void *)pdu_data->lldata;
+			le_chan_sel_algo = (void *)node_rx->pdu_data;
 
 			if (pdu_adv_rx->chan_sel) {
 				u16_t aa_ls =
@@ -6437,7 +6431,6 @@ static void mayfly_adv_stop(void *param)
 {
 	struct radio_le_conn_cmplt *radio_le_conn_cmplt;
 	struct radio_pdu_node_rx *node_rx;
-	struct pdu_data *pdu_data_rx;
 
 	/* Prepare the rx packet structure */
 	node_rx = packet_rx_reserve_get(1);
@@ -6448,8 +6441,7 @@ static void mayfly_adv_stop(void *param)
 	node_rx->hdr.type = NODE_RX_TYPE_CONNECTION;
 
 	/* prepare connection complete structure */
-	pdu_data_rx = (void *)node_rx->pdu_data;
-	radio_le_conn_cmplt = (void *)pdu_data_rx->lldata;
+	radio_le_conn_cmplt = (void *)node_rx->pdu_data;
 	memset(radio_le_conn_cmplt, 0x00, sizeof(struct radio_le_conn_cmplt));
 	radio_le_conn_cmplt->status = 0x3c;
 
@@ -11670,11 +11662,9 @@ void ll_rx_dequeue(void)
 	if (node_rx->hdr.type == NODE_RX_TYPE_CONNECTION) {
 		struct radio_le_conn_cmplt *radio_le_conn_cmplt;
 		struct connection *conn = NULL;
-		struct pdu_data *pdu_data_rx;
 		u8_t bm;
 
-		pdu_data_rx = (void *)node_rx->pdu_data;
-		radio_le_conn_cmplt = (void *)pdu_data_rx->lldata;
+		radio_le_conn_cmplt = (void *)node_rx->pdu_data;
 		if ((radio_le_conn_cmplt->status == 0x3c) ||
 		    radio_le_conn_cmplt->role) {
 			if (radio_le_conn_cmplt->status == 0x3c) {
