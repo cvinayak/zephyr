@@ -1259,7 +1259,9 @@ static u32_t isr_rx_scan_report(u8_t rssi_ready, u8_t rl_idx, bool dir_report)
 		}
 #endif /* CONFIG_BT_CTLR_ADV_EXT */
 	} else {
+#if defined(CONFIG_BT_OBSERVER)
 		node_rx->hdr.type = NODE_RX_TYPE_REPORT;
+#endif /* CONFIG_BT_OBSERVER */
 	}
 
 	pdu_adv_rx = (void *)node_rx->pdu_data;
@@ -8271,10 +8273,11 @@ static void event_connection_prepare(u32_t ticks_at_expire,
 	 * Encryption setup.
 	 */
 	if ((conn->llcp_ack == conn->llcp_req) && !conn->pause_rx) {
-
+		if (0) {
 #if defined(CONFIG_BT_CTLR_CONN_PARAM_REQ)
 		/* check if CPR procedure is requested */
-		if (conn->llcp_conn_param.ack != conn->llcp_conn_param.req) {
+		} else if (conn->llcp_conn_param.ack !=
+			   conn->llcp_conn_param.req) {
 			/* Stop previous event, to avoid Radio DMA corrupting
 			 * the rx queue.
 			 */
@@ -8283,12 +8286,11 @@ static void event_connection_prepare(u32_t ticks_at_expire,
 			/* handle CPR state machine */
 			event_conn_param_prep(conn, event_counter,
 					      ticks_at_expire);
-		}
 #endif /* CONFIG_BT_CTLR_CONN_PARAM_REQ */
 
 #if defined(CONFIG_BT_CTLR_PHY)
 		/* check if PHY Req procedure is requested */
-		if (conn->llcp_phy.ack != conn->llcp_phy.req) {
+		} else if (conn->llcp_phy.ack != conn->llcp_phy.req) {
 			/* Stop previous event, to avoid Radio DMA corrupting
 			 * the rx queue.
 			 */
@@ -8296,9 +8298,8 @@ static void event_connection_prepare(u32_t ticks_at_expire,
 
 			/* handle PHY Upd state machine */
 			event_phy_req_prep(conn);
-		}
 #endif /* CONFIG_BT_CTLR_PHY */
-
+		}
 	}
 #endif /* CONFIG_BT_CTLR_CONN_PARAM_REQ || CONFIG_BT_CTLR_PHY */
 
@@ -11594,7 +11595,10 @@ void ll_rx_dequeue(void)
 
 	switch (node_rx->hdr.type) {
 	case NODE_RX_TYPE_DC_PDU:
+
+#if defined(CONFIG_BT_OBSERVER)
 	case NODE_RX_TYPE_REPORT:
+#endif /* CONFIG_BT_OBSERVER */
 
 #if defined(CONFIG_BT_CTLR_ADV_EXT)
 	case NODE_RX_TYPE_EXT_1M_REPORT:
@@ -11722,7 +11726,10 @@ void ll_rx_mem_release(void **node_rx)
 
 		switch (_node_rx_free->hdr.type) {
 		case NODE_RX_TYPE_DC_PDU:
+
+#if defined(CONFIG_BT_OBSERVER)
 		case NODE_RX_TYPE_REPORT:
+#endif /* CONFIG_BT_OBSERVER */
 
 #if defined(CONFIG_BT_CTLR_ADV_EXT)
 		case NODE_RX_TYPE_EXT_1M_REPORT:

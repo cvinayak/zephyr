@@ -21,7 +21,7 @@
 #include "ticker/ticker.h"
 
 #include "pdu.h"
-#include "ull_types.h"
+
 #include "lll.h"
 #include "lll_conn.h"
 #include "lll_tmp.h"

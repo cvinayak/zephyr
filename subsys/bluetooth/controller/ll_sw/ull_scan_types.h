@@ -11,6 +11,4 @@ struct ll_scan_set {
 
 	u8_t is_enabled:1;
 	u8_t own_addr_type:2;
-
-	u16_t interval;
 };

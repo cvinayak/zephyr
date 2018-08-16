@@ -2460,6 +2460,7 @@ static inline void le_mesh_scan_report(struct pdu_adv *adv, struct net_buf *buf,
 }
 #endif /* CONFIG_BT_HCI_MESH_EXT */
 
+#if defined(CONFIG_BT_OBSERVER)
 static void le_advertising_report(struct pdu_data *pdu_data, u8_t *b,
 				  struct net_buf *buf)
 {
@@ -2639,6 +2640,7 @@ static void le_adv_ext_coded_report(struct pdu_data *pdu_data, u8_t *b,
 	le_adv_ext_report(pdu_data, b, buf, BIT(2));
 }
 #endif /* CONFIG_BT_CTLR_ADV_EXT */
+#endif /* CONFIG_BT_OBSERVER */
 
 #if defined(CONFIG_BT_CTLR_SCAN_REQ_NOTIFY)
 static void le_scan_req_received(struct pdu_data *pdu_data, u8_t *b,
@@ -2917,12 +2919,15 @@ static void mesh_adv_cplt(struct pdu_data *pdu_data, u8_t *b,
 static void encode_control(struct node_rx_pdu *node_rx,
 			   struct pdu_data *pdu_data, struct net_buf *buf)
 {
+#if defined(CONFIG_BT_OBSERVER) || defined(CONFIG_BT_CTLR_SCAN_REQ_NOTIFY)
 	u8_t *b = (u8_t *)node_rx;
+#endif /* CONFIG_BT_OBSERVER || CONFIG_BT_CTLR_SCAN_REQ_NOTIFY */
 	u16_t handle;
 
 	handle = node_rx->hdr.handle;
 
 	switch (node_rx->hdr.type) {
+#if defined(CONFIG_BT_OBSERVER)
 	case NODE_RX_TYPE_REPORT:
 		le_advertising_report(pdu_data, b, buf);
 		break;
@@ -2936,6 +2941,7 @@ static void encode_control(struct node_rx_pdu *node_rx,
 		le_adv_ext_coded_report(pdu_data, b, buf);
 		break;
 #endif /* CONFIG_BT_CTLR_ADV_EXT */
+#endif /* CONFIG_BT_OBSERVER */
 
 #if defined(CONFIG_BT_CTLR_SCAN_REQ_NOTIFY)
 	case NODE_RX_TYPE_SCAN_REQ:
@@ -3318,24 +3324,38 @@ s8_t hci_get_class(struct node_rx_pdu *node_rx)
 	if (node_rx->hdr.type != NODE_RX_TYPE_DC_PDU) {
 
 		switch (node_rx->hdr.type) {
+#if defined(CONFIG_BT_OBSERVER) || \
+	defined(CONFIG_BT_CTLR_SCAN_REQ_NOTIFY) || \
+	defined(CONFIG_BT_CTLR_ADV_INDICATION) || \
+	defined(CONFIG_BT_CTLR_SCAN_INDICATION) || \
+	defined(CONFIG_BT_CTLR_PROFILE_ISR)
+#if defined(CONFIG_BT_OBSERVER)
 		case NODE_RX_TYPE_REPORT:
+
 #if defined(CONFIG_BT_CTLR_ADV_EXT)
 		case NODE_RX_TYPE_EXT_1M_REPORT:
 		case NODE_RX_TYPE_EXT_CODED_REPORT:
 #endif /* CONFIG_BT_CTLR_ADV_EXT */
+#endif /* CONFIG_BT_OBSERVER */
+
 #if defined(CONFIG_BT_CTLR_SCAN_REQ_NOTIFY)
 		case NODE_RX_TYPE_SCAN_REQ:
 #endif /* CONFIG_BT_CTLR_SCAN_REQ_NOTIFY */
+
 #if defined(CONFIG_BT_CTLR_ADV_INDICATION)
 		case NODE_RX_TYPE_ADV_INDICATION:
 #endif /* CONFIG_BT_CTLR_ADV_INDICATION */
+
 #if defined(CONFIG_BT_CTLR_SCAN_INDICATION)
 		case NODE_RX_TYPE_SCAN_INDICATION:
 #endif /* CONFIG_BT_CTLR_SCAN_INDICATION */
+
 #if defined(CONFIG_BT_CTLR_PROFILE_ISR)
 		case NODE_RX_TYPE_PROFILE:
 #endif /* CONFIG_BT_CTLR_PROFILE_ISR */
+
 			return HCI_CLASS_EVT_DISCARDABLE;
+#endif
 
 #if defined(CONFIG_BT_HCI_MESH_EXT)
 		case NODE_RX_TYPE_MESH_ADV_CPLT:

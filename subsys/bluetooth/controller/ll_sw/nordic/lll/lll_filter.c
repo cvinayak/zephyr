@@ -18,10 +18,13 @@
 
 #include "lll.h"
 #include "lll_adv.h"
+#include "lll_scan.h"
 #include "lll_filter.h"
 
-#include "ull_internal.h"
 #include "ull_adv_types.h"
+#include "ull_scan_types.h"
+
+#include "ull_internal.h"
 #include "ull_adv_internal.h"
 #include "ull_scan_internal.h"
 

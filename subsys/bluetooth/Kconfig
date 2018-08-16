@@ -58,7 +58,6 @@ config BT_PERIPHERAL
 
 config BT_CENTRAL
 	bool "Central Role support"
-	depends on !BT_LL_SW_SPLIT
 	select BT_OBSERVER
 	select BT_CONN
 	default y if BT_HCI_RAW

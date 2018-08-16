@@ -16,14 +16,15 @@ struct lll_adv_pdu {
 struct lll_adv {
 	struct lll_hdr hdr;
 
-	u8_t chan_map:3;
-	u8_t chan_map_curr:3;
-	u8_t filter_policy:2;
-
 #if defined(CONFIG_BT_PERIPHERAL)
+	/* NOTE: conn context has to be after lll_hdr */
 	struct lll_conn *conn;
 	u8_t is_hdcd:1;
 #endif /* CONFIG_BT_PERIPHERAL */
+
+	u8_t chan_map:3;
+	u8_t chan_map_curr:3;
+	u8_t filter_policy:2;
 
 #if defined(CONFIG_BT_CTLR_ADV_EXT)
 	u8_t phy_p:3;

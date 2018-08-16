@@ -35,7 +35,6 @@ static void isr_cleanup(void *param);
 static void isr_race(void *param);
 static u32_t isr_rx_pdu(struct lll_conn *lll, struct pdu_data *pdu_data_rx,
 			struct node_tx **tx_release, u8_t *is_rx_enqueue);
-static void prep_pdu_tx(struct lll_conn *lll, struct pdu_data **pdu_data_tx);
 static struct pdu_data *empty_tx_enqueue(struct lll_conn *lll);
 
 static u16_t const sca_ppm_lut[] = {500, 250, 150, 100, 75, 50, 30, 20};
@@ -64,6 +63,11 @@ int lll_conn_reset(void)
 	}
 
 	return 0;
+}
+
+u8_t lll_conn_sca_local_get(void)
+{
+	return CLOCK_CONTROL_NRF5_K32SRC_ACCURACY;
 }
 
 u32_t lll_conn_ppm_local_get(void)
@@ -98,7 +102,7 @@ void lll_conn_abort_cb(struct lll_prepare_param *prepare_param, void *param)
 		 * After event has been cleanly aborted, clean up resources
 		 * and dispatch event done.
 		 */
-		radio_isr_set(lll_conn_isr_abort, param);
+		radio_isr_set(isr_done, param);
 		radio_disable();
 		return;
 	}
@@ -190,7 +194,7 @@ void lll_conn_isr_rx(void *param)
 
 	/* prepare tx packet */
 	is_empty_pdu_tx_retry = lll->empty;
-	prep_pdu_tx(lll, &pdu_data_tx);
+	lll_conn_pdu_tx_prep(lll, &pdu_data_tx);
 
 	/* Decide on event continuation and hence Radio Shorts to use */
 	is_done = is_crc_backoff || ((crc_ok) && (pdu_data_rx->md == 0) &&
@@ -466,6 +470,16 @@ void lll_conn_tx_pkt_set(struct lll_conn *lll, struct pdu_data *pdu_data_tx)
 	}
 }
 
+void lll_conn_pdu_tx_prep(struct lll_conn *lll, struct pdu_data **pdu_data_tx)
+{
+	struct pdu_data *p;
+
+	/* TODO: */
+	p = empty_tx_enqueue(lll);
+
+	*pdu_data_tx = p;
+}
+
 static int init_reset(void)
 {
 	return 0;
@@ -635,26 +649,24 @@ static u32_t isr_rx_pdu(struct lll_conn *lll, struct pdu_data *pdu_data_rx,
 #endif
 
 #if defined(CONFIG_BT_CTLR_LE_PING)
-		} else if ((_radio.conn_curr->enc_rx) ||
-			   (_radio.conn_curr->pause_rx)) {
-			struct connection *conn = _radio.conn_curr;
+		} else if (lll->enc_rx || lll->pause_rx) {
 			u16_t appto_reload_new;
 
 			/* check for change in apto */
-			appto_reload_new = (conn->apto_reload >
-					    (conn->latency + 6)) ?
-					   (conn->apto_reload -
-					    (conn->latency + 6)) :
-					   conn->apto_reload;
-			if (conn->appto_reload != appto_reload_new) {
-				conn->appto_reload = appto_reload_new;
-				conn->apto_expire = 0;
+			appto_reload_new = (lll->apto_reload >
+					    (lll->latency + 6)) ?
+					   (lll->apto_reload -
+					    (lll->latency + 6)) :
+					   lll->apto_reload;
+			if (lll->appto_reload != appto_reload_new) {
+				lll->appto_reload = appto_reload_new;
+				lll->apto_expire = 0;
 			}
 
 			/* start authenticated payload (pre) timeout */
-			if (conn->apto_expire == 0) {
-				conn->appto_expire = conn->appto_reload;
-				conn->apto_expire = conn->apto_reload;
+			if (lll->apto_expire == 0) {
+				lll->appto_expire = lll->appto_reload;
+				lll->apto_expire = lll->apto_reload;
 			}
 #endif /* CONFIG_BT_CTLR_LE_PING */
 
@@ -670,16 +682,6 @@ static u32_t isr_rx_pdu(struct lll_conn *lll, struct pdu_data *pdu_data_rx,
 	}
 
 	return 0;
-}
-
-static void prep_pdu_tx(struct lll_conn *lll, struct pdu_data **pdu_data_tx)
-{
-	struct pdu_data *p;
-
-	/* TODO: */
-	p = empty_tx_enqueue(lll);
-
-	*pdu_data_tx = p;
 }
 
 static struct pdu_data *empty_tx_enqueue(struct lll_conn *lll)

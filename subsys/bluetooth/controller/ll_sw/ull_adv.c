@@ -24,11 +24,13 @@
 #include "lll.h"
 #include "lll_vendor.h"
 #include "lll_adv.h"
+#include "lll_scan.h"
 #include "lll_conn.h"
 #include "lll_filter.h"
 
 #include "ull.h"
 #include "ull_adv_types.h"
+#include "ull_scan_types.h"
 #include "ull_conn_types.h"
 #include "ull_adv_internal.h"
 #include "ull_scan_internal.h"
@@ -40,7 +42,7 @@
 #include "hal/debug.h"
 
 inline struct ll_adv_set *ull_adv_set_get(u16_t handle);
-inline u16_t ll_adv_handle_get(struct ll_adv_set *adv);
+inline u16_t ull_adv_handle_get(struct ll_adv_set *adv);
 
 static int _init_reset(void);
 static inline struct ll_adv_set *is_disabled_get(u16_t handle);
@@ -529,7 +531,6 @@ u32_t ll_adv_enable(u8_t enable)
 			return BT_HCI_ERR_MEM_CAPACITY_EXCEEDED;
 		}
 
-		/* FIXME: use dedicated rx node for only directed adv timeout */
 		node_rx = ll_rx_alloc();
 		if (!node_rx) {
 			ll_rx_link_release(link);
@@ -547,7 +548,7 @@ u32_t ll_adv_enable(u8_t enable)
 
 		conn_lll = &conn->lll;
 		conn_lll->role = 1;
-		conn_lll->handle = 0xFFFF;
+		conn_lll->handle = ll_conn_handle_get(conn);
 		conn_lll->data_chan_sel = 0;
 		conn_lll->data_chan_use = 0;
 		conn_lll->event_counter = 0;
@@ -669,7 +670,7 @@ u32_t ll_adv_enable(u8_t enable)
 		/* NOTE: using same link as supplied for terminate ind */
 		adv->link_cc_free = link;
 		adv->node_rx_cc_free = node_rx;
-		adv->lll.conn = &conn->lll;
+		lll->conn = conn_lll;
 
 		ull_hdr_init(&conn->ull);
 		lll_hdr_init(&conn->lll, conn);
@@ -871,6 +872,11 @@ inline struct ll_adv_set *ull_adv_set_get(u16_t handle)
 	return &ll_adv[handle];
 }
 
+inline u16_t ull_adv_handle_get(struct ll_adv_set *adv)
+{
+	return ((u8_t *)adv - (u8_t *)ll_adv) / sizeof(*adv);
+}
+
 inline struct ll_adv_set *ull_adv_is_enabled_get(u16_t handle)
 {
 	struct ll_adv_set *adv;
@@ -881,11 +887,6 @@ inline struct ll_adv_set *ull_adv_is_enabled_get(u16_t handle)
 	}
 
 	return adv;
-}
-
-inline u16_t ll_adv_handle_get(struct ll_adv_set *adv)
-{
-	return ((u8_t *)adv - (u8_t *)ll_adv) / sizeof(*adv);
 }
 
 u32_t ull_adv_is_enabled(u16_t handle)
@@ -977,7 +978,8 @@ static void ticker_cb(u32_t ticks_at_expire, u32_t remainder, u16_t lazy,
 		 */
 		ret = ticker_update(TICKER_INSTANCE_ID_CTLR,
 				    TICKER_USER_ID_ULL_HIGH,
-				    TICKER_ID_ADV_BASE + ll_adv_handle_get(adv),
+				    (TICKER_ID_ADV_BASE +
+				     ull_adv_handle_get(adv)),
 				    HAL_TICKER_US_TO_TICKS(random_delay * 1000),
 				    0, 0, 0, 0, 0,
 				    ticker_op_update_cb, adv);
@@ -1019,7 +1021,7 @@ static void ticker_stop_cb(u32_t ticks_at_expire, u32_t remainder, u16_t lazy,
 	}
 #endif
 
-	handle = ll_adv_handle_get(param);
+	handle = ull_adv_handle_get(param);
 	LL_ASSERT(handle < CONFIG_BT_ADV_MAX);
 
 	ret = ticker_stop(TICKER_INSTANCE_ID_CTLR, TICKER_USER_ID_ULL_HIGH,

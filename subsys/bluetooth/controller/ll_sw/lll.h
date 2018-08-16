@@ -9,8 +9,9 @@
 #define EVENT_PIPELINE_MAX            5
 
 #define HDR_ULL(p)     ((void *)((u8_t *)(p) + sizeof(struct evt_hdr)))
-#define HDR_ULL2LLL(p) ((void *)((u8_t *)(p) + sizeof(struct ull_hdr)))
-#define HDR_LLL2EVT(p) ((void *)((struct lll_hdr *)(p))->parent)
+#define HDR_ULL2LLL(p) ((struct lll_hdr *)((u8_t *)(p) + \
+					   sizeof(struct ull_hdr)))
+#define HDR_LLL2EVT(p) ((struct evt_hdr *)((struct lll_hdr *)(p))->parent)
 
 #if defined(CONFIG_BT_CTLR_XTAL_ADVANCED)
 #define XON_BITMASK BIT(31) /* XTAL has been retained from previous prepare */
@@ -110,7 +111,10 @@ enum node_rx_type {
 	NODE_RX_TYPE_NONE,
 	NODE_RX_TYPE_EVENT_DONE,
 	NODE_RX_TYPE_DC_PDU,
+
+#if defined(CONFIG_BT_OBSERVER)
 	NODE_RX_TYPE_REPORT,
+#endif /* CONFIG_BT_OBSERVER */
 
 #if defined(CONFIG_BT_CTLR_ADV_EXT)
 	NODE_RX_TYPE_EXT_1M_REPORT,

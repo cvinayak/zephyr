@@ -41,7 +41,8 @@ static void ticker_op_cb(u32_t status, void *params);
 static void ticker_cb(u32_t ticks_at_expire, u32_t remainder, u16_t lazy,
 		      void *param);
 
-void ull_slave_setup(memq_link_t *link, struct node_rx_hdr *rx)
+void ull_slave_setup(memq_link_t *link, struct node_rx_hdr *rx,
+		     struct node_rx_ftr *ftr, struct lll_conn *lll)
 {
 	u32_t conn_offset_us, conn_interval_us;
 	u8_t ticker_id_adv, ticker_id_conn;
@@ -50,27 +51,20 @@ void ull_slave_setup(memq_link_t *link, struct node_rx_hdr *rx)
 	u32_t mayfly_was_enabled;
 	u32_t ticks_slot_offset;
 	struct pdu_adv *pdu_adv;
-	struct node_rx_ftr *ftr;
 	struct ll_adv_set *adv;
 	struct node_rx_cc *cc;
 	struct ll_conn *conn;
-	struct lll_conn *lll;
 	u32_t ticker_status;
 	u8_t peer_addr_type;
 	u16_t win_offset;
 	u16_t timeout;
 
-	ftr = (void *)((u8_t *)((struct node_rx_pdu *)rx)->pdu +
-		       (offsetof(struct pdu_adv, connect_ind) +
-		       sizeof(struct pdu_adv_connect_ind)));
-
-	adv = ((struct lll_adv *)ftr->param)->hdr.parent;
-	conn = ((struct lll_adv *)ftr->param)->conn->hdr.parent;
 	((struct lll_adv *)ftr->param)->conn = NULL;
 
+	adv = ((struct lll_adv *)ftr->param)->hdr.parent;
+	conn = lll->hdr.parent;
+
 	/* Populate the slave context */
-	lll = &conn->lll;
-	lll->handle = ll_conn_handle_get(conn);
 	pdu_adv = (void *)((struct node_rx_pdu *)rx)->pdu;
 	memcpy(&lll->crc_init[0], &pdu_adv->connect_ind.crc_init[0], 3);
 	memcpy(&lll->access_addr[0], &pdu_adv->connect_ind.access_addr[0], 4);
@@ -79,7 +73,7 @@ void ull_slave_setup(memq_link_t *link, struct node_rx_hdr *rx)
 	lll->data_chan_count = util_ones_count_get(&lll->data_chan_map[0],
 			       sizeof(lll->data_chan_map));
 	lll->data_chan_hop = pdu_adv->connect_ind.hop;
-	lll->conn_interval = pdu_adv->connect_ind.interval;
+	lll->interval = pdu_adv->connect_ind.interval;
 	lll->latency = pdu_adv->connect_ind.latency;
 
 	win_offset = pdu_adv->connect_ind.win_offset;
@@ -121,12 +115,12 @@ void ull_slave_setup(memq_link_t *link, struct node_rx_hdr *rx)
 	memcpy(peer_addr, pdu_adv->connect_ind.init_addr, BDADDR_SIZE);
 	timeout = pdu_adv->connect_ind.timeout;
 
-	cc = (void *)((struct node_rx_pdu *)rx)->pdu;
+	cc = (void *)pdu_adv;
 	cc->status = 0;
 	cc->role = 1;
 	cc->peer_addr_type = peer_addr_type;
 	memcpy(cc->peer_addr, peer_addr, BDADDR_SIZE);
-	cc->interval = lll->conn_interval;
+	cc->interval = lll->interval;
 	cc->latency = lll->latency;
 	cc->timeout = timeout;
 	cc->sca = lll->slave.sca;
@@ -260,7 +254,7 @@ void ull_slave_setup(memq_link_t *link, struct node_rx_hdr *rx)
 #endif
 
 	/* Stop Advertiser */
-	ticker_id_adv = TICKER_ID_ADV_BASE + ll_adv_handle_get(adv);
+	ticker_id_adv = TICKER_ID_ADV_BASE + ull_adv_handle_get(adv);
 	ticker_status = ticker_stop(TICKER_INSTANCE_ID_CTLR,
 				    TICKER_USER_ID_ULL_HIGH,
 				    ticker_id_adv, ticker_op_stop_adv_cb,
@@ -344,6 +338,14 @@ void ull_slave_done(struct node_rx_event_done *done, u32_t *ticks_drift_plus,
 	}
 }
 
+#if defined(CONFIG_BT_CTLR_LE_ENC)
+u8_t ll_start_enc_req_send(u16_t handle, u8_t error_code,
+			    u8_t const *const ltk)
+{
+	return 0;
+}
+#endif /* CONFIG_BT_CTLR_LE_ENC */
+
 static void ticker_op_stop_adv_cb(u32_t status, void *params)
 {
 	/* TODO: */
@@ -412,4 +414,3 @@ static void ticker_cb(u32_t ticks_at_expire, u32_t remainder, u16_t lazy,
 
 	DEBUG_RADIO_PREPARE_S(1);
 }
-

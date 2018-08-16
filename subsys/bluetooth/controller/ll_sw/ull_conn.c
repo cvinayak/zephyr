@@ -20,8 +20,9 @@
 #include "lll.h"
 #include "lll_conn.h"
 #include "ull_conn_types.h"
-#include "ull_slave_internal.h"
 #include "ull_internal.h"
+#include "ull_slave_internal.h"
+#include "ull_master_internal.h"
 
 #include "common/log.h"
 #include <soc.h>
@@ -95,16 +96,6 @@ u8_t ll_conn_update(u16_t handle, u8_t cmd, u8_t status, u16_t interval,
 	return 0;
 }
 
-#if defined(CONFIG_BT_CTLR_LE_ENC)
-#if defined(CONFIG_BT_PERIPHERAL)
-u8_t ll_start_enc_req_send(u16_t handle, u8_t error_code,
-			    u8_t const *const ltk)
-{
-	return 0;
-}
-#endif /* CONFIG_BT_PERIPHERAL */
-#endif /* CONFIG_BT_CTLR_LE_ENC */
-
 int ull_conn_init(void)
 {
 	int err;
@@ -131,13 +122,37 @@ int ull_conn_reset(void)
 
 void ull_conn_setup(memq_link_t *link, struct node_rx_hdr *rx)
 {
-	/* TODO: slave or master */
-	ull_slave_setup(link, rx);
+	struct node_rx_ftr *ftr;
+	struct lll_conn *lll;
+
+	ftr = (void *)((u8_t *)((struct node_rx_pdu *)rx)->pdu +
+		       (offsetof(struct pdu_adv, connect_ind) +
+		       sizeof(struct pdu_adv_connect_ind)));
+
+	lll = *((struct lll_conn **)((u8_t *)ftr->param +
+				     sizeof(struct lll_hdr)));
+	switch (lll->role) {
+#if defined(CONFIG_BT_CENTRAL)
+	case 0:
+		ull_master_setup(link, rx, ftr, lll);
+		break;
+#endif /* CONFIG_BT_CENTRAL */
+
+#if defined(CONFIG_BT_PERIPHERAL)
+	case 1:
+		ull_slave_setup(link, rx, ftr, lll);
+		break;
+#endif /* CONFIG_BT_PERIPHERAL */
+
+	default:
+		LL_ASSERT(0);
+		break;
+	}
 }
 
 void ull_conn_done(struct node_rx_event_done *done)
 {
-	struct lll_conn *lll = HDR_ULL2LLL(done->param);
+	struct lll_conn *lll = (void *)HDR_ULL2LLL(done->param);
 	u32_t ticks_drift_minus;
 	u32_t ticks_drift_plus;
 	u16_t latency_event;

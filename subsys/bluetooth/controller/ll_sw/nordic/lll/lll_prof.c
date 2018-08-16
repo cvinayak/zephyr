@@ -35,12 +35,14 @@ void lll_prof_latency_capture(void)
 #if defined(CONFIG_BT_CTLR_GPIO_PA_PIN)
 static u32_t timestamp_radio_end;
 
-void lll_prof_radio_end_backup(void)
+u32_t lll_prof_radio_end_backup(void)
 {
 	/* PA enable is overwriting packet end used in ISR profiling, hence
 	 * back it up for later use.
 	 */
 	timestamp_radio_end = radio_tmr_end_get();
+
+	return timestamp_radio_end;
 }
 #endif /* !CONFIG_BT_CTLR_GPIO_PA_PIN */
 

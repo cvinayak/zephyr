@@ -90,15 +90,29 @@ if(CONFIG_BT_LL_SW_SPLIT)
       CONFIG_BT_LLL_VENDOR_NORDIC
       ll_sw/nordic/lll/lll_conn.c
       )
-  endif()
-  if(CONFIG_BT_PERIPHERAL)
-    zephyr_library_sources(
-      ll_sw/ull_slave.c
-    )
-    zephyr_library_sources_ifdef(
-      CONFIG_BT_LLL_VENDOR_NORDIC
-      ll_sw/nordic/lll/lll_slave.c
+    if(CONFIG_BT_PERIPHERAL)
+      zephyr_library_sources(
+        ll_sw/ull_slave.c
       )
+      zephyr_library_sources_ifdef(
+        CONFIG_BT_LLL_VENDOR_NORDIC
+        ll_sw/nordic/lll/lll_slave.c
+        )
+    endif()
+    if(CONFIG_BT_CENTRAL)
+      zephyr_library_sources(
+        ll_sw/ull_master.c
+      )
+      zephyr_library_sources_ifdef(
+        CONFIG_BT_LLL_VENDOR_NORDIC
+        ll_sw/nordic/lll/lll_master.c
+        )
+    endif()
+    if(CONFIG_BT_CTLR_SCHED_ADVANCED)
+      zephyr_library_sources(
+        ll_sw/ull_sched.c
+      )
+    endif()
   endif()
   zephyr_library_sources_ifdef(
     CONFIG_BT_CTLR_FILTER

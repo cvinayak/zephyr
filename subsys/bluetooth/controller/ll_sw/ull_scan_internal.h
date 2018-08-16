@@ -9,11 +9,25 @@
 int ull_scan_init(void);
 int ull_scan_reset(void);
 
+/* Set scan parameters */
+u32_t ull_scan_params_set(struct ll_scan_set *scan, u8_t type,
+			  u16_t interval, u16_t window,
+			  u8_t own_addr_type, u8_t filter_policy);
+
 /* Return ll_scan_set context (unconditional) */
 struct ll_scan_set *ull_scan_set_get(u16_t handle);
 
+/* Return the scan set handle given the scan set instance */
+u16_t ull_scan_handle_get(struct ll_scan_set *scan);
+
 /* Return ll_scan_set context if enabled */
 struct ll_scan_set *ull_scan_is_enabled_get(u16_t handle);
+
+/* Return ll_scan_set contesst if disabled */
+struct ll_scan_set *ull_scan_is_disabled_get(u16_t handle);
+
+/* Enable and start scanning/intiating role */
+u32_t ull_scan_enable(struct ll_scan_set *scan);
 
 /* Return flags if enabled */
 u32_t ull_scan_is_enabled(u16_t handle);

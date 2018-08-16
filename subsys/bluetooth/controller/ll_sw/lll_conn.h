@@ -67,7 +67,7 @@ struct lll_conn {
 
 	u16_t handle;
 	u16_t event_counter;
-	u16_t conn_interval;
+	u16_t interval;
 	u16_t latency;
 	u16_t latency_prepare;
 	u16_t latency_event;
@@ -298,6 +298,7 @@ struct lll_conn {
 
 int lll_conn_init(void);
 int lll_conn_reset(void);
+u8_t lll_conn_sca_local_get(void);
 u32_t lll_conn_ppm_local_get(void);
 u32_t lll_conn_ppm_get(u8_t sca);
 void lll_conn_prepare_reset(void);
@@ -309,3 +310,4 @@ void lll_conn_isr_tx(void *param);
 void lll_conn_isr_abort(void *param);
 void lll_conn_rx_pkt_set(struct lll_conn *lll);
 void lll_conn_tx_pkt_set(struct lll_conn *lll, struct pdu_data *pdu_data_tx);
+void lll_conn_pdu_tx_prep(struct lll_conn *lll, struct pdu_data **pdu_data_tx);
