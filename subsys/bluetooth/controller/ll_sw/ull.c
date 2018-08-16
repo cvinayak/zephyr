@@ -25,7 +25,6 @@
 
 #include "pdu.h"
 #include "ll.h"
-#include "ull_types.h"
 #include "lll.h"
 #include "lll_filter.h"
 #include "lll_adv.h"

@@ -103,6 +103,112 @@ struct lll_event {
 	u8_t			 is_aborted:1;
 };
 
+enum node_rx_type {
+	NODE_RX_TYPE_NONE,
+	NODE_RX_TYPE_EVENT_DONE,
+	NODE_RX_TYPE_DC_PDU,
+	NODE_RX_TYPE_REPORT,
+
+#if defined(CONFIG_BT_CTLR_ADV_EXT)
+	NODE_RX_TYPE_EXT_1M_REPORT,
+	NODE_RX_TYPE_EXT_CODED_REPORT,
+#endif /* CONFIG_BT_CTLR_ADV_EXT */
+
+#if defined(CONFIG_BT_CTLR_SCAN_REQ_NOTIFY)
+	NODE_RX_TYPE_SCAN_REQ,
+#endif /* CONFIG_BT_CTLR_SCAN_REQ_NOTIFY */
+
+#if defined(CONFIG_BT_CONN)
+	NODE_RX_TYPE_CONNECTION,
+	NODE_RX_TYPE_TERMINATE,
+	NODE_RX_TYPE_CONN_UPDATE,
+	NODE_RX_TYPE_ENC_REFRESH,
+
+#if defined(CONFIG_BT_CTLR_LE_PING)
+	NODE_RX_TYPE_APTO,
+#endif /* CONFIG_BT_CTLR_LE_PING */
+
+	NODE_RX_TYPE_CHAN_SEL_ALGO,
+
+#if defined(CONFIG_BT_CTLR_PHY)
+	NODE_RX_TYPE_PHY_UPDATE,
+#endif /* CONFIG_BT_CTLR_PHY */
+
+#if defined(CONFIG_BT_CTLR_CONN_RSSI)
+	NODE_RX_TYPE_RSSI,
+#endif /* CONFIG_BT_CTLR_CONN_RSSI */
+#endif /* CONFIG_BT_CONN */
+
+#if defined(CONFIG_BT_CTLR_PROFILE_ISR)
+	NODE_RX_TYPE_PROFILE,
+#endif /* CONFIG_BT_CTLR_PROFILE_ISR */
+
+#if defined(CONFIG_BT_CTLR_ADV_INDICATION)
+	NODE_RX_TYPE_ADV_INDICATION,
+#endif /* CONFIG_BT_CTLR_ADV_INDICATION */
+
+#if defined(CONFIG_BT_CTLR_SCAN_INDICATION)
+	NODE_RX_TYPE_SCAN_INDICATION,
+#endif /* CONFIG_BT_CTLR_SCAN_INDICATION */
+
+#if defined(CONFIG_BT_HCI_MESH_EXT)
+	NODE_RX_TYPE_MESH_ADV_CPLT,
+	NODE_RX_TYPE_MESH_REPORT,
+#endif /* CONFIG_BT_HCI_MESH_EXT */
+};
+
+struct node_rx_hdr {
+	union {
+		void        *next;
+		memq_link_t *link;
+		u8_t        ack_last;
+	};
+
+	enum node_rx_type   type;
+	u16_t               handle;
+};
+
+struct node_rx_ftr {
+	void  *param;
+	u32_t ticks_anchor;
+	u32_t us_radio_end;
+	u32_t us_radio_rdy;
+};
+
+struct node_rx_pdu {
+	struct node_rx_hdr hdr;
+	u8_t               pdu[0];
+};
+
+enum {
+	EVENT_DONE_EXTRA_TYPE_NONE,
+	EVENT_DONE_EXTRA_TYPE_CONN,
+};
+
+struct event_done_extra_slave {
+	u32_t start_to_address_actual_us;
+	u32_t window_widening_event_us;
+	u32_t preamble_to_addr_us;
+};
+
+struct event_done_extra {
+	u8_t type;
+	union {
+		struct {
+			u16_t trx_cnt;
+			union {
+				struct event_done_extra_slave slave;
+			};
+		};
+	};
+};
+
+struct node_rx_event_done {
+	struct node_rx_hdr      hdr;
+	void                    *param;
+	struct event_done_extra extra;
+};
+
 static inline void lll_hdr_init(void *lll, void *parent)
 {
 	struct lll_hdr *hdr = lll;
@@ -129,4 +235,5 @@ void *ull_pdu_rx_alloc_peek_iter(u8_t *idx);
 void *ull_pdu_rx_alloc(void);
 void ull_rx_put(memq_link_t *link, void *rx);
 void ull_rx_sched(void);
+void *ull_event_done_extra_get(void);
 void *ull_event_done(void *param);

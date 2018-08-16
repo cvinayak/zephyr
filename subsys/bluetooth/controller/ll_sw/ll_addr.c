@@ -16,7 +16,7 @@
 #include <misc/slist.h>
 #include "util/util.h"
 #include "util/memq.h"
-#include "ull_types.h"
+#include "lll.h"
 #include "ctrl.h"
 #define ull_adv_is_enabled(x)  ll_adv_is_enabled()
 #define ull_scan_is_enabled(x) ll_scan_is_enabled()

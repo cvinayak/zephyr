@@ -19,8 +19,6 @@
 
 #include "pdu.h"
 
-#include "ull_types.h"
-
 #include "lll.h"
 #include "lll_adv.h"
 #include "lll_conn.h"

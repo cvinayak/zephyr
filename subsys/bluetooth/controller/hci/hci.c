@@ -27,7 +27,6 @@
 #include "hal/ecb.h"
 #include "hal/ccm.h"
 #include "ll_sw/pdu.h"
-#include "ll_sw/ull_types.h"
 #include "ll_sw/lll.h"
 #include "ll_sw/lll_conn.h"
 #include "ll_sw/ull_conn_types.h"

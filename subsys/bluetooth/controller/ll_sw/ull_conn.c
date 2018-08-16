@@ -12,7 +12,6 @@
 #include "util/mem.h"
 #include "util/memq.h"
 
-#include "ull_types.h"
 
 #include "pdu.h"
 #include "lll.h"

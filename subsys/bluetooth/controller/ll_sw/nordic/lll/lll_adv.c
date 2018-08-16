@@ -23,8 +23,6 @@
 
 #include "pdu.h"
 
-#include "ull_types.h"
-
 #include "lll.h"
 #include "lll_vendor.h"
 #include "lll_adv.h"

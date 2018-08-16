@@ -41,7 +41,7 @@
 #endif /* CONFIG_SOC_FAMILY_NRF */
 
 #include "ll_sw/pdu.h"
-#include "ll_sw/ull_types.h"
+#include "ll_sw/lll.h"
 #include "ll.h"
 
 #include "hci_internal.h"

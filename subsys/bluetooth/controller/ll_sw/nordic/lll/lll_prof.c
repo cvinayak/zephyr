@@ -14,8 +14,6 @@
 
 #include "pdu.h"
 
-#include "ull_types.h"
-
 #include "lll.h"
 
 static u8_t latency_min = (u8_t) -1;

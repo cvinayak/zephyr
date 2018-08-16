@@ -20,7 +20,6 @@
 #include "lll_adv.h"
 #include "lll_filter.h"
 
-#include "ull_types.h"
 #include "ull_internal.h"
 #include "ull_adv_types.h"
 #include "ull_adv_internal.h"

@@ -12,7 +12,7 @@
 #include "util/memq.h"
 
 #include "pdu.h"
-#include "ull_types.h"
+#include "lll.h"
 #include "ctrl.h"
 #include "ll.h"
 #include "ll_filter.h"

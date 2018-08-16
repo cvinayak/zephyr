@@ -11,7 +11,7 @@
 #include "util/util.h"
 #include "util/memq.h"
 #include "pdu.h"
-#include "ull_types.h"
+#include "lll.h"
 #include "ctrl.h"
 
 u8_t ll_adv_aux_random_addr_set(u8_t handle, u8_t *addr)

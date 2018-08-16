@@ -1,10 +1,5 @@
 /* NOTE: Definitions used internal to ULL implementations */
 
-struct node_rx_event_done {
-	struct node_rx_hdr hdr;
-	void               *param;
-};
-
 static inline u8_t ull_ref_inc(struct ull_hdr *hdr)
 {
 	return ++hdr->ref;
