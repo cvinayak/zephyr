@@ -82,14 +82,20 @@ void radio_event_callback(void)
 
 ISR_DIRECT_DECLARE(radio_nrf5_isr)
 {
+	DEBUG_RADIO_ISR(1);
+
 	isr_radio();
 
 	ISR_DIRECT_PM();
+
+	DEBUG_RADIO_ISR(0);
 	return 1;
 }
 
 static void rtc0_nrf5_isr(void *arg)
 {
+	DEBUG_TICKER_ISR(1);
+
 	u32_t compare0, compare1;
 
 	/* store interested events */
@@ -111,11 +117,17 @@ static void rtc0_nrf5_isr(void *arg)
 	}
 
 	mayfly_run(MAYFLY_CALL_ID_0);
+
+	DEBUG_TICKER_ISR(0);
 }
 
 static void swi4_nrf5_isr(void *arg)
 {
+	DEBUG_TICKER_JOB(1);
+
 	mayfly_run(MAYFLY_CALL_ID_1);
+
+	DEBUG_TICKER_JOB(0);
 }
 
 int ll_init(struct k_sem *sem_rx)

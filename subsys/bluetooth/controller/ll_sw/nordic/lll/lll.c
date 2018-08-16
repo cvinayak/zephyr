@@ -66,6 +66,8 @@ ISR_DIRECT_DECLARE(radio_nrf5_isr)
 
 static void rtc0_nrf5_isr(void *arg)
 {
+	DEBUG_TICKER_ISR(1);
+
 	/* On compare0 run ticker worker instance0 */
 	if (NRF_RTC0->EVENTS_COMPARE[0]) {
 		NRF_RTC0->EVENTS_COMPARE[0] = 0;
@@ -81,11 +83,17 @@ static void rtc0_nrf5_isr(void *arg)
 	}
 
 	mayfly_run(TICKER_USER_ID_ULL_HIGH);
+
+	DEBUG_TICKER_ISR(0);
 }
 
 static void swi4_nrf5_isr(void *arg)
 {
+	DEBUG_TICKER_JOB(1);
+
 	mayfly_run(TICKER_USER_ID_ULL_LOW);
+
+	DEBUG_TICKER_JOB(0);
 }
 
 int lll_init(void)
