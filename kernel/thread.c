@@ -27,6 +27,7 @@
 #include <kernel_internal.h>
 #include <kswap.h>
 #include <init.h>
+#include <tracing.h>
 
 extern struct _static_thread_data _static_thread_data_list_start[];
 extern struct _static_thread_data _static_thread_data_list_end[];
@@ -294,15 +295,35 @@ void _setup_new_thread(struct k_thread *new_thread,
 {
 	stack_size = adjust_stack_size(stack_size);
 
+#ifdef CONFIG_THREAD_USERSPACE_LOCAL_DATA
+#ifndef CONFIG_THREAD_USERSPACE_LOCAL_DATA_ARCH_DEFER_SETUP
+	/* reserve space on top of stack for local data */
+	stack_size = STACK_ROUND_DOWN(stack_size
+			- sizeof(*new_thread->userspace_local_data));
+#endif
+#endif
+
 	_new_thread(new_thread, stack, stack_size, entry, p1, p2, p3,
 		    prio, options);
+
+#ifdef CONFIG_THREAD_USERSPACE_LOCAL_DATA
+#ifndef CONFIG_THREAD_USERSPACE_LOCAL_DATA_ARCH_DEFER_SETUP
+	/* don't set again if the arch's own code in _new_thread() has
+	 * already set the pointer.
+	 */
+	new_thread->userspace_local_data =
+		(struct _thread_userspace_local_data *)
+		(K_THREAD_STACK_BUFFER(stack) + stack_size);
+#endif
+#endif
+
 #ifdef CONFIG_THREAD_MONITOR
 	new_thread->entry.pEntry = entry;
 	new_thread->entry.parameter1 = p1;
 	new_thread->entry.parameter2 = p2;
 	new_thread->entry.parameter3 = p3;
 
-	int key = irq_lock();
+	unsigned int key = irq_lock();
 
 	new_thread->next_thread = _kernel.threads;
 	_kernel.threads = new_thread;
@@ -312,7 +333,6 @@ void _setup_new_thread(struct k_thread *new_thread,
 	_k_object_init(new_thread);
 	_k_object_init(stack);
 	new_thread->stack_obj = stack;
-	new_thread->errno_location = (int *)K_THREAD_STACK_BUFFER(stack);
 
 	/* Any given thread has access to itself */
 	k_object_access_grant(new_thread, new_thread);
@@ -339,6 +359,7 @@ void _setup_new_thread(struct k_thread *new_thread,
 	new_thread->base.prio_deadline = 0;
 #endif
 	new_thread->resource_pool = _current->resource_pool;
+	sys_trace_thread_create(new_thread);
 }
 
 #ifdef CONFIG_MULTITHREADING
@@ -349,12 +370,14 @@ k_tid_t _impl_k_thread_create(struct k_thread *new_thread,
 			      int prio, u32_t options, s32_t delay)
 {
 	__ASSERT(!_is_in_isr(), "Threads may not be created in ISRs");
+
 	_setup_new_thread(new_thread, stack, stack_size, entry, p1, p2, p3,
 			  prio, options);
 
 	if (delay != K_FOREVER) {
 		schedule_new_thread(new_thread, delay);
 	}
+
 	return new_thread;
 }
 
@@ -448,7 +471,7 @@ int _impl_k_thread_cancel(k_tid_t tid)
 {
 	struct k_thread *thread = tid;
 
-	int key = irq_lock();
+	unsigned int key = irq_lock();
 
 	if (_has_thread_started(thread) ||
 	    !_is_thread_timeout_active(thread)) {
@@ -484,6 +507,8 @@ void _impl_k_thread_suspend(struct k_thread *thread)
 
 	_k_thread_single_suspend(thread);
 
+	sys_trace_thread_suspend(thread);
+
 	if (thread == _current) {
 		_Swap(key);
 	} else {
@@ -507,6 +532,7 @@ void _impl_k_thread_resume(struct k_thread *thread)
 
 	_k_thread_single_resume(thread);
 
+	sys_trace_thread_resume(thread);
 	_reschedule(key);
 }
 
@@ -532,9 +558,8 @@ void _k_thread_single_abort(struct k_thread *thread)
 	}
 
 	thread->base.thread_state |= _THREAD_DEAD;
-#ifdef CONFIG_KERNEL_EVENT_LOGGER_THREAD
-	_sys_k_event_logger_thread_exit(thread);
-#endif
+
+	sys_trace_thread_abort(thread);
 
 #ifdef CONFIG_USERSPACE
 	/* Clear initailized state so that this thread object may be re-used

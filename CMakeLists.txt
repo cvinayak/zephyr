@@ -455,7 +455,7 @@ add_custom_command(OUTPUT include/generated/syscall_dispatch.c ${syscall_list_h}
   --json-file        ${syscalls_json}                     # Read this file
   --base-output      include/generated/syscalls           # Write to this dir
   --syscall-dispatch include/generated/syscall_dispatch.c # Write this file
-  > ${syscall_list_h}                                     # Write stdout to this file
+  --syscall-list     ${syscall_list_h}
   WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   DEPENDS ${syscalls_json}
   )
@@ -618,20 +618,22 @@ if(CONFIG_APPLICATION_MEMORY)
     list(APPEND ks ${fixed_path})
   endforeach()
 
-  # We are done constructing kernel_object_file_list, now we inject this
-  # information into the linker script through -D's
-  list(LENGTH kernel_object_file_list NUM_KERNEL_OBJECT_FILES)
-  list(APPEND LINKER_SCRIPT_DEFINES -DNUM_KERNEL_OBJECT_FILES=${NUM_KERNEL_OBJECT_FILES})
-  set(i 0)
+  # We are done constructing kernel_object_file_list, now we inject
+  # this list into the linker script through the define
+  # KERNELSPACE_OBJECT_FILES
+  set(def -DKERNELSPACE_OBJECT_FILES=)
   foreach(f ${ks})
-    list(APPEND LINKER_SCRIPT_DEFINES -DKERNEL_OBJECT_FILE_${i}=${f})
-    math(EXPR i "${i}+1")
+    set(def "${def} ${f}")
   endforeach()
+  list(APPEND LINKER_SCRIPT_DEFINES ${def})
 endif() # CONFIG_APPLICATION_MEMORY
 
 # Declare MPU userspace dependencies before the linker scripts to make
 # sure the order of dependencies are met
 if(CONFIG_CPU_HAS_MPU AND CONFIG_USERSPACE)
+	if(CONFIG_MPU_REQUIRES_POWER_OF_TWO_ALIGNMENT AND CONFIG_APP_SHARED_MEM )
+    set(APP_SMEM_DEP app_smem_linker)
+  endif()
   if(CONFIG_MPU_REQUIRES_POWER_OF_TWO_ALIGNMENT AND CONFIG_APPLICATION_MEMORY)
     set(ALIGN_SIZING_DEP app_sizing_prebuilt linker_app_sizing_script)
   endif()
@@ -697,6 +699,7 @@ add_custom_target(
   linker_script
   DEPENDS
   ${ALIGN_SIZING_DEP} ${PRIV_STACK_DEP}
+  ${APP_SMEM_DEP}
   linker.cmd
   offsets_h
   )
@@ -718,13 +721,11 @@ set(zephyr_lnk
   ${LINKERFLAGPREFIX},-Map=${PROJECT_BINARY_DIR}/${KERNEL_MAP_NAME}
   -u_OffsetAbsSyms
   -u_ConfigAbsSyms
-  ${LINKERFLAGPREFIX},--start-group
   ${LINKERFLAGPREFIX},--whole-archive
   ${ZEPHYR_LIBS_PROPERTY}
   ${LINKERFLAGPREFIX},--no-whole-archive
   kernel
   ${OFFSETS_O_PATH}
-  ${LINKERFLAGPREFIX},--end-group
   ${LIB_INCLUDE_DIR}
   -L${PROJECT_BINARY_DIR}
   ${TOOLCHAIN_LIBS}
@@ -1008,7 +1009,34 @@ configure_file(
      $ENV{ZEPHYR_BASE}/include/arch/arm/cortex_m/scripts/app_data_alignment.ld
      ${PROJECT_BINARY_DIR}/include/generated/app_data_alignment.ld)
 
+configure_file(
+     $ENV{ZEPHYR_BASE}/include/arch/arm/cortex_m/scripts/app_smem.ld
+     ${PROJECT_BINARY_DIR}/include/generated/app_smem.ld)
+
 if(CONFIG_CPU_HAS_MPU AND CONFIG_USERSPACE)
+
+    if(CONFIG_MPU_REQUIRES_POWER_OF_TWO_ALIGNMENT AND CONFIG_APP_SHARED_MEM)
+        set(APP_SMEM_LD "${PROJECT_BINARY_DIR}/include/generated/app_smem.ld")
+        set(OBJ_FILE_DIR "${PROJECT_BINARY_DIR}/../")
+
+        add_custom_target(
+          ${APP_SMEM_DEP} ALL
+          DEPENDS app
+          DEPENDS ${PRIV_STACK_DEP}
+         )
+
+        add_custom_command(
+          TARGET ${APP_SMEM_DEP}
+          COMMAND ${PYTHON_EXECUTABLE}
+          ${ZEPHYR_BASE}/scripts/gen_app_partitions.py
+          -d ${OBJ_FILE_DIR}
+          -o ${APP_SMEM_LD}
+          $<$<BOOL:${CMAKE_VERBOSE_MAKEFILE}>:--verbose>
+          WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/
+          COMMENT "Generating power of 2 aligned app_smem linker section"
+         )
+  endif()
+
 
   if(CONFIG_MPU_REQUIRES_POWER_OF_TWO_ALIGNMENT AND CONFIG_APPLICATION_MEMORY)
 
@@ -1038,7 +1066,7 @@ if(CONFIG_CPU_HAS_MPU AND CONFIG_USERSPACE)
     add_executable(       app_sizing_prebuilt misc/empty_file.c)
     target_link_libraries(app_sizing_prebuilt ${TOPT} ${PROJECT_BINARY_DIR}/linker_app_sizing.cmd ${zephyr_lnk})
     set_property(TARGET   app_sizing_prebuilt PROPERTY LINK_DEPENDS ${PROJECT_BINARY_DIR}/linker_app_sizing.cmd)
-    add_dependencies(     app_sizing_prebuilt linker_app_sizing_script offsets)
+    add_dependencies(     app_sizing_prebuilt linker_app_sizing_script offsets )
 
     add_custom_command(
       TARGET app_sizing_prebuilt

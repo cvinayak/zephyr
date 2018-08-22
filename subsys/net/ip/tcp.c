@@ -48,11 +48,11 @@ static struct net_tcp tcp_context[NET_MAX_TCP_CONTEXT];
 
 static struct tcp_backlog_entry {
 	struct net_tcp *tcp;
-	struct sockaddr remote;
 	u32_t send_seq;
 	u32_t send_ack;
-	u16_t send_mss;
 	struct k_delayed_work ack_timer;
+	struct sockaddr remote;
+	u16_t send_mss;
 } tcp_backlog[CONFIG_NET_TCP_BACKLOG_SIZE];
 
 #if defined(CONFIG_NET_TCP_ACK_TIMEOUT)
@@ -309,7 +309,7 @@ int net_tcp_release(struct net_tcp *tcp)
 {
 	struct net_pkt *pkt;
 	struct net_pkt *tmp;
-	int key;
+	unsigned int key;
 
 	if (!PART_OF_ARRAY(tcp_context, tcp)) {
 		return -EINVAL;
@@ -361,8 +361,7 @@ static int finalize_segment(struct net_context *context, struct net_pkt *pkt)
 {
 #if defined(CONFIG_NET_IPV4)
 	if (net_pkt_family(pkt) == AF_INET) {
-		return net_ipv4_finalize(pkt,
-					 net_context_get_ip_proto(context));
+		net_ipv4_finalize(pkt, net_context_get_ip_proto(context));
 	} else
 #endif
 #if defined(CONFIG_NET_IPV6)
@@ -451,7 +450,7 @@ static int prepare_segment(struct net_tcp *tcp,
 		if (pkt_allocated) {
 			net_pkt_unref(pkt);
 		} else {
-			pkt->frags = tail;
+			net_pkt_frag_add(pkt, tail);
 		}
 
 		return -ENOMEM;
@@ -940,15 +939,14 @@ static void restart_timer(struct net_tcp *tcp)
 		tcp->flags |= NET_TCP_RETRYING;
 		tcp->retry_timeout_shift = 0;
 		k_delayed_work_submit(&tcp->retry_timer, retry_timeout(tcp));
-	} else if (CONFIG_NET_TCP_TIME_WAIT_DELAY != 0) {
-		if (tcp->fin_sent && tcp->fin_rcvd) {
-			/* We know sent_list is empty, which means if
-			 * fin_sent is true it must have been ACKd
-			 */
-			k_delayed_work_submit(&tcp->retry_timer,
-					      CONFIG_NET_TCP_TIME_WAIT_DELAY);
-			net_context_ref(tcp->context);
-		}
+	} else if (CONFIG_NET_TCP_TIME_WAIT_DELAY != 0 &&
+			(tcp->fin_sent && tcp->fin_rcvd)) {
+		/* We know sent_list is empty, which means if
+		 * fin_sent is true it must have been ACKd
+		 */
+		k_delayed_work_submit(&tcp->retry_timer,
+				      CONFIG_NET_TCP_TIME_WAIT_DELAY);
+		net_context_ref(tcp->context);
 	} else {
 		k_delayed_work_cancel(&tcp->retry_timer);
 		tcp->flags &= ~NET_TCP_RETRYING;
@@ -2357,7 +2355,7 @@ NET_CONN_CB(tcp_syn_rcvd)
 	 * See RFC 793 chapter 3.4 "Reset Processing" and RFC 793, page 65
 	 * for more details.
 	 */
-	if (NET_TCP_FLAGS(tcp_hdr) == NET_TCP_RST) {
+	if (NET_TCP_FLAGS(tcp_hdr) & NET_TCP_RST) {
 
 		if (tcp_backlog_rst(pkt) < 0) {
 			net_stats_update_tcp_seg_rsterr(net_pkt_iface(pkt));

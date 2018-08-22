@@ -92,11 +92,6 @@ packages from their respective websites.
       of the ``--user`` flag, this makes it harder for the Command Prompt
       to find the executables in Python modules installed by ``pip3``.
 
-#. If you require pyocd, an open source python2 library for programming and
-   debugging ARM Cortex-M microcontrollers, use this command::
-
-      pip2 install -r scripts/py2-requirements.txt
-
 #. The build system should now be ready to work with any toolchain installed in
    your system. In the next step you'll find instructions for installing
    toolchains for building both x86 and ARM applications.
@@ -118,7 +113,7 @@ packages from their respective websites.
 
 
    * For ARM, install GNU ARM Embedded from the ARM developer website:
-     `GNU ARM Embedded`_ (install to :file:`c:\\gccarmemb`).
+     `GNU ARM Embedded`_ (install to :file:`c:\\gnuarmemb`).
 
 #. Within the Command Prompt, set up environment variables for the installed
    tools and for the Zephyr environment:
@@ -136,8 +131,8 @@ packages from their respective websites.
 
    .. code-block:: console
 
-      set ZEPHYR_TOOLCHAIN_VARIANT=gccarmemb
-      set GCCARMEMB_TOOLCHAIN_PATH=c:\gccarmemb
+      set ZEPHYR_TOOLCHAIN_VARIANT=gnuarmemb
+      set GNUARMEMB_TOOLCHAIN_PATH=c:\gnuarmemb
 
    To use the same toolchain in new sessions in the future you can set the
    variables in the file :file:`%userprofile%\\zephyrrc.cmd`.
@@ -280,7 +275,7 @@ to set it up:
 
 
    * For ARM, install GNU ARM Embedded from the ARM developer website:
-     `GNU ARM Embedded`_ (install to :file:`c:\\gccarmemb`).
+     `GNU ARM Embedded`_ (install to :file:`c:\\gnuarmemb`).
 
 #. Within the MSYS console, set up environment variables for the installed
    tools and for the Zephyr environment (using the provided shell script):
@@ -298,8 +293,8 @@ to set it up:
 
    .. code-block:: console
 
-      export ZEPHYR_TOOLCHAIN_VARIANT=gccarmemb
-      export GCCARMEMB_TOOLCHAIN_PATH=/c/gccarmemb
+      export ZEPHYR_TOOLCHAIN_VARIANT=gnuarmemb
+      export GNUARMEMB_TOOLCHAIN_PATH=/c/gnuarmemb
 
    And for either, run the provided script to set up zephyr project specific
    variables:

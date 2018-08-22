@@ -191,11 +191,10 @@ from sanity_chk import expr_parser
 log_format = "%(levelname)s %(name)s::%(module)s.%(funcName)s():%(lineno)d: %(message)s"
 logging.basicConfig(format=log_format, level=30)
 
-if "ZEPHYR_BASE" not in os.environ:
+ZEPHYR_BASE = os.environ.get("ZEPHYR_BASE")
+if not ZEPHYR_BASE:
     sys.stderr.write("$ZEPHYR_BASE environment variable undefined.\n")
     exit(1)
-ZEPHYR_BASE = os.environ["ZEPHYR_BASE"]
-
 
 sys.path.insert(0, os.path.join(ZEPHYR_BASE, "scripts/"))
 
@@ -207,7 +206,7 @@ LAST_SANITY_XUNIT = os.path.join(ZEPHYR_BASE, "scripts", "sanity_chk",
                                  "last_sanity.xml")
 RELEASE_DATA = os.path.join(ZEPHYR_BASE, "scripts", "sanity_chk",
                             "sanity_last_release.csv")
-CPU_COUNTS = multiprocessing.cpu_count()
+JOBS = multiprocessing.cpu_count() * 2
 
 if os.isatty(sys.stdout.fileno()):
     TERMINAL = True
@@ -641,7 +640,7 @@ class SizeCalculator:
                    "kobject_data", "mmu_tables", "app_pad", "priv_stacks",
                    "ccm_data", "usb_descriptor", "usb_data", "usb_bos_desc",
                    'log_backends_sections', 'log_dynamic_sections',
-                   'log_const_sections']
+                   'log_const_sections',"app_smem"]
     # These get copied into RAM only on non-XIP
     ro_sections = ["text", "ctors", "init_array", "reset", "object_access",
                    "rodata", "devconfig", "net_l2", "vector", "_bt_settings_area"]
@@ -656,8 +655,12 @@ class SizeCalculator:
         with open(filename, "rb") as f:
             magic = f.read(4)
 
-        if (magic != b'\x7fELF'):
-            raise SanityRuntimeError("%s is not an ELF binary" % filename)
+        try:
+            if (magic != b'\x7fELF'):
+                raise SanityRuntimeError("%s is not an ELF binary" % filename)
+        except Exception as e:
+            print(str(e))
+            sys.exit(2)
 
         # Search for CONFIG_XIP in the ELF's list of symbols using NM and AWK.
         # GREP can not be used as it returns an error if the symbol is not
@@ -667,8 +670,13 @@ class SizeCalculator:
         is_xip_output = subprocess.check_output(
             is_xip_command, shell=True, stderr=subprocess.STDOUT).decode(
             "utf-8").strip()
-        if is_xip_output.endswith("no symbols"):
-            raise SanityRuntimeError("%s has no symbol information" % filename)
+        try:
+            if is_xip_output.endswith("no symbols"):
+                raise SanityRuntimeError("%s has no symbol information" % filename)
+        except Exception as e:
+            print(str(e))
+            sys.exit(2)
+
         self.is_xip = (len(is_xip_output) != 0)
 
         self.filename = filename
@@ -1066,18 +1074,9 @@ class MakeGenerator:
             tf.write("all: %s\n" % (" ".join(self.goals.keys())))
             tf.flush()
 
-            # Normally spawn 2x as many processes as CPUs.  Ninja,
-            # though, seems to have significant parallelism internally
-            # and results in rather high loads, so use 1.5x there to
-            # match what we see with GNU make.
-            loadmul = 2
-            if options.ninja:
-                    loadmul = 1.5
+            cmd = ["make", "-k", "-j", str(JOBS), "-f", tf.name, "all"]
 
-            cmd = ["make", "-k", "-j",
-                   str(int(CPU_COUNTS * loadmul)), "-f", tf.name, "all"]
-            p = subprocess.Popen(cmd, stderr=subprocess.PIPE,
-                                 stdout=devnull)
+            p = subprocess.Popen(cmd, stderr=subprocess.PIPE, stdout=devnull)
 
             for line in iter(p.stderr.readline, b''):
                 line = line.decode("utf-8")
@@ -1296,7 +1295,7 @@ class Platform:
 
     yaml_platform_schema = scl.yaml_load(
         os.path.join(
-            os.environ['ZEPHYR_BASE'],
+            ZEPHYR_BASE,
             "scripts",
             "sanity_chk",
             "sanitycheck-platform-schema.yaml"))
@@ -1311,6 +1310,7 @@ class Platform:
         data = scp.data
 
         self.name = data['identifier']
+        self.sanitycheck = data.get("sanitycheck", True)
         # if no RAM size is specified by the board, take a default of 128K
         self.ram = data.get("ram", 128)
         testing = data.get("testing", {})
@@ -1564,7 +1564,7 @@ class TestSuite:
     config_re = re.compile('(CONFIG_[A-Za-z0-9_]+)[=]\"?([^\"]*)\"?$')
 
     yaml_tc_schema = scl.yaml_load(
-        os.path.join(os.environ['ZEPHYR_BASE'],
+        os.path.join(ZEPHYR_BASE,
                      "scripts", "sanity_chk", "sanitycheck-tc-schema.yaml"))
 
     def __init__(self, board_root_list, testcase_roots, outdir):
@@ -1625,7 +1625,8 @@ class TestSuite:
                 verbose("Found plaform configuration " + fn)
                 try:
                     platform = Platform(fn)
-                    self.platforms.append(platform)
+                    if platform.sanitycheck:
+                        self.platforms.append(platform)
                 except RuntimeError as e:
                     error("E: %s: can't load: %s" % (fn, e))
                     self.load_errors += 1
@@ -1641,8 +1642,14 @@ class TestSuite:
         self.instances = {}
 
     def get_last_failed(self):
-        if not os.path.exists(LAST_SANITY):
-            raise SanityRuntimeError("Couldn't find last sanity run.")
+
+        try:
+            if not os.path.exists(LAST_SANITY):
+                raise SanityRuntimeError("Couldn't find last sanity run.")
+        except Exception as e:
+            print(str(e))
+            sys.exit(2)
+
         result = []
         with open(LAST_SANITY, "r") as fp:
             cr = csv.DictReader(fp)
@@ -1655,9 +1662,14 @@ class TestSuite:
         return result
 
     def load_from_file(self, file):
-        if not os.path.exists(file):
-            raise SanityRuntimeError(
-                "Couldn't find input file with list of tests.")
+        try:
+            if not os.path.exists(file):
+                raise SanityRuntimeError(
+                    "Couldn't find input file with list of tests.")
+        except Exception as e:
+            print(str(e))
+            sys.exit(2)
+
         with open(file, "r") as fp:
             cr = csv.reader(fp)
             instance_list = []
@@ -1678,8 +1690,14 @@ class TestSuite:
 
         toolchain = os.environ.get("ZEPHYR_TOOLCHAIN_VARIANT", None) or \
                     os.environ.get("ZEPHYR_GCC_VARIANT", None)
-        if not toolchain:
-            raise SanityRuntimeError("E: Variable ZEPHYR_TOOLCHAIN_VARIANT is not defined")
+
+
+        try:
+            if not toolchain:
+                raise SanityRuntimeError("E: Variable ZEPHYR_TOOLCHAIN_VARIANT is not defined")
+        except Exception as e:
+            print(str(e))
+            sys.exit(2)
 
 
         instances = []
@@ -1805,8 +1823,13 @@ class TestSuite:
         results = mg.execute(defconfig_cb)
 
         for name, goal in results.items():
-            if goal.failed:
-                raise SanityRuntimeError("Couldn't build some defconfigs")
+            try:
+                if goal.failed:
+                    raise SanityRuntimeError("Couldn't build some defconfigs")
+            except Exception as e:
+                error(str(e))
+                sys.exit(2)
+
 
         for k, out_config in dlist.items():
             test, plat, name = k
@@ -1986,7 +2009,7 @@ class TestSuite:
         self.goals = mg.execute(cb, cb_context)
 
         # Parallelize size calculation
-        executor = concurrent.futures.ThreadPoolExecutor(CPU_COUNTS)
+        executor = concurrent.futures.ThreadPoolExecutor(JOBS)
         futures = [executor.submit(calc_one_elf_size, name, goal)
                    for name, goal in self.goals.items()]
         concurrent.futures.wait(futures)
@@ -2007,8 +2030,13 @@ class TestSuite:
                 cw.writerow(rowdict)
 
     def discard_report(self, filename):
-        if self.discards is None:
-            raise SanityRuntimeError("apply_filters() hasn't been run!")
+
+        try:
+            if self.discards is None:
+                raise SanityRuntimeError("apply_filters() hasn't been run!")
+        except Exception as e:
+            error(str(e))
+            sys.exit(2)
 
         with open(filename, "wt") as csvfile:
             fieldnames = ["test", "arch", "platform", "reason"]
@@ -2026,8 +2054,12 @@ class TestSuite:
         interesting_metrics = [("ram_size", int, True),
                                ("rom_size", int, True)]
 
-        if self.goals is None:
-            raise SanityRuntimeError("execute() hasn't been run!")
+        try:
+            if self.goals is None:
+                raise SanityRuntimeError("execute() hasn't been run!")
+        except Exception as e:
+            print(str(e))
+            sys.exit(2)
 
         if not os.path.exists(filename):
             info("Cannot compare metrics, %s not found" % filename)
@@ -2141,8 +2173,12 @@ class TestSuite:
 
 
     def testcase_xunit_report(self, filename, duration):
-        if self.goals is None:
-            raise SanityRuntimeError("execute() hasn't been run!")
+        try:
+            if self.goals is None:
+                raise SanityRuntimeError("execute() hasn't been run!")
+        except Exception as e:
+            print(str(e))
+            sys.exit(2)
 
         fails = 0
         passes = 0
@@ -2212,8 +2248,12 @@ class TestSuite:
         f.close()
 
     def testcase_report(self, filename):
-        if self.goals is None:
-            raise SanityRuntimeError("execute() hasn't been run!")
+        try:
+            if self.goals is None:
+                raise SanityRuntimeError("execute() hasn't been run!")
+        except Exception as e:
+            print(str(e))
+            sys.exit(2)
 
         with open(filename, "wt") as csvfile:
             fieldnames = ["test", "arch", "platform", "passed", "status",
@@ -2385,8 +2425,8 @@ def parse_arguments():
         help="Only build the code, do not execute any of it in QEMU")
     parser.add_argument(
         "-j", "--jobs", type=int,
-        help="Number of cores to use when building, defaults to "
-        "number of CPUs * 2")
+        help="Number of jobs for building, defaults to number of CPU threads "
+        "overcommited by factor 2")
 
     parser.add_argument(
         "--device-testing", action="store_true",
@@ -2609,7 +2649,7 @@ def generate_coverage(outdir, ignores):
 
 def main():
     start_time = time.time()
-    global VERBOSE, INLINE_LOGS, CPU_COUNTS, log_file
+    global VERBOSE, INLINE_LOGS, JOBS, log_file
     global options
     options = parse_arguments()
 
@@ -2630,8 +2670,15 @@ def main():
     INLINE_LOGS = options.inline_logs
     if options.log_file:
         log_file = open(options.log_file, "w")
+
     if options.jobs:
-        CPU_COUNTS = options.jobs
+        JOBS = options.jobs
+
+    # Decrease JOBS for Ninja, if jobs weren't explicitly set
+    if options.ninja and not options.jobs:
+        JOBS = int(JOBS * 0.75)
+
+    info("JOBS: %d" % JOBS);
 
     if options.subset:
         subset, sets = options.subset.split("/")

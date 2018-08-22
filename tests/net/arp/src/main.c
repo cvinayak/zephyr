@@ -377,7 +377,7 @@ void test_arp(void)
 
 	memcpy(net_buf_add(frag, len), app_data, len);
 
-	pkt2 = net_arp_prepare(pkt);
+	pkt2 = net_arp_prepare(pkt, &NET_IPV4_HDR(pkt)->dst, NULL);
 
 	/* pkt2 is the ARP packet and pkt is the IPv4 packet and it was
 	 * stored in ARP table.
@@ -466,23 +466,17 @@ void test_arp(void)
 
 	if (!net_ipv4_addr_cmp(&arp_hdr->dst_ipaddr,
 			       &NET_IPV4_HDR(pkt)->dst)) {
-		char out[sizeof("xxx.xxx.xxx.xxx")];
-
-		snprintk(out, sizeof(out), "%s",
-			 net_sprint_ipv4_addr(&arp_hdr->dst_ipaddr));
-		printk("ARP IP dest invalid %s, should be %s", out,
-		       net_sprint_ipv4_addr(&NET_IPV4_HDR(pkt)->dst));
+		printk("ARP IP dest invalid %s, should be %s",
+			net_sprint_ipv4_addr(&arp_hdr->dst_ipaddr),
+			net_sprint_ipv4_addr(&NET_IPV4_HDR(pkt)->dst));
 		zassert_true(0, "exiting");
 	}
 
 	if (!net_ipv4_addr_cmp(&arp_hdr->src_ipaddr,
 			       &NET_IPV4_HDR(pkt)->src)) {
-		char out[sizeof("xxx.xxx.xxx.xxx")];
-
-		snprintk(out, sizeof(out), "%s",
-			 net_sprint_ipv4_addr(&arp_hdr->src_ipaddr));
-		printk("ARP IP src invalid %s, should be %s", out,
-		       net_sprint_ipv4_addr(&NET_IPV4_HDR(pkt)->src));
+		printk("ARP IP src invalid %s, should be %s",
+			net_sprint_ipv4_addr(&arp_hdr->src_ipaddr),
+			net_sprint_ipv4_addr(&NET_IPV4_HDR(pkt)->src));
 		zassert_true(0, "exiting");
 	}
 
@@ -497,7 +491,7 @@ void test_arp(void)
 	/* Then a case where target is not in the same subnet */
 	net_ipaddr_copy(&ipv4->dst, &dst_far);
 
-	pkt2 = net_arp_prepare(pkt);
+	pkt2 = net_arp_prepare(pkt, &NET_IPV4_HDR(pkt)->dst, NULL);
 
 	zassert_not_equal((void *)(pkt2), (void *)(pkt),
 		"ARP cache should not find anything");
@@ -510,12 +504,9 @@ void test_arp(void)
 
 	if (!net_ipv4_addr_cmp(&arp_hdr->dst_ipaddr,
 			       &iface->config.ip.ipv4->gw)) {
-		char out[sizeof("xxx.xxx.xxx.xxx")];
-
-		snprintk(out, sizeof(out), "%s",
-			 net_sprint_ipv4_addr(&arp_hdr->dst_ipaddr));
-		printk("ARP IP dst invalid %s, should be %s\n", out,
-			 net_sprint_ipv4_addr(&iface->config.ip.ipv4->gw));
+		printk("ARP IP dst invalid %s, should be %s\n",
+			net_sprint_ipv4_addr(&arp_hdr->dst_ipaddr),
+			net_sprint_ipv4_addr(&iface->config.ip.ipv4->gw));
 		zassert_true(0, "exiting");
 	}
 
@@ -531,7 +522,7 @@ void test_arp(void)
 	 */
 	net_pkt_ref(pkt);
 
-	pkt2 = net_arp_prepare(pkt);
+	pkt2 = net_arp_prepare(pkt, &NET_IPV4_HDR(pkt)->dst, NULL);
 
 	zassert_not_null(pkt2,
 		"ARP cache is not sending the request again");
@@ -548,7 +539,7 @@ void test_arp(void)
 	 */
 	net_pkt_ref(pkt);
 
-	pkt2 = net_arp_prepare(pkt);
+	pkt2 = net_arp_prepare(pkt, &NET_IPV4_HDR(pkt)->dst, NULL);
 
 	zassert_not_null(pkt2,
 		"ARP cache did not send a req");

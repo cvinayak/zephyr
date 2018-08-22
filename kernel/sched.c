@@ -263,7 +263,7 @@ static void pend(struct k_thread *thread, _wait_q_t *wait_q, s32_t timeout)
 	 */
 	if (timeout != K_FOREVER) {
 		s32_t ticks = _TICK_ALIGN + _ms_to_ticks(timeout);
-		int key = irq_lock();
+		unsigned int key = irq_lock();
 
 		_add_thread_timeout(thread, wait_q, ticks);
 		irq_unlock(key);
@@ -371,6 +371,7 @@ void _thread_priority_set(struct k_thread *thread, int prio)
 			thread->base.prio = prio;
 		}
 	}
+	sys_trace_thread_priority_set(thread);
 
 	if (need_sched) {
 		_reschedule(irq_lock());
@@ -591,8 +592,8 @@ struct k_thread *_priq_mq_best(struct _priq_mq *pq)
 }
 
 #ifdef CONFIG_TIMESLICING
-extern s32_t _time_slice_duration;    /* Measured in ms */
-extern s32_t _time_slice_elapsed;     /* Measured in ms */
+extern s32_t _time_slice_duration;    /* Measured in ticks */
+extern s32_t _time_slice_elapsed;     /* Measured in ticks */
 extern int _time_slice_prio_ceiling;
 
 void k_sched_time_slice_set(s32_t duration_in_ms, int prio)
@@ -600,7 +601,7 @@ void k_sched_time_slice_set(s32_t duration_in_ms, int prio)
 	__ASSERT(duration_in_ms >= 0, "");
 	__ASSERT((prio >= 0) && (prio < CONFIG_NUM_PREEMPT_PRIORITIES), "");
 
-	_time_slice_duration = duration_in_ms;
+	_time_slice_duration = _ms_to_ticks(duration_in_ms);
 	_time_slice_elapsed = 0;
 	_time_slice_prio_ceiling = prio;
 }
@@ -689,6 +690,11 @@ void _sched_init(void)
 	for (int i = 0; i < ARRAY_SIZE(_kernel.ready_q.runq.queues); i++) {
 		sys_dlist_init(&_kernel.ready_q.runq.queues[i]);
 	}
+#endif
+
+#ifdef CONFIG_TIMESLICING
+	k_sched_time_slice_set(CONFIG_TIMESLICE_SIZE,
+		CONFIG_TIMESLICE_PRIORITY);
 #endif
 }
 
@@ -834,7 +840,7 @@ Z_SYSCALL_HANDLER(k_sleep, duration)
 
 void _impl_k_wakeup(k_tid_t thread)
 {
-	int key = irq_lock();
+	unsigned int key = irq_lock();
 
 	/* verify first if thread is not waiting on an object */
 	if (_is_thread_pending(thread)) {

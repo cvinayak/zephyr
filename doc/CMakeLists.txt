@@ -23,6 +23,11 @@ else()
   separate_arguments(SPHINXOPTS)
 endif()
 
+if(NOT DEFINED SPHINX_OUTPUT_DIR)
+  set(SPHINX_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/html
+)
+endif()
+
 if(NOT DEFINED DOC_TAG)
   set(DOC_TAG development)
 endif()
@@ -68,10 +73,10 @@ add_custom_target(
 
 add_custom_target(
   content
-  # Copy the .rst files in doc/ to the rst folder
+  # Copy all files in doc/ to the rst folder
   COMMAND ${CMAKE_COMMAND} -E env
   ZEPHYR_BUILD=${CMAKE_CURRENT_BINARY_DIR}
-  ${PYTHON_EXECUTABLE} scripts/extract_content.py ${RST_OUT} doc
+  ${PYTHON_EXECUTABLE} scripts/extract_content.py -a ${RST_OUT} doc
   # Copy the .rst files in samples/ and boards/ to the rst folder
   COMMAND ${CMAKE_COMMAND} -E env
   ZEPHYR_BUILD=${CMAKE_CURRENT_BINARY_DIR}
@@ -99,20 +104,18 @@ add_custom_target(
   ENV_VAR_ARCH=*
   KERNELVERSION=${PROJECT_VERSION}
   SRCARCH=x86
-  ${PYTHON_EXECUTABLE} scripts/genrest.py ../Kconfig ${RST_OUT}/doc/reference/kconfig/
+  ${PYTHON_EXECUTABLE} scripts/genrest.py Kconfig ${RST_OUT}/doc/reference/kconfig/
   WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
 )
 
 set(KI_SCRIPT ${ZEPHYR_BASE}/scripts/filter-known-issues.py)
 set(CONFIG_DIR ${ZEPHYR_BASE}/.known-issues/doc)
-configure_file(${CMAKE_CURRENT_LIST_DIR}/conf.py ${RST_OUT}/doc/conf.py COPYONLY)
-configure_file(${CMAKE_CURRENT_LIST_DIR}/substitutions.txt ${RST_OUT}/doc/substitutions.txt COPYONLY)
 
 add_custom_target(
   html
   COMMAND ${CMAKE_COMMAND} -E env
   ZEPHYR_BUILD=${CMAKE_CURRENT_BINARY_DIR}
-  ${SPHINXBUILD} -w ${SPHINX_LOG} -N -t ${DOC_TAG} -b html ${ALLSPHINXOPTS} ${RST_OUT}/doc ${CMAKE_CURRENT_BINARY_DIR}/html
+  ${SPHINXBUILD} -w ${SPHINX_LOG} -N -t ${DOC_TAG} -b html ${ALLSPHINXOPTS} ${RST_OUT}/doc ${SPHINX_OUTPUT_DIR}
   # Merge the Doxygen and Sphinx logs into a single file
   COMMAND ${CMAKE_COMMAND} -P ${ZEPHYR_BASE}/cmake/util/fmerge.cmake ${DOC_LOG} ${DOXY_LOG} ${SPHINX_LOG}
   COMMAND ${PYTHON_EXECUTABLE} ${KI_SCRIPT} --config-dir ${CONFIG_DIR} --errors ${DOC_WARN} --warnings ${DOC_WARN} ${DOC_LOG}

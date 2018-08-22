@@ -8,10 +8,7 @@
 #define _ksched__h_
 
 #include <kernel_structs.h>
-
-#ifdef CONFIG_KERNEL_EVENT_LOGGER
-#include <logging/kernel_event_logger.h>
-#endif /* CONFIG_KERNEL_EVENT_LOGGER */
+#include <tracing.h>
 
 #ifdef CONFIG_MULTITHREADING
 #define _VALID_PRIO(prio, entry_point) \
@@ -225,9 +222,8 @@ static inline void _ready_thread(struct k_thread *thread)
 		_add_thread_to_ready_q(thread);
 	}
 
-#ifdef CONFIG_KERNEL_EVENT_LOGGER_THREAD
-	_sys_k_event_logger_thread_ready(thread);
-#endif
+	sys_trace_thread_ready(thread);
+
 }
 
 static inline void _ready_one_thread(_wait_q_t *wq)

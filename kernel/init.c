@@ -31,6 +31,7 @@
 #include <kswap.h>
 #include <entropy.h>
 #include <logging/log_ctrl.h>
+#include <tracing.h>
 
 /* kernel build timestamp items */
 #define BUILD_TIMESTAMP "BUILD: " __DATE__ " " __TIME__
@@ -181,14 +182,18 @@ void _bss_zero(void)
  */
 void _data_copy(void)
 {
-	memcpy(&__data_ram_start, &__data_rom_start,
+	(void)memcpy(&__data_ram_start, &__data_rom_start,
 		 ((u32_t) &__data_ram_end - (u32_t) &__data_ram_start));
 #ifdef CONFIG_CCM_BASE_ADDRESS
-	memcpy(&__ccm_data_start, &__ccm_data_rom_start,
+	(void)memcpy(&__ccm_data_start, &__ccm_data_rom_start,
 		 ((u32_t) &__ccm_data_end - (u32_t) &__ccm_data_start));
 #endif
+#ifdef CONFIG_APP_SHARED_MEM
+	(void)memcpy(&_app_smem_start, &_app_smem_rom_start,
+		 ((u32_t) &_app_smem_end - (u32_t) &_app_smem_start));
+#endif
 #ifdef CONFIG_APPLICATION_MEMORY
-	memcpy(&__app_data_ram_start, &__app_data_rom_start,
+	(void)memcpy(&__app_data_ram_start, &__app_data_rom_start,
 		 ((u32_t) &__app_data_ram_end - (u32_t) &__app_data_ram_start));
 #endif
 }
@@ -330,12 +335,16 @@ static void prepare_multithreading(struct k_thread *dummy_thread)
 			  MAIN_STACK_SIZE, bg_thread_main,
 			  NULL, NULL, NULL,
 			  CONFIG_MAIN_THREAD_PRIORITY, K_ESSENTIAL);
+
+	sys_trace_thread_create(_main_thread);
+
 	_mark_thread_as_started(_main_thread);
 	_ready_thread(_main_thread);
 
 #ifdef CONFIG_MULTITHREADING
 	init_idle_thread(_idle_thread, _idle_stack);
 	_kernel.cpus[0].idle_thread = _idle_thread;
+	sys_trace_thread_create(_idle_thread);
 #endif
 
 #if defined(CONFIG_SMP) && CONFIG_MP_NUM_CPUS > 1

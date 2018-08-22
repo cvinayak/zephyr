@@ -103,12 +103,19 @@ Follow these steps to create a new application directory. (Refer to
 
 #. Create an empty :file:`CMakeLists.txt` file in your application directory.
 
-#. Include the :file:`boilerplate.cmake` to pull in the Zephyr build system:
+#. Add boilerplate code that sets the minimum CMake version and pulls
+   in the Zephyr build system:
 
    .. code-block:: cmake
 
+      cmake_minimum_required(VERSION 3.8.2)
       include($ENV{ZEPHYR_BASE}/cmake/app/boilerplate.cmake NO_POLICY_SCOPE)
       project(NONE)
+
+   .. note:: cmake_minimum_required is also invoked from
+             :file:`boilerplate.cmake`. The most recent of the two
+             versions will be enforced by CMake.
+
 
 #. Place your application source code in the :file:`src` sub-directory. For
    this example, we'll assume you created a file named :file:`src/main.c`.
@@ -674,9 +681,8 @@ Create a Debugger Configuration
 RTOS Awareness
 ==============
 
-Experimental support for Zephyr RTOS awareness is implemented in `pyOCD PR
-#333`_. It is compatible with GDB PyOCD Debugging in Eclipse, but you must
-download this pull request and build pyOCD from source. You must also enable
+Support for Zephyr RTOS awareness is implemented in `pyOCD v0.11.0`_ and later.
+It is compatible with GDB PyOCD Debugging in Eclipse, but you must enable
 CONFIG_OPENOCD_SUPPORT=y in your application.
 
 CMake Details
@@ -798,19 +804,18 @@ Make sure to follow these steps in order.
 
       set(KCONFIG_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/Kconfig)
 
-   Make sure to include the following lines in your :file:`Kconfig` file before
-   any application-specific configuration options:
+   Structure your :file:`Kconfig` file like this:
 
    .. literalinclude:: application-kconfig.include
 
    .. note::
 
        Environment variables in ``source`` statements are expanded directly,
-       so you do not need to define a ``option env="ZEPHYR_BASE"`` Kconfig
+       so you do not need to define an ``option env="ZEPHYR_BASE"`` Kconfig
        "bounce" symbol. If you use such a symbol, it must have the same name as
        the environment variable.
 
-       See the :ref:`kconfig_extensions_and_changes` section in the
+       See the :ref:`kconfig_extensions` section in the
        :ref:`board_porting_guide` for more information.
 
 #. Now include the mandatory boilerplate that integrates the
@@ -1191,4 +1196,4 @@ project that demonstrates some of these features.
 
 .. _Eclipse IDE for C/C++ Developers: https://www.eclipse.org/downloads/packages/eclipse-ide-cc-developers/oxygen2
 .. _GNU MCU Eclipse plug-ins: https://gnu-mcu-eclipse.github.io/plugins/install/
-.. _pyOCD PR #333: https://github.com/mbedmicro/pyOCD/pull/333
+.. _pyOCD v0.11.0: https://github.com/mbedmicro/pyOCD/releases/tag/v0.11.0

@@ -9,10 +9,9 @@
 #include <logging/log_backend.h>
 #include <logging/log_ctrl.h>
 #include <logging/log_output.h>
+#include <logging/log_backend_uart.h>
 #include <misc/printk.h>
 #include <assert.h>
-#include <atomic.h>
-#include <stdio.h>
 #include <atomic.h>
 
 #ifndef CONFIG_LOG_PRINTK_MAX_STRING_LENGTH
@@ -20,8 +19,10 @@
 #endif
 
 #ifdef CONFIG_LOG_BACKEND_UART
-#include <logging/log_backend_uart.h>
 LOG_BACKEND_UART_DEFINE(log_backend_uart);
+const struct log_backend *uart_backend = &log_backend_uart;
+#else
+const struct log_backend *uart_backend;
 #endif
 
 static struct log_list_t list;
@@ -48,14 +49,6 @@ static inline void msg_finalize(struct log_msg *msg,
 
 	atomic_inc(&buffered_cnt);
 
-	if (!IS_ENABLED(CONFIG_LOG_INPLACE_PROCESS) &&
-	    CONFIG_LOG_PROCESS_TRIGGER_THRESHOLD) {
-		if (buffered_cnt == CONFIG_LOG_PROCESS_TRIGGER_THRESHOLD &&
-		    proc_tid) {
-			k_wakeup(proc_tid);
-		}
-	}
-
 	key = irq_lock();
 
 	log_list_add_tail(&list, msg);
@@ -64,6 +57,12 @@ static inline void msg_finalize(struct log_msg *msg,
 
 	if (IS_ENABLED(CONFIG_LOG_INPLACE_PROCESS) || panic_mode) {
 		(void)log_process(false);
+	} else if (!IS_ENABLED(CONFIG_LOG_INPLACE_PROCESS) &&
+		   CONFIG_LOG_PROCESS_TRIGGER_THRESHOLD) {
+		if (buffered_cnt == CONFIG_LOG_PROCESS_TRIGGER_THRESHOLD &&
+		    proc_tid) {
+			k_wakeup(proc_tid);
+		}
 	}
 }
 
@@ -132,11 +131,12 @@ void log_n(const char *str,
 	msg_finalize(msg, src_level);
 }
 
-void log_hexdump(const u8_t *data,
+void log_hexdump(const char *str,
+		 const u8_t *data,
 		 u32_t length,
 		 struct log_msg_ids src_level)
 {
-	struct log_msg *msg = log_msg_hexdump_create(data, length);
+	struct log_msg *msg = log_msg_hexdump_create(str, data, length);
 
 	if (msg == NULL) {
 		return;
@@ -153,13 +153,13 @@ int log_printk(const char *fmt, va_list ap)
 		struct log_msg *msg;
 		int length;
 
-		length = vsnprintf(formatted_str,
+		length = vsnprintk(formatted_str,
 				   sizeof(formatted_str), fmt, ap);
 
 		length = (length > sizeof(formatted_str)) ?
 			 sizeof(formatted_str) : length;
 
-		msg = log_msg_hexdump_create(formatted_str, length);
+		msg = log_msg_hexdump_create(NULL, formatted_str, length);
 		if (!msg) {
 			return 0;
 		}
@@ -197,17 +197,46 @@ void log_core_init(void)
 	log_msg_pool_init();
 	log_list_init(&list);
 
-	/* No backends attached so far but set default level as a filter for
-	 * any source of logging in the system. When backends are attached later
-	 * logs will be filtered out during processing.
+	/*
+	 * Initialize aggregated runtime filter levels (no backends are
+	 * attached yet, so leave backend slots in each dynamic filter set
+	 * alone for now).
+	 *
+	 * Each log source's aggregated runtime level is set to match its
+	 * compile-time level. When backends are attached later on in
+	 * log_init(), they'll be initialized to the same value.
 	 */
 	if (IS_ENABLED(CONFIG_LOG_RUNTIME_FILTERING)) {
 		for (int i = 0; i < log_sources_count(); i++) {
 			u32_t *filters = log_dynamic_filters_get(i);
+			u8_t level = log_compiled_level_get(i);
 
 			LOG_FILTER_SLOT_SET(filters,
 					    LOG_FILTER_AGGR_SLOT_IDX,
-					    CONFIG_LOG_DEFAULT_LEVEL);
+					    level);
+		}
+	}
+}
+
+/*
+ * Initialize a backend's runtime filters to match the compile-time
+ * settings.
+ *
+ * (Aggregated filters were already set up in log_core_init().
+ */
+static void backend_filter_init(struct log_backend const *const backend)
+{
+	u8_t level;
+	int i;
+
+	if (IS_ENABLED(CONFIG_LOG_RUNTIME_FILTERING)) {
+		for (i = 0; i < log_sources_count(); i++) {
+			level = log_compiled_level_get(i);
+
+			log_filter_set(backend,
+				       CONFIG_LOG_DOMAIN_ID,
+				       i,
+				       level);
 		}
 	}
 }
@@ -231,12 +260,11 @@ void log_init(void)
 				   i + LOG_FILTER_FIRST_BACKEND_SLOT_IDX);
 	}
 
-#ifdef CONFIG_LOG_BACKEND_UART
-	log_backend_uart_init();
-	log_backend_enable(&log_backend_uart,
-			   NULL,
-			   CONFIG_LOG_DEFAULT_LEVEL);
-#endif
+	if (IS_ENABLED(CONFIG_LOG_BACKEND_UART)) {
+		backend_filter_init(uart_backend);
+		log_backend_uart_init();
+		log_backend_activate(uart_backend, NULL);
+	}
 }
 
 static void thread_set(k_tid_t process_tid)
@@ -430,8 +458,8 @@ void log_backend_enable(struct log_backend const *const backend,
 			void *ctx,
 			u32_t level)
 {
-	log_backend_activate(backend, ctx);
 	backend_filter_set(backend, level);
+	log_backend_activate(backend, ctx);
 }
 
 void log_backend_disable(struct log_backend const *const backend)

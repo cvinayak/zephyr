@@ -15,6 +15,7 @@
 
 #if !defined(_ASMLANGUAGE)
 #include <kernel_includes.h>
+#include <errno.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -502,6 +503,12 @@ struct _mem_domain_info {
 
 #endif /* CONFIG_USERSPACE */
 
+#ifdef CONFIG_THREAD_USERSPACE_LOCAL_DATA
+struct _thread_userspace_local_data {
+	int errno_var;
+};
+#endif
+
 /**
  * @ingroup thread_apis
  * Thread Structure
@@ -537,14 +544,12 @@ struct k_thread {
 	void *custom_data;
 #endif
 
+#ifdef CONFIG_THREAD_USERSPACE_LOCAL_DATA
+	struct _thread_userspace_local_data *userspace_local_data;
+#endif
+
 #ifdef CONFIG_ERRNO
-#ifdef CONFIG_USERSPACE
-	/* Set to the lowest area in the thread stack since this needs to
-	 * be directly read/writable by user mode. Not ideal, but best we
-	 * can do until we have thread-local storage
-	 */
-	int *errno_location;
-#else
+#ifndef CONFIG_USERSPACE
 	/** per-thread errno variable */
 	int errno_var;
 #endif
@@ -657,13 +662,13 @@ extern void k_thread_foreach(k_thread_user_cb_t user_cb, void *user_data);
  * @brief system thread that must not abort
  * @req K-THREAD-000
  * */
-#define K_ESSENTIAL (1 << 0)
+#define K_ESSENTIAL (BIT(0))
 
 #if defined(CONFIG_FP_SHARING)
 /**
  * @brief thread uses floating point registers
  */
-#define K_FP_REGS (1 << 1)
+#define K_FP_REGS (BIT(1))
 #endif
 
 /**
@@ -672,7 +677,7 @@ extern void k_thread_foreach(k_thread_user_cb_t user_cb, void *user_data);
  * This thread has dropped from supervisor mode to user mode and consequently
  * has additional restrictions
  */
-#define K_USER (1 << 2)
+#define K_USER (BIT(2))
 
 /**
  * @brief Inherit Permissions
@@ -682,14 +687,14 @@ extern void k_thread_foreach(k_thread_user_cb_t user_cb, void *user_data);
  * permissions from the thread that created it. No effect if CONFIG_USERSPACE
  * is not enabled.
  */
-#define K_INHERIT_PERMS (1 << 3)
+#define K_INHERIT_PERMS (BIT(3))
 
 #ifdef CONFIG_X86
 /* x86 Bitmask definitions for threads user options */
 
 #if defined(CONFIG_FP_SHARING) && defined(CONFIG_SSE)
 /* thread uses SSEx (and also FP) registers */
-#define K_SSE_REGS (1 << 7)
+#define K_SSE_REGS (BIT(7))
 #endif
 #endif
 
@@ -1356,9 +1361,9 @@ static ALWAYS_INLINE s32_t _ms_to_ticks(s32_t ms)
 
 #ifdef _NEED_PRECISE_TICK_MS_CONVERSION
 	/* use 64-bit math to keep precision */
-	s64_t ms_ticks_per_sec = (s64_t)ms * sys_clock_ticks_per_sec;
-
-	return (s32_t)ceiling_fraction(ms_ticks_per_sec, MSEC_PER_SEC);
+	return (s32_t)ceiling_fraction(
+		(s64_t)ms * sys_clock_hw_cycles_per_sec,
+		(s64_t)MSEC_PER_SEC * sys_clock_hw_cycles_per_tick);
 #else
 	/* simple division keeps precision */
 	s32_t ms_per_tick = MSEC_PER_SEC / sys_clock_ticks_per_sec;
@@ -1668,19 +1673,19 @@ __syscall s64_t k_uptime_get(void);
  *
  * @retval prev_status Previous status of always on flag
  */
-#ifdef CONFIG_TICKLESS_KERNEL
 static inline int k_enable_sys_clock_always_on(void)
 {
+#ifdef CONFIG_TICKLESS_KERNEL
 	int prev_status = _sys_clock_always_on;
 
 	_sys_clock_always_on = 1;
 	_enable_sys_clock();
 
 	return prev_status;
-}
 #else
-#define k_enable_sys_clock_always_on() do { } while ((0))
+	return -ENOTSUP;
 #endif
+}
 
 /**
  * @brief Disable clock always on in tickless kernel
@@ -1690,14 +1695,12 @@ static inline int k_enable_sys_clock_always_on(void)
  * scheduling. To save power, this routine should be called
  * immediately when clock is not used to track time.
  */
-#ifdef CONFIG_TICKLESS_KERNEL
 static inline void k_disable_sys_clock_always_on(void)
 {
+#ifdef CONFIG_TICKLESS_KERNEL
 	_sys_clock_always_on = 0;
-}
-#else
-#define k_disable_sys_clock_always_on() do { } while ((0))
 #endif
+}
 
 /**
  * @brief Get system uptime (32-bit version).
@@ -4964,6 +4967,7 @@ inline void *operator new[](size_t size, void *ptr)
 
 #endif /* defined(CONFIG_CPLUSPLUS) && defined(__cplusplus) */
 
+#include <tracing.h>
 #include <syscalls/kernel.h>
 
 #endif /* !_ASMLANGUAGE */

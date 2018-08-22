@@ -17,8 +17,20 @@
 #include <device.h>
 #include <init.h>
 #include <logging/sys_log.h>
+#if defined(CONFIG_NETWORKING) && defined (CONFIG_DYNAMIC_OBJECTS)
+/* Used by auto-generated obj_size_get() switch body, as we need to
+ * know the size of struct net_context
+ */
+#include <net/net_context.h>
+#endif
 
 #define MAX_THREAD_BITS		(CONFIG_MAX_THREAD_BYTES * 8)
+
+#ifdef CONFIG_DYNAMIC_OBJECTS
+extern u8_t _thread_idx_map[CONFIG_MAX_THREAD_BYTES];
+#endif
+
+static void clear_perms_cb(struct _k_object *ko, void *ctx_ptr);
 
 const char *otype_to_str(enum k_objects otype)
 {
@@ -103,7 +115,7 @@ static struct dyn_obj *dyn_object_find(void *obj)
 {
 	struct rbnode *node;
 	struct dyn_obj *ret;
-	int key;
+	unsigned int key;
 
 	/* For any dynamically allocated kernel object, the object
 	 * pointer is just a member of the conatining struct dyn_obj,
@@ -123,10 +135,74 @@ static struct dyn_obj *dyn_object_find(void *obj)
 	return ret;
 }
 
+/**
+ * @internal
+ *
+ * @brief Allocate a new thread index for a new thread.
+ *
+ * This finds an unused thread index that can be assigned to a new
+ * thread. If too many threads have been allocated, the kernel will
+ * run out of indexes and this function will fail.
+ *
+ * Note that if an unused index is found, that index will be marked as
+ * used after return of this function.
+ *
+ * @param tidx The new thread index if successful
+ *
+ * @return 1 if successful, 0 if failed
+ **/
+static int _thread_idx_alloc(u32_t *tidx)
+{
+	int i;
+	int idx;
+	int base;
+
+	base = 0;
+	for (i = 0; i < CONFIG_MAX_THREAD_BYTES; i++) {
+		idx = find_lsb_set(_thread_idx_map[i]);
+
+		if (idx) {
+			*tidx = base + (idx - 1);
+
+			sys_bitfield_clear_bit((mem_addr_t)_thread_idx_map,
+					       *tidx);
+
+			/* Clear permission from all objects */
+			_k_object_wordlist_foreach(clear_perms_cb,
+						   (void *)*tidx);
+
+			return 1;
+		}
+
+		base += 8;
+	}
+
+	return 0;
+}
+
+/**
+ * @internal
+ *
+ * @brief Free a thread index.
+ *
+ * This frees a thread index so it can be used by another
+ * thread.
+ *
+ * @param tidx The thread index to be freed
+ **/
+static void _thread_idx_free(u32_t tidx)
+{
+	/* To prevent leaked permission when index is recycled */
+	_k_object_wordlist_foreach(clear_perms_cb, (void *)tidx);
+
+	sys_bitfield_set_bit((mem_addr_t)_thread_idx_map, tidx);
+}
+
 void *_impl_k_object_alloc(enum k_objects otype)
 {
 	struct dyn_obj *dyn_obj;
-	int key;
+	unsigned int key;
+	u32_t tidx;
 
 	/* Stacks are not supported, we don't yet have mem pool APIs
 	 * to request memory that is aligned
@@ -146,6 +222,16 @@ void *_impl_k_object_alloc(enum k_objects otype)
 	dyn_obj->kobj.flags = K_OBJ_FLAG_ALLOC;
 	memset(dyn_obj->kobj.perms, 0, CONFIG_MAX_THREAD_BYTES);
 
+	/* Need to grab a new thread index for k_thread */
+	if (otype == K_OBJ_THREAD) {
+		if (!_thread_idx_alloc(&tidx)) {
+			k_free(dyn_obj);
+			return NULL;
+		}
+
+		dyn_obj->kobj.data = tidx;
+	}
+
 	/* The allocating thread implicitly gets permission on kernel objects
 	 * that it allocates
 	 */
@@ -162,7 +248,7 @@ void *_impl_k_object_alloc(enum k_objects otype)
 void k_object_free(void *obj)
 {
 	struct dyn_obj *dyn_obj;
-	int key;
+	unsigned int key;
 
 	/* This function is intentionally not exposed to user mode.
 	 * There's currently no robust way to track that an object isn't
@@ -174,6 +260,10 @@ void k_object_free(void *obj)
 	if (dyn_obj) {
 		rb_remove(&obj_rb_tree, &dyn_obj->node);
 		sys_dlist_remove(&dyn_obj->obj_list);
+
+		if (dyn_obj->kobj.type == K_OBJ_THREAD) {
+			_thread_idx_free(dyn_obj->kobj.data);
+		}
 	}
 	irq_unlock(key);
 
@@ -202,7 +292,7 @@ struct _k_object *_k_object_find(void *obj)
 
 void _k_object_wordlist_foreach(_wordlist_cb_func_t func, void *context)
 {
-	int key;
+	unsigned int key;
 	struct dyn_obj *obj, *next;
 
 	_k_object_gperf_wordlist_foreach(func, context);
@@ -303,7 +393,7 @@ void _thread_perms_clear(struct _k_object *ko, struct k_thread *thread)
 	int index = thread_index_get(thread);
 
 	if (index != -1) {
-		int key = irq_lock();
+		unsigned int key = irq_lock();
 
 		sys_bitfield_clear_bit((mem_addr_t)&ko->perms, index);
 		unref_check(ko);
@@ -314,7 +404,7 @@ void _thread_perms_clear(struct _k_object *ko, struct k_thread *thread)
 static void clear_perms_cb(struct _k_object *ko, void *ctx_ptr)
 {
 	int id = (int)ctx_ptr;
-	int key = irq_lock();
+	unsigned int key = irq_lock();
 
 	sys_bitfield_clear_bit((mem_addr_t)&ko->perms, id);
 	unref_check(ko);
@@ -462,6 +552,17 @@ void _k_object_init(void *object)
 	ko->flags |= K_OBJ_FLAG_INITIALIZED;
 }
 
+void _k_object_recycle(void *object)
+{
+	struct _k_object *ko = _k_object_find(object);
+
+	if (ko) {
+		memset(ko->perms, 0, sizeof(ko->perms));
+		_thread_perms_set(ko, k_current_get());
+		ko->flags |= K_OBJ_FLAG_INITIALIZED;
+	}
+}
+
 void _k_object_uninit(void *object)
 {
 	struct _k_object *ko;
@@ -474,6 +575,125 @@ void _k_object_uninit(void *object)
 
 	ko->flags &= ~K_OBJ_FLAG_INITIALIZED;
 }
+
+/*
+ * Copy to/from helper functions used in syscall handlers
+ */
+void *z_user_alloc_from_copy(void *src, size_t size)
+{
+	void *dst = NULL;
+	unsigned int key;
+
+	key = irq_lock();
+
+	/* Does the caller in user mode have access to read this memory? */
+	if (Z_SYSCALL_MEMORY_READ(src, size)) {
+		goto out_err;
+	}
+
+	dst = z_thread_malloc(size);
+	if (!dst) {
+		printk("out of thread resource pool memory (%zu)", size);
+		goto out_err;
+	}
+
+	(void)memcpy(dst, src, size);
+out_err:
+	irq_unlock(key);
+	return dst;
+}
+
+static int user_copy(void *dst, void *src, size_t size, bool to_user)
+{
+	int ret = EFAULT;
+	unsigned int key;
+
+	key = irq_lock();
+
+	/* Does the caller in user mode have access to this memory? */
+	if (to_user ? Z_SYSCALL_MEMORY_WRITE(dst, size) :
+			Z_SYSCALL_MEMORY_READ(src, size)) {
+		goto out_err;
+	}
+
+	(void)memcpy(dst, src, size);
+	ret = 0;
+out_err:
+	irq_unlock(key);
+	return ret;
+}
+
+int z_user_from_copy(void *dst, void *src, size_t size)
+{
+	return user_copy(dst, src, size, false);
+}
+
+int z_user_to_copy(void *dst, void *src, size_t size)
+{
+	return user_copy(dst, src, size, true);
+}
+
+char *z_user_string_alloc_copy(char *src, size_t maxlen)
+{
+	unsigned long actual_len;
+	int err;
+	unsigned int key;
+	char *ret = NULL;
+
+	key = irq_lock();
+	actual_len = z_user_string_nlen(src, maxlen, &err);
+	if (err) {
+		goto out;
+	}
+	if (actual_len == maxlen) {
+		/* Not NULL terminated */
+		printk("string too long %p (%lu)\n", src, actual_len);
+		goto out;
+	}
+	if (__builtin_uaddl_overflow(actual_len, 1, &actual_len)) {
+		printk("overflow\n");
+		goto out;
+	}
+
+	ret = z_user_alloc_from_copy(src, actual_len);
+out:
+	irq_unlock(key);
+	return ret;
+}
+
+int z_user_string_copy(char *dst, char *src, size_t maxlen)
+{
+	unsigned long actual_len;
+	int ret, err;
+	unsigned int key;
+
+	key = irq_lock();
+	actual_len = z_user_string_nlen(src, maxlen, &err);
+	if (err) {
+		ret = EFAULT;
+		goto out;
+	}
+	if (actual_len == maxlen) {
+		/* Not NULL terminated */
+		printk("string too long %p (%lu)\n", src, actual_len);
+		ret = EINVAL;
+		goto out;
+	}
+	if (__builtin_uaddl_overflow(actual_len, 1, &actual_len)) {
+		printk("overflow\n");
+		ret = EINVAL;
+		goto out;
+	}
+
+	ret = z_user_from_copy(dst, src, actual_len);
+out:
+	irq_unlock(key);
+	return ret;
+}
+
+/*
+ * Default handlers if otherwise unimplemented
+ */
 
 static u32_t handler_bad_syscall(u32_t bad_id, u32_t arg2, u32_t arg3,
 				  u32_t arg4, u32_t arg5, u32_t arg6, void *ssf)
