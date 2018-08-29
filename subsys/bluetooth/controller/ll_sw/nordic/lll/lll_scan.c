@@ -18,6 +18,7 @@
 #include "ull_types.h"
 
 #include "lll.h"
+#include "lll_vendor.h"
 #include "lll_scan.h"
 
 #include "lll_internal.h"

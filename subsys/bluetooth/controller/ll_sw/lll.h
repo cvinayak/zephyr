@@ -6,13 +6,6 @@
 #define TICKER_USER_ID_ULL_LOW  MAYFLY_CALL_ID_2
 #define TICKER_USER_ID_THREAD   MAYFLY_CALL_ID_PROGRAM
 
-#define EVENT_OVERHEAD_XTAL_US        1500
-#define EVENT_OVERHEAD_PREEMPT_US     0    /* if <= min, then dynamic preempt */
-#define EVENT_OVERHEAD_PREEMPT_MIN_US 0
-#define EVENT_OVERHEAD_PREEMPT_MAX_US EVENT_OVERHEAD_XTAL_US
-#define EVENT_OVERHEAD_START_US       200
-#define EVENT_JITTER_US               16
-
 #define EVENT_PIPELINE_MAX            4
 
 #define ULL_HDR(p) ((void *)((u8_t *)(p) + sizeof(struct evt_hdr)))
@@ -123,9 +116,6 @@ int lll_prepare(lll_is_abort_cb_t is_abort_cb, lll_abort_cb_t abort_cb,
 		struct lll_prepare_param *prepare_param);
 void lll_resume(void *param);
 void lll_disable(void *param);
-u32_t lll_evt_offset_get(struct evt_hdr *evt);
-u32_t lll_preempt_calc(struct evt_hdr *evt, u8_t ticker_id,
-		       u32_t ticks_at_event);
 
 int ull_prepare_enqueue(lll_is_abort_cb_t is_abort_cb,
 			       lll_abort_cb_t abort_cb,
