@@ -632,6 +632,11 @@ void *ull_pdu_rx_alloc_peek(u8_t count)
 	return MFIFO_DEQUEUE_PEEK(pdu_rx_free);
 }
 
+void *ull_pdu_rx_alloc_peek_iter(u8_t *idx)
+{
+	return *(void **)MFIFO_DEQUEUE_ITER_GET(pdu_rx_free, idx);
+}
+
 void *ull_pdu_rx_alloc(void)
 {
 	return MFIFO_DEQUEUE(pdu_rx_free);

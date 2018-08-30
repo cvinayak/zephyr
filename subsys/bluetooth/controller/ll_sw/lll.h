@@ -125,6 +125,7 @@ int ull_prepare_enqueue(lll_is_abort_cb_t is_abort_cb,
 void *ull_prepare_dequeue_get(void);
 void *ull_prepare_dequeue_iter(u8_t *idx);
 void *ull_pdu_rx_alloc_peek(u8_t count);
+void *ull_pdu_rx_alloc_peek_iter(u8_t *idx);
 void *ull_pdu_rx_alloc(void);
 void ull_rx_put(memq_link_t *link, void *rx);
 void ull_rx_sched(void);
