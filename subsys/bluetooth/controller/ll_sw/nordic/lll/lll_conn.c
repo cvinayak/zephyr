@@ -5,6 +5,7 @@
  */
 
 #include <stdbool.h>
+#include <stddef.h>
 
 #include <toolchain.h>
 #include <zephyr/types.h>
@@ -12,6 +13,7 @@
 #include <drivers/clock_control/nrf5_clock_control.h>
 
 #include "util/memq.h"
+#include "util/mfifo.h"
 
 #include "hal/ccm.h"
 #include "hal/radio.h"
@@ -41,6 +43,9 @@ static u16_t const sca_ppm_lut[] = {500, 250, 150, 100, 75, 50, 30, 20};
 static u8_t crc_expire;
 static u16_t trx_cnt;
 
+static MFIFO_DEFINE(conn_ack, sizeof(struct lll_tx),
+		    CONFIG_BT_CTLR_TX_BUFFERS);
+
 int lll_conn_init(void)
 {
 	int err;
@@ -56,6 +61,8 @@ int lll_conn_init(void)
 int lll_conn_reset(void)
 {
 	int err;
+
+	MFIFO_INIT(conn_ack);
 
 	err = init_reset();
 	if (err) {
@@ -478,6 +485,48 @@ void lll_conn_pdu_tx_prep(struct lll_conn *lll, struct pdu_data **pdu_data_tx)
 	p = empty_tx_enqueue(lll);
 
 	*pdu_data_tx = p;
+}
+
+u8_t lll_conn_ack_last_idx_get(void)
+{
+	return mfifo_conn_ack.l;
+}
+
+memq_link_t *lll_conn_ack_peek(u16_t *handle, struct node_tx **node_tx)
+{
+	struct lll_tx *tx;
+
+	tx = MFIFO_DEQUEUE_GET(conn_ack);
+	if (!tx) {
+		return NULL;
+	}
+
+	*handle = tx->handle;
+	*node_tx = tx->node;
+
+	return (*node_tx)->link;
+}
+
+memq_link_t *lll_conn_ack_by_last_peek(u8_t last, u16_t *handle,
+				      struct node_tx **node_tx)
+{
+	struct lll_tx *tx;
+
+	tx = mfifo_dequeue_get(mfifo_conn_ack.m, mfifo_conn_ack.s,
+			       mfifo_conn_ack.f, last);
+	if (!tx) {
+		return NULL;
+	}
+
+	*handle = tx->handle;
+	*node_tx = tx->node;
+
+	return (*node_tx)->link;
+}
+
+void *lll_conn_ack_dequeue(void)
+{
+	return MFIFO_DEQUEUE(conn_ack);
 }
 
 static int init_reset(void)
