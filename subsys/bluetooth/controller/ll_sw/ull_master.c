@@ -97,7 +97,7 @@ u32_t ll_create_connection(u16_t scan_interval, u16_t scan_window,
 
 	conn_lll = &conn->lll;
 	conn_lll->role = 0;
-	conn_lll->handle = ll_conn_handle_get(conn);
+	conn_lll->handle = 0xFFFF;
 	access_addr = access_addr_get();
 	memcpy(conn_lll->access_addr, &access_addr,
 	       sizeof(conn_lll->access_addr));
@@ -217,6 +217,7 @@ void ull_master_setup(memq_link_t *link, struct node_rx_hdr *rx,
 	cc->timeout = scan->lll.conn_timeout;
 	cc->sca = lll_conn_sca_local_get();
 
+	lll->handle = ll_conn_handle_get(conn);
 	rx->handle = lll->handle;
 
 	ll_rx_put(link, rx);

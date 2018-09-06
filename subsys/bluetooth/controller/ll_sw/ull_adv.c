@@ -548,7 +548,7 @@ u32_t ll_adv_enable(u8_t enable)
 
 		conn_lll = &conn->lll;
 		conn_lll->role = 1;
-		conn_lll->handle = ll_conn_handle_get(conn);
+		conn_lll->handle = 0xFFFF;
 		conn_lll->data_chan_sel = 0;
 		conn_lll->data_chan_use = 0;
 		conn_lll->event_counter = 0;

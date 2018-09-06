@@ -127,6 +127,7 @@ void ull_slave_setup(memq_link_t *link, struct node_rx_hdr *rx,
 	cc->timeout = timeout;
 	cc->sca = lll->slave.sca;
 
+	lll->handle = ll_conn_handle_get(conn);
 	rx->handle = lll->handle;
 
 	ll_rx_put(link, rx);
