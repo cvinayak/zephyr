@@ -345,7 +345,7 @@ void ull_slave_done(struct node_rx_event_done *done, u32_t *ticks_drift_plus,
 u8_t ll_start_enc_req_send(u16_t handle, u8_t error_code,
 			    u8_t const *const ltk)
 {
-	return 0;
+	return BT_HCI_ERR_CMD_DISALLOWED;
 }
 #endif /* CONFIG_BT_CTLR_LE_ENC */
 
