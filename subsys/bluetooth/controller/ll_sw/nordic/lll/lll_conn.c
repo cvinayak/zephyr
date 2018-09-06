@@ -579,8 +579,6 @@ static void isr_done(void *param)
 			lll->slave.window_widening_event_us = 0;
 			lll->slave.window_size_event_us = 0;
 		}
-
-		/* TODO: event sync-ed */
 	}
 
 	isr_cleanup(param);
