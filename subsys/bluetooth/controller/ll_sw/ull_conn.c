@@ -404,6 +404,28 @@ void ull_conn_done(struct node_rx_event_done *done)
 	}
 }
 
+void ull_conn_tx_demux(void)
+{
+	struct lll_tx *tx;
+
+	tx = MFIFO_DEQUEUE_GET(conn_tx);
+	while (tx) {
+		memq_link_t *link;
+		struct ll_conn *conn;
+
+		conn = &_conn[tx->handle];
+
+		link = mem_acquire(&mem_link_tx.free);
+		LL_ASSERT(link);
+
+		memq_enqueue(link, tx->node, &conn->lll.memq_tx.tail);
+
+		MFIFO_DEQUEUE(conn_tx);
+
+		tx = MFIFO_DEQUEUE_GET(conn_tx);
+	}
+}
+
 static int _init_reset(void)
 {
 	/* Initialize conn pool. */
@@ -475,26 +497,4 @@ static void conn_cleanup(struct lll_conn *lll)
 				    ticker_op_stop_cb, (void *)__LINE__);
 	LL_ASSERT((ticker_status == TICKER_STATUS_SUCCESS) ||
 		  (ticker_status == TICKER_STATUS_BUSY));
-}
-
-static void _tx_demux(void)
-{
-	struct lll_tx *tx;
-
-	tx = MFIFO_DEQUEUE_GET(conn_tx);
-	while (tx) {
-		memq_link_t *link;
-		struct ll_conn *conn;
-
-		conn = &_conn[tx->handle];
-
-		link = mem_acquire(&mem_link_tx.free);
-		LL_ASSERT(link);
-
-		memq_enqueue(link, tx->node, &conn->lll.memq_tx.tail);
-
-		MFIFO_DEQUEUE(conn_tx);
-
-		tx = MFIFO_DEQUEUE_GET(conn_tx);
-	}
 }
