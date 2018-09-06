@@ -12,6 +12,7 @@
 
 #include "util/mem.h"
 #include "util/memq.h"
+#include "util/mfifo.h"
 #include "util/mayfly.h"
 
 #include "ticker/ticker.h"
@@ -36,6 +37,22 @@ static void conn_cleanup(struct lll_conn *lll);
 static struct ll_conn _conn[CONFIG_BT_MAX_CONN];
 static void *_conn_free;
 
+#define CONN_TX_POOL_SIZE ((CONFIG_BT_CTLR_TX_BUFFER_SIZE) * \
+			   (CONFIG_BT_CTLR_TX_BUFFERS))
+
+static MFIFO_DEFINE(conn_tx, sizeof(struct lll_tx),
+		    CONFIG_BT_CTLR_TX_BUFFERS);
+
+static struct {
+	void *free;
+	u8_t pool[CONN_TX_POOL_SIZE];
+} mem_conn_tx;
+
+static struct {
+	void *free;
+	u8_t pool[sizeof(memq_link_t) * CONFIG_BT_CTLR_TX_BUFFERS];
+} mem_link_tx;
+
 struct ll_conn *ll_conn_acquire(void)
 {
 	return mem_acquire(&_conn_free);
@@ -58,15 +75,39 @@ struct ll_conn *ll_conn_get(u16_t handle)
 
 void *ll_tx_mem_acquire(void)
 {
-	return NULL;
+	return mem_acquire(&mem_conn_tx.free);;
 }
 
 void ll_tx_mem_release(void *node_tx)
 {
+	mem_release(node_tx, &mem_conn_tx.free);
 }
 
 u8_t ll_tx_mem_enqueue(u16_t handle, void *node_tx)
 {
+	struct lll_tx *tx;
+	struct ll_conn *conn;
+	u8_t idx;
+
+	if (handle >= CONFIG_BT_MAX_CONN) {
+		return -EINVAL;
+	}
+
+	conn = &_conn[handle];
+	if (conn->lll.handle != handle) {
+		return -EINVAL;
+	}
+
+	idx = MFIFO_ENQUEUE_GET(conn_tx, (void **) &tx);
+	if (!tx) {
+		return -ENOBUFS;
+	}
+
+	tx->handle = handle;
+	tx->node = node_tx;
+
+	MFIFO_ENQUEUE(conn_tx, idx);
+
 	return 0;
 }
 
@@ -111,6 +152,9 @@ int ull_conn_init(void)
 int ull_conn_reset(void)
 {
 	int err;
+
+	/* Re-initialize the Tx mfifo */
+	MFIFO_INIT(conn_tx);
 
 	err = _init_reset();
 	if (err) {
@@ -362,8 +406,17 @@ void ull_conn_done(struct node_rx_event_done *done)
 
 static int _init_reset(void)
 {
+	/* Initialize conn pool. */
 	mem_init(_conn, sizeof(struct ll_conn),
 		 sizeof(_conn)/sizeof(struct ll_conn), &_conn_free);
+
+	/* Initialize tx pool. */
+	mem_init(mem_conn_tx.pool, CONFIG_BT_CTLR_TX_BUFFER_SIZE,
+		 CONFIG_BT_CTLR_TX_BUFFERS, &mem_conn_tx.free);
+
+	/* Initialize tx link pool. */
+	mem_init(mem_link_tx.pool, sizeof(memq_link_t),
+		 CONFIG_BT_CTLR_TX_BUFFERS, &mem_link_tx.free);
 
 	return 0;
 }
@@ -422,4 +475,26 @@ static void conn_cleanup(struct lll_conn *lll)
 				    ticker_op_stop_cb, (void *)__LINE__);
 	LL_ASSERT((ticker_status == TICKER_STATUS_SUCCESS) ||
 		  (ticker_status == TICKER_STATUS_BUSY));
+}
+
+static void _tx_demux(void)
+{
+	struct lll_tx *tx;
+
+	tx = MFIFO_DEQUEUE_GET(conn_tx);
+	while (tx) {
+		memq_link_t *link;
+		struct ll_conn *conn;
+
+		conn = &_conn[tx->handle];
+
+		link = mem_acquire(&mem_link_tx.free);
+		LL_ASSERT(link);
+
+		memq_enqueue(link, tx->node, &conn->lll.memq_tx.tail);
+
+		MFIFO_DEQUEUE(conn_tx);
+
+		tx = MFIFO_DEQUEUE_GET(conn_tx);
+	}
 }

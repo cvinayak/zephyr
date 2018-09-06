@@ -281,11 +281,7 @@ struct lll_conn {
 	struct ccm ccm_rx;
 	struct ccm ccm_tx;
 
-	struct radio_pdu_node_tx *pkt_tx_head;
-	struct radio_pdu_node_tx *pkt_tx_ctrl;
-	struct radio_pdu_node_tx *pkt_tx_ctrl_last;
-	struct radio_pdu_node_tx *pkt_tx_data;
-	struct radio_pdu_node_tx *pkt_tx_last;
+	MEMQ_DECLARE(tx);
 	u8_t  packet_tx_head_len;
 	u8_t  packet_tx_head_offset;
 

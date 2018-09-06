@@ -742,7 +742,7 @@ static struct pdu_data *empty_tx_enqueue(struct lll_conn *lll)
 	p = (void *)radio_pkt_empty_get();
 	p->ll_id = PDU_DATA_LLID_DATA_CONTINUE;
 	p->len = 0;
-	if (lll->pkt_tx_head) {
+	if (memq_peek(lll->memq_tx.head, lll->memq_tx.tail, NULL)) {
 		p->md = 1;
 	} else {
 		p->md = 0;
