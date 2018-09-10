@@ -310,16 +310,15 @@ lll_conn_isr_rx_exit:
 	if (rssi_ready) {
 		u8_t rssi = radio_rssi_get();
 
-		_radio.conn_curr->rssi_latest = rssi;
+		lll->rssi_latest = rssi;
 
-		if (((_radio.conn_curr->rssi_reported - rssi) & 0xFF) >
-		    RADIO_RSSI_THRESHOLD) {
-			if (_radio.conn_curr->rssi_sample_count) {
-				_radio.conn_curr->rssi_sample_count--;
+		if (((lll->rssi_reported - rssi) & 0xFF) >
+		    LLL_CONN_RSSI_THRESHOLD) {
+			if (lll->rssi_sample_count) {
+				lll->rssi_sample_count--;
 			}
 		} else {
-			_radio.conn_curr->rssi_sample_count =
-				RADIO_RSSI_SAMPLE_COUNT;
+			lll->rssi_sample_count = LLL_CONN_RSSI_SAMPLE_COUNT;
 		}
 	}
 #else /* !CONFIG_BT_CTLR_CONN_RSSI */

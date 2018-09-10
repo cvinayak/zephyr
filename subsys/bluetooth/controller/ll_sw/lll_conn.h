@@ -6,6 +6,9 @@
 
 /* NOTE: Definitions used between ULL and LLL implementations */
 
+#define LLL_CONN_RSSI_SAMPLE_COUNT 10
+#define LLL_CONN_RSSI_THRESHOLD    4
+
 struct lll_tx {
 	u16_t handle;
 	void *node;

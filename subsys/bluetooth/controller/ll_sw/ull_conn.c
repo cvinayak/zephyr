@@ -137,6 +137,22 @@ u8_t ll_conn_update(u16_t handle, u8_t cmd, u8_t status, u16_t interval,
 	return 0;
 }
 
+#if defined(CONFIG_BT_CTLR_CONN_RSSI)
+u32_t ll_rssi_get(u16_t handle, u8_t *rssi)
+{
+	struct ll_conn *conn;
+
+	conn = is_connected_get(handle);
+	if (!conn) {
+		return -EINVAL;
+	}
+
+	*rssi = conn->lll.rssi_latest;
+
+	return 0;
+}
+#endif /* CONFIG_BT_CTLR_CONN_RSSI */
+
 int ull_conn_init(void)
 {
 	int err;
@@ -342,24 +358,24 @@ void ull_conn_done(struct node_rx_event_done *done)
 #if defined(CONFIG_BT_CTLR_CONN_RSSI)
 	/* generate RSSI event */
 	if (lll->rssi_sample_count == 0) {
-		struct radio_pdu_node_rx *node_rx;
+		struct node_rx_pdu *rx;
 		struct pdu_data *pdu_data_rx;
 
-		node_rx = packet_rx_reserve_get(2);
-		if (node_rx) {
+		/* TODO: allocate rx ull-to-thread */
+		if (rx) {
 			lll->rssi_reported = lll->rssi_latest;
-			lll->rssi_sample_count = RADIO_RSSI_SAMPLE_COUNT;
+			lll->rssi_sample_count = LLL_CONN_RSSI_SAMPLE_COUNT;
 
 			/* Prepare the rx packet structure */
-			node_rx->hdr.handle = lll->handle;
-			node_rx->hdr.type = NODE_RX_TYPE_RSSI;
+			rx->hdr.handle = lll->handle;
+			rx->hdr.type = NODE_RX_TYPE_RSSI;
 
 			/* prepare connection RSSI structure */
-			pdu_data_rx = (void *)node_rx->pdu_data;
+			pdu_data_rx = (void *)rx->pdu;
 			pdu_data_rx->rssi = lll->rssi_reported;
 
 			/* enqueue connection RSSI structure into queue */
-			packet_rx_enqueue();
+			/* TODO: */
 		}
 	}
 #endif /* CONFIG_BT_CTLR_CONN_RSSI */
