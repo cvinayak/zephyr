@@ -125,14 +125,15 @@ void lll_conn_abort_cb(struct lll_prepare_param *prepare_param, void *param)
 
 void lll_conn_isr_rx(void *param)
 {
+	struct node_tx *tx_release = NULL;
 	struct lll_conn *lll = param;
 	struct pdu_data *pdu_data_rx;
 	struct pdu_data *pdu_data_tx;
 	struct node_rx_pdu *node_rx;
-	struct node_tx *tx_release;
 	u8_t is_empty_pdu_tx_retry;
 	u8_t is_crc_backoff = 0;
 	u8_t is_rx_enqueue = 0;
+	u8_t is_ull_rx = 0;
 	u8_t rssi_ready;
 	u8_t trx_done;
 	u8_t is_done;
@@ -287,20 +288,50 @@ lll_conn_isr_rx_exit:
 	lll_prof_cputime_capture();
 #endif /* CONFIG_BT_CTLR_PROFILE_ISR */
 
-	/* TODO: */
-	#if 0
-	/* release tx node and generate event for num complete */
 	if (tx_release) {
-		pdu_node_tx_release(_radio.conn_curr->handle, tx_release);
+		struct lll_tx *tx;
+		memq_link_t *link;
+		u8_t idx;
+
+		link = memq_dequeue(lll->memq_tx.tail, &lll->memq_tx.head,
+				    NULL);
+
+		idx = MFIFO_ENQUEUE_GET(conn_ack, (void **)&tx);
+		LL_ASSERT(tx);
+
+		tx->handle = lll->handle;
+		tx->node = tx_release;
+
+		tx_release->link = link;
+
+		MFIFO_ENQUEUE(conn_ack, idx);
+
+		is_ull_rx = 1;
 	}
 
+	if (is_rx_enqueue) {
+		ull_pdu_rx_alloc();
+
+		node_rx->hdr.type = NODE_RX_TYPE_DC_PDU;
+		node_rx->hdr.handle = lll->handle;
+
+		ull_rx_put(node_rx->hdr.link, node_rx);
+		is_ull_rx = 1;
+	}
+
+	if (is_ull_rx) {
+		ull_rx_sched();
+	}
+
+	/* TODO: */
+	#if 0
 	/* enqueue any rx packet/event towards application */
 	if (rx_enqueue) {
 		/* set data flow control lock on currently rx-ed connection */
 		rx_fc_lock(_radio.conn_curr->handle);
 
 		/* set the connection handle and enqueue */
-		node_rx->hdr.handle = _radio.conn_curr->handle;
+		node_rx->hdr.handle = lll->handle;
 		packet_rx_enqueue();
 	}
 	#endif
@@ -478,10 +509,101 @@ void lll_conn_tx_pkt_set(struct lll_conn *lll, struct pdu_data *pdu_data_tx)
 
 void lll_conn_pdu_tx_prep(struct lll_conn *lll, struct pdu_data **pdu_data_tx)
 {
+	struct node_tx *tx;
 	struct pdu_data *p;
+	memq_link_t *link;
 
-	/* TODO: */
-	p = empty_tx_enqueue(lll);
+	if (lll->empty ||
+	    !(link = memq_peek(lll->memq_tx.head, lll->memq_tx.tail,
+			       (void **)&tx))) {
+		p = empty_tx_enqueue(lll);
+	} else {
+		u16_t max_tx_octets;
+
+		p = (void *)(tx->pdu + lll->packet_tx_head_offset);
+
+		if (!lll->packet_tx_head_len) {
+			lll->packet_tx_head_len = p->len;
+		}
+
+		if (lll->packet_tx_head_offset) {
+			p->ll_id = PDU_DATA_LLID_DATA_CONTINUE;
+		}
+
+		p->len = lll->packet_tx_head_len - lll->packet_tx_head_offset;
+		p->md = 0;
+
+#if defined(CONFIG_BT_CTLR_DATA_LENGTH)
+#if defined(CONFIG_BT_CTLR_PHY)
+		switch (lll->phy_tx_time) {
+		default:
+		case BIT(0):
+			/* 1M PHY, 1us = 1 bit, hence divide by 8.
+			 * Deduct 10 bytes for preamble (1), access address (4),
+			 * header (2), and CRC (3).
+			 */
+			max_tx_octets = (lll->max_tx_time >> 3) - 10;
+			break;
+
+		case BIT(1):
+			/* 2M PHY, 1us = 2 bits, hence divide by 4.
+			 * Deduct 11 bytes for preamble (2), access address (4),
+			 * header (2), and CRC (3).
+			 */
+			max_tx_octets = (lll->max_tx_time >> 2) - 11;
+			break;
+
+#if defined(CONFIG_BT_CTLR_PHY_CODED)
+		case BIT(2):
+			if (lll->phy_flags & 0x01) {
+				/* S8 Coded PHY, 8us = 1 bit, hence divide by
+				 * 64.
+				 * Subtract time for preamble (80), AA (256),
+				 * CI (16), TERM1 (24), CRC (192) and
+				 * TERM2 (24), total 592 us.
+				 * Subtract 2 bytes for header.
+				 */
+				max_tx_octets = ((lll->max_tx_time - 592) >>
+						 6) - 2;
+			} else {
+				/* S2 Coded PHY, 2us = 1 bit, hence divide by
+				 * 16.
+				 * Subtract time for preamble (80), AA (256),
+				 * CI (16), TERM1 (24), CRC (48) and
+				 * TERM2 (6), total 430 us.
+				 * Subtract 2 bytes for header.
+				 */
+				max_tx_octets = ((lll->max_tx_time - 430) >>
+						 4) - 2;
+			}
+			break;
+#endif /* CONFIG_BT_CTLR_PHY_CODED */
+		}
+
+		if (lll->enc_tx) {
+			/* deduct the MIC */
+			max_tx_octets -= 4;
+		}
+
+		if (max_tx_octets > lll->max_tx_octets) {
+			max_tx_octets = lll->max_tx_octets;
+		}
+#else /* !CONFIG_BT_CTLR_PHY */
+		max_tx_octets = lll->max_tx_octets;
+#endif /* !CONFIG_BT_CTLR_PHY */
+#else /* !CONFIG_BT_CTLR_DATA_LENGTH */
+		max_tx_octets = PDU_DC_PAYLOAD_SIZE_MIN;
+#endif /* !CONFIG_BT_CTLR_DATA_LENGTH */
+
+		if (p->len > max_tx_octets) {
+			p->len = max_tx_octets;
+			p->md = 1;
+		}
+
+		if (link->next) {
+			p->md = 1;
+		}
+	}
 
 	*pdu_data_tx = p;
 }
@@ -618,8 +740,31 @@ static u32_t isr_rx_pdu(struct lll_conn *lll, struct pdu_data *pdu_data_rx,
 		}
 
 		if (!lll->empty) {
-			/* TODO: */
-			LL_ASSERT(0);
+			struct pdu_data *pdu_data_tx;
+			u8_t pdu_data_tx_len;
+			struct node_tx *tx;
+			memq_link_t *link;
+
+			link = memq_peek(lll->memq_tx.head, lll->memq_tx.tail,
+					 (void **)&tx);
+			LL_ASSERT(link);
+
+			pdu_data_tx = (void *)(tx->pdu +
+					       lll->packet_tx_head_offset);
+
+			pdu_data_tx_len = pdu_data_tx->len;
+			if (pdu_data_tx_len != 0) {
+				/* if encrypted increment tx counter */
+				if (lll->enc_tx) {
+					lll->ccm_tx.counter++;
+				}
+			}
+
+			lll->packet_tx_head_offset += pdu_data_tx_len;
+			if (lll->packet_tx_head_offset ==
+			    lll->packet_tx_head_len) {
+				*tx_release = tx;
+			}
 		} else {
 			lll->empty = 0;
 		}
@@ -631,10 +776,22 @@ static u32_t isr_rx_pdu(struct lll_conn *lll, struct pdu_data *pdu_data_rx,
 	     * packet and internal control enqueue
 	     */
 	    (ull_pdu_rx_alloc_peek(3) != 0)) {
-		u8_t ccm_rx_increment = 0;
-		u8_t nack = 0;
+		/* Increment next expected serial number */
+		lll->nesn++;
 
 		if (pdu_data_rx->len != 0) {
+			/* If required, wait for CCM to finish
+			 */
+			if (lll->enc_rx) {
+				u32_t done;
+
+				done = radio_ccm_is_done();
+				LL_ASSERT(done);
+
+				lll->ccm_rx.counter++;
+			}
+
+			*is_rx_enqueue = 1;
 #if 0
 			/* If required, wait for CCM to finish
 			 */
@@ -716,14 +873,6 @@ static u32_t isr_rx_pdu(struct lll_conn *lll, struct pdu_data *pdu_data_rx,
 			}
 #endif /* CONFIG_BT_CTLR_LE_PING */
 
-		}
-
-		if (!nack) {
-			lll->nesn++;
-
-			if (ccm_rx_increment) {
-				lll->ccm_rx.counter++;
-			}
 		}
 	}
 

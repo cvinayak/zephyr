@@ -402,7 +402,6 @@ static inline u8_t disable(u16_t handle)
 
 	scan = ull_scan_is_enabled_get(handle);
 	if (!scan) {
-		printk("1\n");
 		return BT_HCI_ERR_CMD_DISALLOWED;
 	}
 
@@ -412,7 +411,6 @@ static inline u8_t disable(u16_t handle)
 
 	ret = ull_ticker_status_take(ret, &ret_cb);
 	if (ret) {
-		printk("%u %u\n", ret, ret_cb);
 		return BT_HCI_ERR_CMD_DISALLOWED;
 	}
 

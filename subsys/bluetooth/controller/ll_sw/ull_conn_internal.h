@@ -19,4 +19,4 @@ u32_t ull_conn_ppm_local_get(void);
 u32_t ull_conn_ppm_get(u8_t sca);
 void ull_conn_setup(memq_link_t *link, struct node_rx_hdr *rx);
 void ull_conn_done(struct node_rx_event_done *done);
-void ull_conn_tx_demux(void);
+void ull_conn_tx_demux(u8_t count);

@@ -285,6 +285,8 @@ struct lll_conn {
 	struct ccm ccm_tx;
 
 	MEMQ_DECLARE(tx);
+	memq_link_t link_tx;
+	memq_link_t *link_tx_free;
 	u8_t  packet_tx_head_len;
 	u8_t  packet_tx_head_offset;
 
@@ -310,3 +312,8 @@ void lll_conn_isr_abort(void *param);
 void lll_conn_rx_pkt_set(struct lll_conn *lll);
 void lll_conn_tx_pkt_set(struct lll_conn *lll, struct pdu_data *pdu_data_tx);
 void lll_conn_pdu_tx_prep(struct lll_conn *lll, struct pdu_data **pdu_data_tx);
+u8_t lll_conn_ack_last_idx_get(void);
+memq_link_t *lll_conn_ack_peek(u16_t *handle, struct node_tx **node_tx);
+memq_link_t *lll_conn_ack_by_last_peek(u8_t last, u16_t *handle,
+				       struct node_tx **node_tx);
+void *lll_conn_ack_dequeue(void);

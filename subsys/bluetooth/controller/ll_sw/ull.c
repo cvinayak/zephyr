@@ -119,15 +119,6 @@ static struct k_sem *sem_recv;
 /* Entropy device */
 static struct device *dev_entropy;
 
-/* Rx memq configuration defines */
-#define TODO_PDU_RX_SIZE_MIN  64
-#define TODO_PDU_RX_SIZE_MAX  64
-#define TODO_PDU_RX_COUNT_MAX 10
-#define TODO_PDU_RX_POOL_SIZE ((TODO_PDU_RX_SIZE_MAX) * \
-			       (TODO_PDU_RX_COUNT_MAX))
-
-#define TODO_LINK_RX_COUNT_MAX ((TODO_PDU_RX_COUNT_MAX) + 2)
-
 /* prepare and done event FIFOs */
 static MFIFO_DEFINE(prep, sizeof(struct lll_event), EVENT_PIPELINE_MAX);
 static MFIFO_DEFINE(done, sizeof(void *), EVENT_PIPELINE_MAX);
@@ -193,6 +184,10 @@ static inline int _init_reset(void);
 static inline void _done_alloc(void);
 static inline void _rx_alloc(u8_t max);
 static void _rx_demux(void *param);
+#if defined(CONFIG_BT_CONN)
+static inline void _rx_demux_conn_tx_ack(u16_t handle, memq_link_t *link,
+					 struct node_tx *node_tx);
+#endif /* CONFIG_BT_CONN */
 #if defined(CONFIG_BT_TMP)
 static inline void _rx_demux_tx_ack(u16_t handle, memq_link_t *link,
 			     struct node_tx *node_tx);
@@ -403,6 +398,8 @@ void ll_rx_dequeue(void)
 			break;
 		}
 	}
+
+	case NODE_RX_TYPE_DC_PDU:
 #endif /* CONFIG_BT_CONN */
 
 #if defined(CONFIG_BT_OBSERVER)
@@ -757,14 +754,18 @@ void *ull_pdu_rx_alloc(void)
 
 void ull_rx_put(memq_link_t *link, void *rx)
 {
-#if defined(CONFIG_BT_TMP)
 	struct node_rx_hdr *rx_hdr = rx;
 
 	/* Serialize Tx ack with Rx enqueue by storing reference to
 	 * last element index in Tx ack FIFO.
 	 */
+#if defined(CONFIG_BT_CONN)
+	rx_hdr->ack_last = lll_conn_ack_last_idx_get();
+#elif defined(CONFIG_BT_TMP)
 	rx_hdr->ack_last = lll_tmp_ack_last_idx_get();
-#endif /* CONFIG_BT_TMP */
+#else /* !CONFIG_BT_TMP */
+	ARG_UNUSED(rx_hdr);
+#endif /* !CONFIG_BT_TMP */
 
 	/* Enqueue the Rx object */
 	memq_enqueue(link, rx, &memq_ull_rx.tail);
@@ -984,21 +985,38 @@ static void _rx_demux(void *param)
 		link = memq_peek(memq_ull_rx.head, memq_ull_rx.tail,
 				 (void **)&rx);
 		if (link) {
-#if defined(CONFIG_BT_TMP)
 			struct node_tx *node_tx;
 			memq_link_t *link_tx;
 			u16_t handle;
 
 			LL_ASSERT(rx);
 
+#if defined(CONFIG_BT_CONN)
+			link_tx = lll_conn_ack_by_last_peek(rx->ack_last,
+							    &handle, &node_tx);
+			if (link_tx) {
+				_rx_demux_conn_tx_ack(handle, link_tx, node_tx);
+			} else {
+#elif defined(CONFIG_BT_TMP)
 			link_tx = lll_tmp_ack_by_last_peek(rx->ack_last,
 							   &handle, &node_tx);
 			if (link_tx) {
 				_rx_demux_tx_ack(handle, link_tx, node_tx);
 			} else {
-#endif /* CONFIG_BT_TMP */
+#else /* !CONFIG_BT_TMP */
+#endif /* !CONFIG_BT_TMP */
 				_rx_demux_rx(link, rx);
-#if defined(CONFIG_BT_TMP)
+#if defined(CONFIG_BT_CONN)
+			}
+		} else {
+			struct node_tx *node_tx;
+			u16_t handle;
+
+			link = lll_conn_ack_peek(&handle, &node_tx);
+			if (link) {
+				_rx_demux_conn_tx_ack(handle, link, node_tx);
+			}
+#elif defined(CONFIG_BT_TMP)
 			}
 		} else {
 			struct node_tx *node_tx;
@@ -1012,6 +1030,14 @@ static void _rx_demux(void *param)
 		}
 	} while (link);
 }
+
+#if defined(CONFIG_BT_CONN)
+static inline void _rx_demux_conn_tx_ack(u16_t handle, memq_link_t *link,
+					 struct node_tx *node_tx)
+{
+	LL_ASSERT(0);
+}
+#endif /* CONFIG_BT_CONN */
 
 #if defined(CONFIG_BT_TMP)
 static inline void _rx_demux_tx_ack(u16_t handle, memq_link_t *link,
@@ -1089,6 +1115,8 @@ static inline void _rx_demux_rx(memq_link_t *link, struct node_rx_hdr *rx)
 	case NODE_RX_TYPE_DC_PDU:
 	{
 		/* TODO: process and pass through to thread */
+		ll_rx_put(link, rx);
+		ll_rx_sched();
 	}
 	break;
 #endif /* CONFIG_BT_CONN */

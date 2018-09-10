@@ -552,6 +552,24 @@ u32_t ll_adv_enable(u8_t enable)
 		conn_lll->data_chan_sel = 0;
 		conn_lll->data_chan_use = 0;
 		conn_lll->event_counter = 0;
+		conn_lll->sn = 0;
+		conn_lll->nesn = 0;
+
+		if (!conn_lll->link_tx_free) {
+			conn_lll->link_tx_free = &conn_lll->link_tx;
+		}
+
+		memq_init(conn_lll->link_tx_free, &conn_lll->memq_tx.head,
+			  &conn_lll->memq_tx.tail);
+
+		conn_lll->packet_tx_head_len = 0;
+		conn_lll->packet_tx_head_offset = 0;
+
+#if defined(CONFIG_BT_CTLR_CONN_RSSI)
+		conn_lll->rssi_latest = 0x7F;
+		conn_lll->rssi_reported = 0x7F;
+		conn_lll->rssi_sample_count = 0;
+#endif /* CONFIG_BT_CTLR_CONN_RSSI */
 
 		/* TODO: move to ull? */
 		conn_lll->latency_prepare = 0;

@@ -415,5 +415,8 @@ static void ticker_cb(u32_t ticks_at_expire, u32_t remainder, u16_t lazy,
 			     0, &_mfy);
 	LL_ASSERT(!ret);
 
+	/* De-mux remaining tx nodes from FIFO */
+	ull_conn_tx_demux(UINT8_MAX);
+
 	DEBUG_RADIO_PREPARE_S(1);
 }

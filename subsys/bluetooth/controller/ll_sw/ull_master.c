@@ -110,6 +110,24 @@ u32_t ll_create_connection(u16_t scan_interval, u16_t scan_window,
 	conn_lll->data_chan_sel = 0;
 	conn_lll->data_chan_use = 0;
 	conn_lll->event_counter = 0;
+	conn_lll->sn = 0;
+	conn_lll->nesn = 0;
+
+	if (!conn_lll->link_tx_free) {
+		conn_lll->link_tx_free = &conn_lll->link_tx;
+	}
+
+	memq_init(conn_lll->link_tx_free, &conn_lll->memq_tx.head,
+		  &conn_lll->memq_tx.tail);
+
+	conn_lll->packet_tx_head_len = 0;
+	conn_lll->packet_tx_head_offset = 0;
+
+#if defined(CONFIG_BT_CTLR_CONN_RSSI)
+	conn_lll->rssi_latest = 0x7F;
+	conn_lll->rssi_reported = 0x7F;
+	conn_lll->rssi_sample_count = 0;
+#endif /* CONFIG_BT_CTLR_CONN_RSSI */
 
 	/* TODO: move to ull? */
 	conn_lll->interval = interval;
@@ -447,7 +465,6 @@ static void ticker_cb(u32_t ticks_at_expire, u32_t remainder, u16_t lazy,
 	static struct mayfly _mfy = {0, 0, &_link, NULL, lll_master_prepare};
 	static struct lll_prepare_param p;
 	struct ll_conn *conn = param;
-	struct lll_conn *lll;
 	u32_t ret;
 	u8_t ref;
 
@@ -457,19 +474,23 @@ static void ticker_cb(u32_t ticks_at_expire, u32_t remainder, u16_t lazy,
 	ref = ull_ref_inc(&conn->ull);
 	LL_ASSERT(ref);
 
-	lll = &conn->lll;
+	/* De-mux 1 tx node from FIFO */
+	ull_conn_tx_demux(1);
 
 	/* Append timing parameters */
 	p.ticks_at_expire = ticks_at_expire;
 	p.remainder = remainder;
 	p.lazy = lazy;
-	p.param = lll;
+	p.param = &conn->lll;
 	_mfy.param = &p;
 
 	/* Kick LLL prepare */
 	ret = mayfly_enqueue(TICKER_USER_ID_ULL_HIGH, TICKER_USER_ID_LLL,
 			     0, &_mfy);
 	LL_ASSERT(!ret);
+
+	/* De-mux remaining tx nodes from FIFO */
+	ull_conn_tx_demux(UINT8_MAX);
 
 	DEBUG_RADIO_PREPARE_M(1);
 }

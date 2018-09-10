@@ -30,6 +30,7 @@
 #include "hal/debug.h"
 
 static int _init_reset(void);
+static struct ll_conn *is_connected_get(u16_t handle);
 static void ticker_op_update_cb(u32_t status, void *param);
 static void terminate_ind_rx_enqueue(struct lll_conn *lll, u8_t reason);
 static void conn_cleanup(struct lll_conn *lll);
@@ -89,12 +90,8 @@ u8_t ll_tx_mem_enqueue(u16_t handle, void *node_tx)
 	struct ll_conn *conn;
 	u8_t idx;
 
-	if (handle >= CONFIG_BT_MAX_CONN) {
-		return -EINVAL;
-	}
-
-	conn = &_conn[handle];
-	if (conn->lll.handle != handle) {
+	conn = is_connected_get(handle);
+	if (!conn) {
 		return -EINVAL;
 	}
 
@@ -420,16 +417,19 @@ void ull_conn_done(struct node_rx_event_done *done)
 	}
 }
 
-void ull_conn_tx_demux(void)
+void ull_conn_tx_demux(u8_t count)
 {
-	struct lll_tx *tx;
-
-	tx = MFIFO_DEQUEUE_GET(conn_tx);
-	while (tx) {
-		memq_link_t *link;
+	do {
 		struct ll_conn *conn;
+		struct lll_tx *tx;
+		memq_link_t *link;
 
-		conn = &_conn[tx->handle];
+		tx = MFIFO_DEQUEUE_GET(conn_tx);
+		if (!tx) {
+			break;
+		}
+
+		conn = ll_conn_get(tx->handle);
 
 		link = mem_acquire(&mem_link_tx.free);
 		LL_ASSERT(link);
@@ -437,9 +437,7 @@ void ull_conn_tx_demux(void)
 		memq_enqueue(link, tx->node, &conn->lll.memq_tx.tail);
 
 		MFIFO_DEQUEUE(conn_tx);
-
-		tx = MFIFO_DEQUEUE_GET(conn_tx);
-	}
+	} while (--count);
 }
 
 static int _init_reset(void)
@@ -459,10 +457,20 @@ static int _init_reset(void)
 	return 0;
 }
 
-static void ticker_op_update_cb(u32_t status, void *param)
+static struct ll_conn *is_connected_get(u16_t handle)
 {
-	LL_ASSERT(status == TICKER_STATUS_SUCCESS ||
-		  param == ull_disable_mark_get());
+	struct ll_conn *conn;
+
+	if (handle >= CONFIG_BT_MAX_CONN) {
+		return NULL;
+	}
+
+	conn = ll_conn_get(handle);
+	if (conn->lll.handle != handle) {
+		return NULL;
+	}
+
+	return conn;
 }
 
 static void terminate_ind_rx_enqueue(struct lll_conn *lll, u8_t reason)
@@ -489,6 +497,12 @@ static void terminate_ind_rx_enqueue(struct lll_conn *lll, u8_t reason)
 
 	ll_rx_put(link, rx);
 	ll_rx_sched();
+}
+
+static void ticker_op_update_cb(u32_t status, void *param)
+{
+	LL_ASSERT(status == TICKER_STATUS_SUCCESS ||
+		  param == ull_disable_mark_get());
 }
 
 static void ticker_op_stop_cb(u32_t status, void *param)
