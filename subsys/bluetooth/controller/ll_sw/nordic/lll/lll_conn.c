@@ -323,19 +323,6 @@ lll_conn_isr_rx_exit:
 		ull_rx_sched();
 	}
 
-	/* TODO: */
-	#if 0
-	/* enqueue any rx packet/event towards application */
-	if (rx_enqueue) {
-		/* set data flow control lock on currently rx-ed connection */
-		rx_fc_lock(_radio.conn_curr->handle);
-
-		/* set the connection handle and enqueue */
-		node_rx->hdr.handle = lll->handle;
-		packet_rx_enqueue();
-	}
-	#endif
-
 #if defined(CONFIG_BT_CTLR_CONN_RSSI)
 	/* Collect RSSI for connection */
 	if (rssi_ready) {
