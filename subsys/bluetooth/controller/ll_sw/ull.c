@@ -1037,11 +1037,12 @@ static void _rx_demux(void *param)
 			}
 		} else {
 			struct node_tx *node_tx;
+			u8_t ack_last;
 			u16_t handle;
 
-			link = lll_conn_ack_peek(&handle, &node_tx);
+			link = lll_conn_ack_peek(&ack_last, &handle, &node_tx);
 			if (link) {
-				_rx_demux_conn_tx_ack(rx->ack_last, handle,
+				_rx_demux_conn_tx_ack(ack_last, handle,
 						      link, node_tx);
 			}
 #elif defined(CONFIG_BT_TMP)
@@ -1279,6 +1280,7 @@ static u8_t tx_cmplt_get(u16_t *handle, u8_t *first, u8_t last)
 		}
 
 		if (((u32_t)node_tx & ~3) != 0) {
+			ll_tx_mem_release(node_tx);
 		}
 
 		tx = mfifo_dequeue_iter_get(mfifo_tx_ack.m, mfifo_tx_ack.s,

@@ -613,7 +613,8 @@ u8_t lll_conn_ack_last_idx_get(void)
 	return mfifo_conn_ack.l;
 }
 
-memq_link_t *lll_conn_ack_peek(u16_t *handle, struct node_tx **node_tx)
+memq_link_t *lll_conn_ack_peek(u8_t *ack_last, u16_t *handle,
+			       struct node_tx **node_tx)
 {
 	struct lll_tx *tx;
 
@@ -621,6 +622,8 @@ memq_link_t *lll_conn_ack_peek(u16_t *handle, struct node_tx **node_tx)
 	if (!tx) {
 		return NULL;
 	}
+
+	*ack_last = mfifo_conn_ack.l;
 
 	*handle = tx->handle;
 	*node_tx = tx->node;
