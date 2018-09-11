@@ -188,8 +188,8 @@ static inline void _done_alloc(void);
 static inline void _rx_alloc(u8_t max);
 static void _rx_demux(void *param);
 #if defined(CONFIG_BT_CONN)
-static inline void _rx_demux_conn_tx_ack(u16_t handle, memq_link_t *link,
-					 struct node_tx *tx);
+static inline void _rx_demux_conn_tx_ack(u8_t ack_last, u16_t handle,
+					 memq_link_t *link, struct node_tx *tx);
 #endif /* CONFIG_BT_CONN */
 #if defined(CONFIG_BT_TMP)
 static inline void _rx_demux_tx_ack(u16_t handle, memq_link_t *link,
@@ -198,7 +198,8 @@ static inline void _rx_demux_tx_ack(u16_t handle, memq_link_t *link,
 static inline void _rx_demux_rx(memq_link_t *link, struct node_rx_hdr *rx);
 static inline void _rx_demux_event_done(memq_link_t *link,
 					struct node_rx_hdr *rx);
-void _disabled_cb(void *param);
+static void _disabled_cb(void *param);
+static u8_t tx_cmplt_get(u16_t *handle, u8_t *first, u8_t last);
 
 int ll_init(struct k_sem *sem_rx)
 {
@@ -352,41 +353,36 @@ void ll_reset(void)
 
 u8_t ll_rx_get(void **node_rx, u16_t *handle)
 {
+	struct node_rx_hdr *rx;
 	memq_link_t *link;
 	u8_t cmplt = 0;
-	void *rx;
 
-	link = memq_peek(memq_ll_rx.head, memq_ll_rx.tail, &rx);
+	link = memq_peek(memq_ll_rx.head, memq_ll_rx.tail, (void **)&rx);
 	if (link) {
-		link_tx = ull_conn_ack_by_last_peek(rx->ack_last, &handle,
-						    &tx);
-		/* TODO: tx complete get a handle */
+		cmplt = tx_cmplt_get(handle, &mfifo_tx_ack.f, rx->ack_last);
 		if (!cmplt) {
-			/* TODO: release tx complete for handles */
+			u8_t f, cmplt_prev, cmplt_curr;
+			u16_t h;
+
+			cmplt_curr = 0;
+			f = mfifo_tx_ack.f;
+			do {
+				cmplt_prev = cmplt_curr;
+				cmplt_curr = tx_cmplt_get(&h, &f,
+							  mfifo_tx_ack.l);
+			} while ((cmplt_prev != 0) ||
+				 (cmplt_prev != cmplt_curr));
+
 			*node_rx = rx;
 		} else {
 			*node_rx = NULL;
 		}
 	} else {
-		/* TODO: tx complete get a handle */
+		cmplt = tx_cmplt_get(handle, &mfifo_tx_ack.f, mfifo_tx_ack.l);
 		*node_rx = NULL;
 	}
 
 	return cmplt;
-}
-
-u8_t tx_cmplt_get()
-{
-	link_tx = ull_conn_ack_by_last_peek(rx->ack_last, &handle,
-					    &tx);
-	if (!link_tx) {
-		return 0;
-	}
-
-	do {
-		struct pdu_data *pdu_data_tx;
-
-		pdu_data_tx = (void *)tx->pdu;
 }
 
 void ll_rx_dequeue(void)
@@ -660,7 +656,7 @@ void ll_rx_put(memq_link_t *link, void *rx)
 	 * last element index in Tx ack FIFO.
 	 */
 #if defined(CONFIG_BT_CONN)
-	rx_hdr->ack_last = ull_conn_ack_last_idx_get();
+	rx_hdr->ack_last = mfifo_tx_ack.l;
 #else /* !CONFIG_BT_CONN */
 	ARG_UNUSED(rx_hdr);
 #endif /* !CONFIG_BT_CONN */
@@ -1045,7 +1041,8 @@ static void _rx_demux(void *param)
 
 			link = lll_conn_ack_peek(&handle, &node_tx);
 			if (link) {
-				_rx_demux_conn_tx_ack(handle, link, node_tx);
+				_rx_demux_conn_tx_ack(rx->ack_last, handle,
+						      link, node_tx);
 			}
 #elif defined(CONFIG_BT_TMP)
 			}
@@ -1064,22 +1061,25 @@ static void _rx_demux(void *param)
 
 #if defined(CONFIG_BT_CONN)
 static inline void _rx_demux_conn_tx_ack(u8_t ack_last, u16_t handle,
-					 memq_link_t *link, struct node_tx *tx)
+					 memq_link_t *link,
+					 struct node_tx *node_tx)
 {
 	do {
+		struct lll_tx *tx;
+		u8_t idx;
+
 		idx = MFIFO_ENQUEUE_GET(tx_ack, (void **)&tx);
 		LL_ASSERT(tx);
 
 		tx->handle = handle;
-		tx->node = tx;
-
-		tx_release->link = link;
+		tx->node = node_tx;
 
 		MFIFO_ENQUEUE(tx_ack, idx);
 
 		lll_conn_ack_dequeue();
+		ull_conn_link_tx_release(link);
 
-		link = lll_conn_ack_by_last_peek(ack_last, &handle, &tx);
+		link = lll_conn_ack_by_last_peek(ack_last, &handle, &node_tx);
 	} while (link);
 }
 #endif /* CONFIG_BT_CONN */
@@ -1245,49 +1245,46 @@ static inline void _rx_demux_event_done(memq_link_t *link,
 	}
 }
 
-static u8_t ull_conn_ack_last_idx_get(void)
-{
-	return mfifo_tx_ack.l;
-}
-
-static memq_link_t *ull_conn_ack_peek(u16_t *handle, struct node_tx **node_tx)
-{
-	struct lll_tx *tx;
-
-	tx = MFIFO_DEQUEUE_GET(tx_ack);
-	if (!tx) {
-		return NULL;
-	}
-
-	*handle = tx->handle;
-	*node_tx = tx->node;
-
-	return (*node_tx)->link;
-}
-
-static memq_link_t *ull_conn_ack_by_last_peek(u8_t last, u16_t *handle,
-				       struct node_tx **node_tx)
-{
-	struct lll_tx *tx;
-
-	tx = mfifo_dequeue_get(mfifo_tx_ack.m, mfifo_tx_ack.s, mfifo_tx_ack.f,
-			       last);
-	if (!tx) {
-		return NULL;
-	}
-
-	*handle = tx->handle;
-	*node_tx = tx->node;
-
-	return (*node_tx)->link;
-}
-
-static void *ull_conn_ack_dequeue(void)
-{
-	return MFIFO_DEQUEUE(tx_ack);
-}
-
-void _disabled_cb(void *param)
+static void _disabled_cb(void *param)
 {
 	k_sem_give(param);
+}
+
+static u8_t tx_cmplt_get(u16_t *handle, u8_t *first, u8_t last)
+{
+	struct node_tx *node_tx;
+	struct lll_tx *tx;
+	u8_t cmplt;
+
+	tx = mfifo_dequeue_iter_get(mfifo_tx_ack.m, mfifo_tx_ack.s,
+				    mfifo_tx_ack.n, mfifo_tx_ack.f, last,
+				    first);
+	if (!tx) {
+		return 0;
+	}
+
+	node_tx = tx->node;
+	*handle = tx->handle;
+	cmplt = 0;
+	do {
+		struct pdu_data *p;
+
+		p = (void *)node_tx->pdu;
+		if (!node_tx || (node_tx == (void *)1) ||
+		    ((((u32_t)node_tx & ~3) != 0) &&
+		     (p->ll_id == PDU_DATA_LLID_DATA_START ||
+		      p->ll_id == PDU_DATA_LLID_DATA_CONTINUE))) {
+			tx->node = (void *)1;
+			cmplt++;
+		}
+
+		if (((u32_t)node_tx & ~3) != 0) {
+		}
+
+		tx = mfifo_dequeue_iter_get(mfifo_tx_ack.m, mfifo_tx_ack.s,
+					    mfifo_tx_ack.n, mfifo_tx_ack.f,
+					    last, first);
+	} while (tx && tx->handle == *handle);
+
+	return cmplt;
 }

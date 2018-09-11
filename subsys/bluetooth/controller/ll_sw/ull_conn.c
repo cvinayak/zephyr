@@ -440,6 +440,11 @@ void ull_conn_tx_demux(u8_t count)
 	} while (--count);
 }
 
+void ull_conn_link_tx_release(void *link)
+{
+	mem_release(link, &mem_link_tx.free);
+}
+
 static int _init_reset(void)
 {
 	/* Initialize conn pool. */
