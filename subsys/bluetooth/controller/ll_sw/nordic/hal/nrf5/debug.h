@@ -62,7 +62,7 @@
 		DEBUG_PORT->OUTCLR = DEBUG_PIN_MASK; \
 	} while (0)
 
-#define DEBUG_CPU_SLEEP(f) \
+#define DEBUG_CPU_SLEEP(flag) \
 	do { \
 		if (flag) { \
 			DEBUG_PORT->OUTSET = DEBUG_PIN0; \
