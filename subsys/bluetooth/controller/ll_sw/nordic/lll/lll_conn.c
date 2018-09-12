@@ -226,7 +226,8 @@ void lll_conn_isr_rx(void *param)
 			lll->empty = is_empty_pdu_tx_retry;
 
 			goto lll_conn_isr_rx_exit;
-#elif defined(CONFIG_BT_PERIPHERAL)
+#endif /* CONFIG_BT_CENTRAL */
+#if defined(CONFIG_BT_PERIPHERAL)
 		/* Event done for slave */
 		} else {
 			radio_switch_complete_and_disable();
