@@ -49,6 +49,7 @@ static struct bt_conn *pairing_conn;
 
 #define NAME_LEN 30
 
+#if defined(CONFIG_BT_OBSERVER)
 static bool data_cb(struct bt_data *data, void *user_data)
 {
 	char *name = user_data;
@@ -77,6 +78,7 @@ static void device_found(const bt_addr_le_t *addr, s8_t rssi, u8_t evtype,
 	print(NULL, "[DEVICE]: %s, AD evt type %u, RSSI %i %s",
 	      le_addr, evtype, rssi, name);
 }
+#endif /* CONFIG_BT_OBSERVER */
 
 #if !defined(CONFIG_BT_CONN)
 #if 0 /* FIXME: Add support for changing prompt */
@@ -540,6 +542,7 @@ static int cmd_id_select(const struct shell *shell, size_t argc, char *argv[])
 	return 0;
 }
 
+#if defined(CONFIG_BT_OBSERVER)
 static int cmd_active_scan_on(const struct shell *shell, int dups)
 {
 	int err;
@@ -641,7 +644,9 @@ static int cmd_scan(const struct shell *shell, size_t argc, char *argv[])
 
 	return 0;
 }
+#endif /* CONFIG_BT_OBSERVER */
 
+#if defined(CONFIG_BT_BROADCASTER)
 static const struct bt_data ad_discov[] = {
 	BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
 };
@@ -718,6 +723,49 @@ fail:
 	shell_help_print(shell, NULL, 0);
 	return -ENOEXEC;
 }
+
+static int cmd_directed_adv(const struct shell *shell,
+			     size_t argc, char *argv[])
+{
+	int err;
+	bt_addr_le_t addr;
+	struct bt_conn *conn;
+	struct bt_le_adv_param *param = BT_LE_ADV_CONN_DIR;
+
+	if (!shell_cmd_precheck(shell, (argc >= 2), NULL, 0)) {
+		return 0;
+	}
+
+	err = str2bt_addr_le(argv[1], argv[2], &addr);
+	if (err) {
+		error(shell, "Invalid peer address (err %d)", err);
+		return err;
+	}
+
+	if (argc > 3) {
+		if (!strcmp(argv[3], "low")) {
+			param = BT_LE_ADV_CONN_DIR_LOW_DUTY;
+		} else {
+			shell_help_print(shell, NULL, 0);
+			return 0;
+		}
+	}
+
+	conn = bt_conn_create_slave_le(&addr, param);
+	if (!conn) {
+		error(shell, "Failed to start directed advertising");
+		return -ENOEXEC;
+	} else {
+		print(shell, "Started directed advertising");
+
+		/* unref connection obj in advance as app user */
+		bt_conn_unref(conn);
+	}
+
+	return 0;
+}
+
+#endif /* CONFIG_BT_BROADCASTER */
 
 #if defined(CONFIG_BT_CONN)
 #if defined(CONFIG_BT_CENTRAL)
@@ -848,47 +896,6 @@ static int cmd_conn_update(const struct shell *shell,
 	}
 
 	return err;
-}
-
-static int cmd_directed_adv(const struct shell *shell,
-			     size_t argc, char *argv[])
-{
-	int err;
-	bt_addr_le_t addr;
-	struct bt_conn *conn;
-	struct bt_le_adv_param *param = BT_LE_ADV_CONN_DIR;
-
-	if (!shell_cmd_precheck(shell, (argc >= 2), NULL, 0)) {
-		return 0;
-	}
-
-	err = str2bt_addr_le(argv[1], argv[2], &addr);
-	if (err) {
-		error(shell, "Invalid peer address (err %d)", err);
-		return err;
-	}
-
-	if (argc > 3) {
-		if (!strcmp(argv[3], "low")) {
-			param = BT_LE_ADV_CONN_DIR_LOW_DUTY;
-		} else {
-			shell_help_print(shell, NULL, 0);
-			return 0;
-		}
-	}
-
-	conn = bt_conn_create_slave_le(&addr, param);
-	if (!conn) {
-		error(shell, "Failed to start directed advertising");
-		return -ENOEXEC;
-	} else {
-		print(shell, "Started directed advertising");
-
-		/* unref connection obj in advance as app user */
-		bt_conn_unref(conn);
-	}
-
-	return 0;
 }
 
 static int cmd_select(const struct shell *shell, size_t argc, char *argv[])
@@ -1372,19 +1379,23 @@ SHELL_CREATE_STATIC_SUBCMD_SET(bt_cmds) {
 	SHELL_CMD(id-show, NULL, HELP_NONE, cmd_id_show),
 	SHELL_CMD(id-select, NULL, "<id>", cmd_id_select),
 	SHELL_CMD(name, NULL, "[name]", cmd_name),
+#if defined(CONFIG_BT_OBSERVER)
 	SHELL_CMD(scan, NULL,
 		  "<value: on, passive, off> <dup filter: dups, nodups>",
 		  cmd_scan),
+#endif /* CONFIG_BT_OBSERVER */
+#if defined(CONFIG_BT_BROADCASTER)
 	SHELL_CMD(advertise, NULL,
 		  "<type: off, on, scan, nconn> <mode: discov, non_discov>",
 		  cmd_advertise),
+	SHELL_CMD(directed-adv, NULL, HELP_ADDR_LE " [mode: low]",
+		  cmd_directed_adv),
+#endif /* CONFIG_BT_BROADCASTER */
 #if defined(CONFIG_BT_CONN)
 #if defined(CONFIG_BT_CENTRAL)
 	SHELL_CMD(connect, NULL, HELP_ADDR_LE, cmd_connect_le),
 	SHELL_CMD(auto-conn, NULL, HELP_ADDR_LE, cmd_auto_conn),
 #endif /* CONFIG_BT_CENTRAL */
-	SHELL_CMD(directed-adv, NULL, HELP_ADDR_LE " [mode: low]",
-		  cmd_directed_adv),
 	SHELL_CMD(disconnect, NULL, HELP_NONE, cmd_disconnect),
 	SHELL_CMD(select, NULL, HELP_ADDR_LE, cmd_select),
 	SHELL_CMD(conn-update, NULL, "<min> <max> <latency> <timeout>",
