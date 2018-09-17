@@ -355,7 +355,7 @@ u8_t ll_rx_get(void **node_rx, u16_t *handle)
 {
 	struct node_rx_hdr *rx;
 	memq_link_t *link;
-	u8_t cmplt = 0;
+	u8_t cmplt;
 
 	link = memq_peek(memq_ll_rx.head, memq_ll_rx.tail, (void **)&rx);
 	if (link) {
@@ -1082,6 +1082,8 @@ static inline void _rx_demux_conn_tx_ack(u8_t ack_last, u16_t handle,
 
 		link = lll_conn_ack_by_last_peek(ack_last, &handle, &node_tx);
 	} while (link);
+
+	ll_rx_sched();
 }
 #endif /* CONFIG_BT_CONN */
 
@@ -1253,7 +1255,6 @@ static void _disabled_cb(void *param)
 
 static u8_t tx_cmplt_get(u16_t *handle, u8_t *first, u8_t last)
 {
-	struct node_tx *node_tx;
 	struct lll_tx *tx;
 	u8_t cmplt;
 
@@ -1264,12 +1265,13 @@ static u8_t tx_cmplt_get(u16_t *handle, u8_t *first, u8_t last)
 		return 0;
 	}
 
-	node_tx = tx->node;
 	*handle = tx->handle;
 	cmplt = 0;
 	do {
+		struct node_tx *node_tx;
 		struct pdu_data *p;
 
+		node_tx = tx->node;
 		p = (void *)node_tx->pdu;
 		if (!node_tx || (node_tx == (void *)1) ||
 		    ((((u32_t)node_tx & ~3) != 0) &&

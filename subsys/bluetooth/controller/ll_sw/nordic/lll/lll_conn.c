@@ -291,19 +291,16 @@ lll_conn_isr_rx_exit:
 
 	if (tx_release) {
 		struct lll_tx *tx;
-		memq_link_t *link;
 		u8_t idx;
 
-		link = memq_dequeue(lll->memq_tx.tail, &lll->memq_tx.head,
-				    NULL);
+		lll->packet_tx_head_len = 0;
+		lll->packet_tx_head_offset = 0;
 
 		idx = MFIFO_ENQUEUE_GET(conn_ack, (void **)&tx);
 		LL_ASSERT(tx);
 
 		tx->handle = lll->handle;
 		tx->node = tx_release;
-
-		tx_release->link = link;
 
 		MFIFO_ENQUEUE(conn_ack, idx);
 
@@ -754,7 +751,10 @@ static u32_t isr_rx_pdu(struct lll_conn *lll, struct pdu_data *pdu_data_rx,
 			lll->packet_tx_head_offset += pdu_data_tx_len;
 			if (lll->packet_tx_head_offset ==
 			    lll->packet_tx_head_len) {
-				*tx_release = tx;
+				link = memq_dequeue(lll->memq_tx.tail,
+						    &lll->memq_tx.head,
+						    (void **)tx_release);
+				(*tx_release)->link = link;
 			}
 		} else {
 			lll->empty = 0;
