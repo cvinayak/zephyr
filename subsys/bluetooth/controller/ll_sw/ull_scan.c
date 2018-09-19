@@ -367,22 +367,7 @@ static void ticker_cb(u32_t ticks_at_expire, u32_t remainder, u16_t lazy,
 		u32_t ticks_at_expire_normal = ticks_at_expire;
 		u32_t retval;
 
-#if defined(CONFIG_BT_CTLR_XTAL_ADVANCED)
-		if (scan->evt.ticks_xtal_to_start & XON_BITMASK) {
-			u32_t ticks_prepare_to_start =
-				(scan->evt.ticks_active_to_start >
-				 scan->evt.ticks_preempt_to_start) ?
-				scan->evt.ticks_active_to_start :
-				scan->evt.ticks_preempt_to_start;
-
-			ticks_at_expire_normal -=
-				(scan->evt.ticks_xtal_to_start &
-				 ~XON_BITMASK) - ticks_prepare_to_start;
-		}
-#endif /* CONFIG_BT_CTLR_XTAL_ADVANCED */
-
-		s_mfy_sched_after_mstr_offset_get.param =
-			(void *)ticks_at_expire_normal;
+		s_mfy_sched_after_mstr_offset_get.param = (void *)scan;
 
 		retval = mayfly_enqueue(TICKER_USER_ID_ULL_HIGH,
 				TICKER_USER_ID_ULL_LOW, 1,

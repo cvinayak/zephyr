@@ -38,15 +38,17 @@ static void conn_cleanup(struct lll_conn *lll);
 static struct ll_conn _conn[CONFIG_BT_MAX_CONN];
 static void *_conn_free;
 
-#define CONN_TX_POOL_SIZE ((CONFIG_BT_CTLR_TX_BUFFER_SIZE) * \
-			   (CONFIG_BT_CTLR_TX_BUFFERS))
+#define CONN_TX_BUF_SIZE (MROUND(offsetof(struct node_tx, pdu) + \
+				 offsetof(struct pdu_data, lldata) + \
+				 (CONFIG_BT_CTLR_TX_BUFFER_SIZE)) * \
+			  (CONFIG_BT_CTLR_TX_BUFFERS))
 
 static MFIFO_DEFINE(conn_tx, sizeof(struct lll_tx),
 		    CONFIG_BT_CTLR_TX_BUFFERS);
 
 static struct {
 	void *free;
-	u8_t pool[CONN_TX_POOL_SIZE];
+	u8_t pool[CONN_TX_BUF_SIZE * CONFIG_BT_CTLR_TX_BUFFERS];
 } mem_conn_tx;
 
 static struct {
@@ -449,11 +451,11 @@ static int _init_reset(void)
 {
 	/* Initialize conn pool. */
 	mem_init(_conn, sizeof(struct ll_conn),
-		 sizeof(_conn)/sizeof(struct ll_conn), &_conn_free);
+		 sizeof(_conn) / sizeof(struct ll_conn), &_conn_free);
 
 	/* Initialize tx pool. */
-	mem_init(mem_conn_tx.pool, CONFIG_BT_CTLR_TX_BUFFER_SIZE,
-		 CONFIG_BT_CTLR_TX_BUFFERS, &mem_conn_tx.free);
+	mem_init(mem_conn_tx.pool, CONN_TX_BUF_SIZE, CONFIG_BT_CTLR_TX_BUFFERS,
+		 &mem_conn_tx.free);
 
 	/* Initialize tx link pool. */
 	mem_init(mem_link_tx.pool, sizeof(memq_link_t),
@@ -493,6 +495,7 @@ static void terminate_ind_rx_enqueue(struct lll_conn *lll, u8_t reason)
 
 	/* Get the link mem reserved in the connection context */
 	link = rx->hdr.link;
+	rx->hdr.link = NULL;
 
 	/* Serialize release queue with rx queue by storing reference to
 	 * last element in release queue

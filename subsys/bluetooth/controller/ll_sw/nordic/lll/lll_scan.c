@@ -669,7 +669,8 @@ static inline u32_t isr_rx_pdu(struct lll_scan *lll, u8_t devmatch_ok,
 		conn_interval_us = (u32_t)lll_conn->interval * 1250;
 		conn_offset_us = radio_tmr_end_get() + 502 + 1250;
 
-		if (lll->conn_win_offset_us == 0) {
+		if (!IS_ENABLED(CONFIG_BT_CTLR_SCHED_ADVANCED) ||
+		    lll->conn_win_offset_us == 0) {
 			conn_space_us = conn_offset_us;
 			pdu_tx->connect_ind.win_offset = 0;
 		} else {

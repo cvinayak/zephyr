@@ -3239,7 +3239,7 @@ static void encode_data_ctrl(struct node_rx_pdu *node_rx,
 		break;
 
 	default:
-		LL_ASSERT(0);
+		//LL_ASSERT(0);
 		return;
 	}
 }

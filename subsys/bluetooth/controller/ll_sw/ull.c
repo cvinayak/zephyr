@@ -470,7 +470,7 @@ void ll_rx_dequeue(void)
 	}
 
 	if (0) {
-#if defined(CONFIG_BT_PERIPHERAL)
+#if defined(CONFIG_BT_CONN)
 	} else if (rx->type == NODE_RX_TYPE_CONNECTION) {
 		struct node_rx_ftr *ftr;
 
@@ -478,7 +478,9 @@ void ll_rx_dequeue(void)
 			       (offsetof(struct pdu_adv, connect_ind) +
 			       sizeof(struct pdu_adv_connect_ind)));
 
-		if ((cc->status == 0x3c) || cc->role) {
+		if (0) {
+#if defined(CONFIG_BT_PERIPHERAL)
+		} else if ((cc->status == 0x3c) || cc->role) {
 			struct lll_adv *lll = ftr->param;
 			struct ll_adv_set *adv = (void *)HDR_LLL2EVT(lll);
 
@@ -500,11 +502,14 @@ void ll_rx_dequeue(void)
 			}
 
 			adv->is_enabled = 0;
+#endif /* CONFIG_BT_PERIPHERAL */
+#if defined(CONFIG_BT_CENTRAL)
 		} else {
 			struct lll_scan *lll = ftr->param;
 			struct ll_scan_set *scan = (void *)HDR_LLL2EVT(lll);
 
 			scan->is_enabled = 0;
+#endif /* CONFIG_BT_CENTRAL */
 		}
 
 		if (IS_ENABLED(CONFIG_BT_CTLR_PRIVACY)) {
@@ -517,7 +522,7 @@ void ll_rx_dequeue(void)
 				ll_adv_scan_state_cb(0);
 			}
 		}
-#endif /* CONFIG_BT_PERIPHERAL */
+#endif /* CONFIG_BT_CONN */
 
 #if defined(CONFIG_BT_HCI_MESH_EXT)
 	} else if (rx->type == NODE_RX_TYPE_MESH_ADV_CPLT) {

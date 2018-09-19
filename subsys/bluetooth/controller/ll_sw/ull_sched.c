@@ -5,6 +5,16 @@
  */
 
 #include <zephyr/types.h>
+#include <toolchain.h>
+
+#include "util/memq.h"
+
+#include "pdu.h"
+
+#include "lll.h"
+#include "lll_scan.h"
+
+#include "ull_scan_types.h"
 
 void ull_sched_after_mstr_slot_get(u8_t user_id, u32_t ticks_slot_abs,
 				   u32_t *ticks_anchor, u32_t *us_offset)
@@ -14,5 +24,8 @@ void ull_sched_after_mstr_slot_get(u8_t user_id, u32_t ticks_slot_abs,
 
 void ull_sched_mfy_after_mstr_offset_get(void *param)
 {
+	struct ll_scan_set *scan = param;
+
 	/* TODO: */
+	scan->lll.conn_win_offset_us = 0;
 }
