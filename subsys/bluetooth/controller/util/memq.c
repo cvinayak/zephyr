@@ -24,6 +24,11 @@ memq_link_t *memq_deinit(memq_link_t **head, memq_link_t **tail)
 {
 	memq_link_t *link;
 
+	/* if head and tail are not equal, then queue is not empty */
+	if (*head != *tail) {
+		return NULL;
+	}
+
 	link = *head;
 	*head = *tail = NULL;
 
