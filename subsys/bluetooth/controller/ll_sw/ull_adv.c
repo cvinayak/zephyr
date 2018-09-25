@@ -554,6 +554,7 @@ u32_t ll_adv_enable(u8_t enable)
 		conn_lll->event_counter = 0;
 		conn_lll->sn = 0;
 		conn_lll->nesn = 0;
+		conn_lll->empty = 0;
 
 		if (!conn_lll->link_tx_free) {
 			conn_lll->link_tx_free = &conn_lll->link_tx;
@@ -561,6 +562,7 @@ u32_t ll_adv_enable(u8_t enable)
 
 		memq_init(conn_lll->link_tx_free, &conn_lll->memq_tx.head,
 			  &conn_lll->memq_tx.tail);
+		conn_lll->link_tx_free = NULL;
 
 		conn_lll->packet_tx_head_len = 0;
 		conn_lll->packet_tx_head_offset = 0;
@@ -573,7 +575,12 @@ u32_t ll_adv_enable(u8_t enable)
 
 		/* TODO: move to ull? */
 		conn_lll->latency_prepare = 0;
+		conn_lll->latency_event = 0;
+		conn_lll->slave.latency_enabled = 0;
+		conn_lll->slave.latency_cancel = 0;
 		conn_lll->slave.window_widening_prepare_us = 0;
+		conn_lll->slave.window_widening_event_us = 0;
+		conn_lll->slave.window_size_prepare_us = 0;
 		conn_lll->connect_expire = 6;
 		conn_lll->supervision_expire = 0;
 		conn_lll->procedure_expire = 0;

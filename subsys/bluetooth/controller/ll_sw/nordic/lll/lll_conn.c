@@ -293,9 +293,6 @@ lll_conn_isr_rx_exit:
 		struct lll_tx *tx;
 		u8_t idx;
 
-		lll->packet_tx_head_len = 0;
-		lll->packet_tx_head_offset = 0;
-
 		idx = MFIFO_ENQUEUE_GET(conn_ack, (void **)&tx);
 		LL_ASSERT(tx);
 
@@ -638,6 +635,35 @@ void *lll_conn_ack_dequeue(void)
 	return MFIFO_DEQUEUE(conn_ack);
 }
 
+void lll_conn_tx_flush(void *param)
+{
+	struct lll_conn *lll = param;
+	struct node_tx *node_tx;
+	memq_link_t *link;
+
+	link = memq_dequeue(lll->memq_tx.tail, &lll->memq_tx.head,
+			    (void **)&node_tx);
+	while (link) {
+		struct pdu_data *p;
+		struct lll_tx *tx;
+		u8_t idx;
+
+		idx = MFIFO_ENQUEUE_GET(conn_ack, (void **)&tx);
+		LL_ASSERT(tx);
+
+		tx->handle = lll->handle;
+		tx->node = node_tx;
+		node_tx->link = link;
+		p = (void *)node_tx->pdu;
+		p->ll_id = PDU_DATA_LLID_RESV;
+
+		MFIFO_ENQUEUE(conn_ack, idx);
+
+		link = memq_dequeue(lll->memq_tx.tail, &lll->memq_tx.head,
+				    (void **)&node_tx);
+	}
+}
+
 static int init_reset(void)
 {
 	return 0;
@@ -751,6 +777,9 @@ static u32_t isr_rx_pdu(struct lll_conn *lll, struct pdu_data *pdu_data_rx,
 			lll->packet_tx_head_offset += pdu_data_tx_len;
 			if (lll->packet_tx_head_offset ==
 			    lll->packet_tx_head_len) {
+				lll->packet_tx_head_len = 0;
+				lll->packet_tx_head_offset = 0;
+
 				link = memq_dequeue(lll->memq_tx.tail,
 						    &lll->memq_tx.head,
 						    (void **)tx_release);

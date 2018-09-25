@@ -13,6 +13,7 @@
 #include <misc/printk.h>
 #include <misc/byteorder.h>
 #include <zephyr.h>
+#include <soc.h>
 
 #include <settings/settings.h>
 
@@ -287,9 +288,12 @@ void main(void)
 	 * of starting delayed work so we do it here
 	 */
 	while (1) {
+		NRF_GPIO->OUTCLR = BIT(17);
 		//k_sleep(MSEC_PER_SEC);
-		//k_sleep(50);
+		//k_sleep(20);
 		k_yield();
+
+		NRF_GPIO->OUTSET = BIT(17);
 
 		/* Current Time Service updates only when time is changed */
 		cts_notify();

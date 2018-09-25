@@ -318,3 +318,4 @@ memq_link_t *lll_conn_ack_peek(u8_t *ack_last, u16_t *handle,
 memq_link_t *lll_conn_ack_by_last_peek(u8_t last, u16_t *handle,
 				       struct node_tx **node_tx);
 void *lll_conn_ack_dequeue(void);
+void lll_conn_tx_flush(void *param);

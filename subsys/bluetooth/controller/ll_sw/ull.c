@@ -42,6 +42,7 @@
 #include "ull_tmp_internal.h"
 
 #include "common/log.h"
+#include <soc.h>
 #include "hal/debug.h"
 
 /* Define ticker nodes and user operations */
@@ -357,6 +358,7 @@ u8_t ll_rx_get(void **node_rx, u16_t *handle)
 	memq_link_t *link;
 	u8_t cmplt;
 
+	DEBUG_CPU_SLEEP(0);
 	link = memq_peek(memq_ll_rx.head, memq_ll_rx.tail, (void **)&rx);
 	if (link) {
 		cmplt = tx_cmplt_get(handle, &mfifo_tx_ack.f, rx->ack_last);
@@ -381,6 +383,7 @@ u8_t ll_rx_get(void **node_rx, u16_t *handle)
 		cmplt = tx_cmplt_get(handle, &mfifo_tx_ack.f, mfifo_tx_ack.l);
 		*node_rx = NULL;
 	}
+	DEBUG_CPU_SLEEP(1);
 
 	return cmplt;
 }
@@ -613,8 +616,16 @@ void ll_rx_mem_release(void **node_rx)
 		case NODE_RX_TYPE_TERMINATE:
 		{
 			struct ll_conn *conn;
+			memq_link_t *link;
 
 			conn = ll_conn_get(_node_rx_free->handle);
+
+			LL_ASSERT(!conn->lll.link_tx_free);
+			link = memq_deinit(&conn->lll.memq_tx.head,
+					   &conn->lll.memq_tx.tail);
+			LL_ASSERT(link);
+			conn->lll.link_tx_free = link;
+
 			ll_conn_release(conn);
 		}
 		break;
@@ -810,6 +821,22 @@ void ull_rx_sched(void)
 	/* Kick the ULL (using the mayfly, tailchain it) */
 	mayfly_enqueue(TICKER_USER_ID_LLL, TICKER_USER_ID_ULL_HIGH, 1, &_mfy);
 }
+
+#if defined(CONFIG_BT_CONN)
+void ull_tx_ack_put(u16_t handle, struct node_tx *node_tx)
+{
+	struct lll_tx *tx;
+	u8_t idx;
+
+	idx = MFIFO_ENQUEUE_GET(tx_ack, (void **)&tx);
+	LL_ASSERT(tx);
+
+	tx->handle = handle;
+	tx->node = node_tx;
+
+	MFIFO_ENQUEUE(tx_ack, idx);
+}
+#endif /* CONFIG_BT_CONN */
 
 int ull_prepare_enqueue(lll_is_abort_cb_t is_abort_cb,
 			lll_abort_cb_t abort_cb,
@@ -1071,23 +1098,17 @@ static inline void _rx_demux_conn_tx_ack(u8_t ack_last, u16_t handle,
 					 struct node_tx *node_tx)
 {
 	do {
-		struct lll_tx *tx;
-		u8_t idx;
-
-		idx = MFIFO_ENQUEUE_GET(tx_ack, (void **)&tx);
-		LL_ASSERT(tx);
-
-		tx->handle = handle;
-		tx->node = node_tx;
-
-		MFIFO_ENQUEUE(tx_ack, idx);
-
+		ull_tx_ack_put(handle, node_tx);
 		lll_conn_ack_dequeue();
 		ull_conn_link_tx_release(link);
 
 		link = lll_conn_ack_by_last_peek(ack_last, &handle, &node_tx);
 	} while (link);
 
+	/* De-mux tx nodes from FIFO */
+	ull_conn_tx_demux(UINT8_MAX);
+
+	/* trigger thread to call ll_rx_get() */
 	ll_rx_sched();
 }
 #endif /* CONFIG_BT_CONN */
@@ -1287,7 +1308,9 @@ static u8_t tx_cmplt_get(u16_t *handle, u8_t *first, u8_t last)
 		}
 
 		if (((u32_t)node_tx & ~3) != 0) {
+			DEBUG_CPU_SLEEP(1);
 			ll_tx_mem_release(node_tx);
+			DEBUG_CPU_SLEEP(0);
 		}
 
 		tx = mfifo_dequeue_iter_get(mfifo_tx_ack.m, mfifo_tx_ack.s,

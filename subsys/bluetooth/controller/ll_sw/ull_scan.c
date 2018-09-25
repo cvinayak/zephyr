@@ -8,6 +8,7 @@
 #include <zephyr.h>
 #include <bluetooth/hci.h>
 
+#include "hal/ccm.h"
 #include "hal/ticker.h"
 
 #include "util/util.h"
@@ -23,6 +24,7 @@
 #include "lll_vendor.h"
 #include "lll_adv.h"
 #include "lll_scan.h"
+#include "lll_conn.h"
 #include "lll_filter.h"
 
 #include "ull.h"

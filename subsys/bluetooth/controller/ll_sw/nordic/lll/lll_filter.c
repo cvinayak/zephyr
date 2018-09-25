@@ -10,6 +10,8 @@
 #include <misc/byteorder.h>
 #include <bluetooth/hci.h>
 
+#include "hal/ccm.h"
+
 #include "util/util.h"
 #include "util/memq.h"
 
@@ -19,6 +21,7 @@
 #include "lll.h"
 #include "lll_adv.h"
 #include "lll_scan.h"
+#include "lll_conn.h"
 #include "lll_filter.h"
 
 #include "ull_adv_types.h"

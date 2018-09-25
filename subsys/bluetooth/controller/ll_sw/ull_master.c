@@ -119,6 +119,7 @@ u32_t ll_create_connection(u16_t scan_interval, u16_t scan_window,
 
 	memq_init(conn_lll->link_tx_free, &conn_lll->memq_tx.head,
 		  &conn_lll->memq_tx.tail);
+	conn_lll->link_tx_free = NULL;
 
 	conn_lll->packet_tx_head_len = 0;
 	conn_lll->packet_tx_head_offset = 0;

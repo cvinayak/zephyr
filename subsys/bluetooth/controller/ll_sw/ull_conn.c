@@ -112,6 +112,17 @@ u8_t ll_tx_mem_enqueue(u16_t handle, void *node_tx)
 
 u8_t ll_terminate_ind_send(u16_t handle, u8_t reason)
 {
+	struct ll_conn *conn;
+
+	conn = is_connected_get(handle);
+	if (!conn) {
+		return -EINVAL;
+	}
+
+	conn->lll.llcp_terminate.reason_own = reason;
+
+	conn->lll.llcp_terminate.req++;
+
 	return 0;
 }
 
@@ -424,7 +435,6 @@ void ull_conn_tx_demux(u8_t count)
 	do {
 		struct ll_conn *conn;
 		struct lll_tx *tx;
-		memq_link_t *link;
 
 		tx = MFIFO_DEQUEUE_GET(conn_tx);
 		if (!tx) {
@@ -432,11 +442,20 @@ void ull_conn_tx_demux(u8_t count)
 		}
 
 		conn = ll_conn_get(tx->handle);
+		if (conn && (conn->lll.handle == tx->handle)) {
+			memq_link_t *link;
 
-		link = mem_acquire(&mem_link_tx.free);
-		LL_ASSERT(link);
+			link = mem_acquire(&mem_link_tx.free);
+			LL_ASSERT(link);
 
-		memq_enqueue(link, tx->node, &conn->lll.memq_tx.tail);
+			memq_enqueue(link, tx->node, &conn->lll.memq_tx.tail);
+		} else {
+			struct node_tx *node_tx = tx->node;
+			struct pdu_data *p = (void *)node_tx->pdu;
+
+			p->ll_id = PDU_DATA_LLID_RESV;
+			ull_tx_ack_put(tx->handle, tx->node);
+		}
 
 		MFIFO_DEQUEUE(conn_tx);
 	} while (--count);
@@ -497,12 +516,6 @@ static void terminate_ind_rx_enqueue(struct lll_conn *lll, u8_t reason)
 	link = rx->hdr.link;
 	rx->hdr.link = NULL;
 
-	/* Serialize release queue with rx queue by storing reference to
-	 * last element in release queue
-	 */
-	/* TODO: */
-	/* node_rx->hdr.packet_release_last = _radio.packet_release_last; */
-
 	ll_rx_put(link, rx);
 	ll_rx_sched();
 }
@@ -515,7 +528,15 @@ static void ticker_op_update_cb(u32_t status, void *param)
 
 static void ticker_op_stop_cb(u32_t status, void *param)
 {
+	static memq_link_t _link;
+	static struct mayfly _mfy = {0, 0, &_link, NULL, lll_conn_tx_flush};
+
 	LL_ASSERT(status == TICKER_STATUS_SUCCESS);
+
+	_mfy.param = param;
+
+	/* Flush pending tx PDUs in LLL (using a mayfly) */
+	mayfly_enqueue(TICKER_USER_ID_ULL_LOW, TICKER_USER_ID_LLL, 1, &_mfy);
 }
 
 static void conn_cleanup(struct lll_conn *lll)
@@ -532,7 +553,7 @@ static void conn_cleanup(struct lll_conn *lll)
 	ticker_status = ticker_stop(TICKER_INSTANCE_ID_CTLR,
 				    TICKER_USER_ID_ULL_HIGH,
 				    ticker_id,
-				    ticker_op_stop_cb, (void *)__LINE__);
+				    ticker_op_stop_cb, (void *)lll);
 	LL_ASSERT((ticker_status == TICKER_STATUS_SUCCESS) ||
 		  (ticker_status == TICKER_STATUS_BUSY));
 }
