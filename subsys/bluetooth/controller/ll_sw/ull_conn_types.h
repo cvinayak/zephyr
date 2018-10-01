@@ -10,6 +10,27 @@ struct ll_conn {
 	struct evt_hdr  evt;
 	struct ull_hdr  ull;
 	struct lll_conn lll;
+
+	u16_t connect_expire;
+	u16_t supervision_reload;
+	u16_t supervision_expire;
+	u16_t procedure_reload;
+	u16_t procedure_expire;
+
+	u8_t llcp_req;
+	u8_t llcp_ack;
+	u8_t llcp_type;
+
+	struct {
+		u8_t req;
+		u8_t ack;
+		u8_t reason_own;
+		u8_t reason_peer;
+		struct {
+			struct node_rx_hdr hdr;
+			u8_t reason;
+		} node_rx;
+	} llcp_terminate;
 };
 
 struct node_rx_cc {

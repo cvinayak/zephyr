@@ -547,14 +547,7 @@ u32_t ll_adv_enable(u8_t enable)
 		}
 
 		conn_lll = &conn->lll;
-		conn_lll->role = 1;
 		conn_lll->handle = 0xFFFF;
-		conn_lll->data_chan_sel = 0;
-		conn_lll->data_chan_use = 0;
-		conn_lll->event_counter = 0;
-		conn_lll->sn = 0;
-		conn_lll->nesn = 0;
-		conn_lll->empty = 0;
 
 		if (!conn_lll->link_tx_free) {
 			conn_lll->link_tx_free = &conn_lll->link_tx;
@@ -567,13 +560,24 @@ u32_t ll_adv_enable(u8_t enable)
 		conn_lll->packet_tx_head_len = 0;
 		conn_lll->packet_tx_head_offset = 0;
 
+		conn_lll->sn = 0;
+		conn_lll->nesn = 0;
+		conn_lll->enc_rx = 0;
+		conn_lll->enc_tx = 0;
+		conn_lll->empty = 0;
+
 #if defined(CONFIG_BT_CTLR_CONN_RSSI)
 		conn_lll->rssi_latest = 0x7F;
 		conn_lll->rssi_reported = 0x7F;
 		conn_lll->rssi_sample_count = 0;
 #endif /* CONFIG_BT_CTLR_CONN_RSSI */
 
-		/* TODO: move to ull? */
+		/* FIXME: BEGIN: Move to ULL? */
+		conn_lll->role = 1;
+		conn_lll->data_chan_sel = 0;
+		conn_lll->data_chan_use = 0;
+		conn_lll->event_counter = 0;
+
 		conn_lll->latency_prepare = 0;
 		conn_lll->latency_event = 0;
 		conn_lll->slave.latency_enabled = 0;
@@ -581,117 +585,17 @@ u32_t ll_adv_enable(u8_t enable)
 		conn_lll->slave.window_widening_prepare_us = 0;
 		conn_lll->slave.window_widening_event_us = 0;
 		conn_lll->slave.window_size_prepare_us = 0;
-		conn_lll->connect_expire = 6;
-		conn_lll->supervision_expire = 0;
-		conn_lll->procedure_expire = 0;
+		/* FIXME: END: Move to ULL? */
 
-#if defined(CONFIG_BT_CTLR_LE_PING)
-		conn_lll->apto_expire = 0;
-		conn_lll->appto_expire = 0;
-#endif /* CONFIG_BT_CTLR_LE_PING */
+		conn->connect_expire = 6;
+		conn->supervision_expire = 0;
+		conn->procedure_expire = 0;
 
 		/* NOTE: use allocated link for generating dedicated
 		 * terminate ind rx node
 		 */
-		conn_lll->llcp_terminate.node_rx.hdr.link = link;
+		conn->llcp_terminate.node_rx.hdr.link = link;
 
-#if 0
-		conn = &ull_conn->lll;
-		conn->handle = 0xFFFF;
-		conn->llcp_features = RADIO_BLE_FEAT;
-		conn->data_chan_sel = 0;
-		conn->data_chan_use = 0;
-		conn->event_counter = 0;
-		conn->latency_prepare = 0;
-		conn->latency_event = 0;
-
-#if defined(CONFIG_BT_CTLR_DATA_LENGTH)
-		conn->default_tx_octets = _radio.default_tx_octets;
-		conn->max_tx_octets = RADIO_LL_LENGTH_OCTETS_RX_MIN;
-		conn->max_rx_octets = RADIO_LL_LENGTH_OCTETS_RX_MIN;
-
-#if defined(CONFIG_BT_CTLR_PHY)
-		conn->default_tx_time = _radio.default_tx_time;
-		conn->max_tx_time =
-			RADIO_PKT_TIME(RADIO_LL_LENGTH_OCTETS_RX_MIN, 0);
-		conn->max_rx_time =
-			RADIO_PKT_TIME(RADIO_LL_LENGTH_OCTETS_RX_MIN, 0);
-#endif /* CONFIG_BT_CTLR_PHY */
-#endif /* CONFIG_BT_CTLR_DATA_LENGTH */
-
-#if defined(CONFIG_BT_CTLR_PHY)
-		conn->phy_pref_tx = _radio.default_phy_tx;
-		conn->phy_tx = BIT(0);
-		conn->phy_pref_flags = 0;
-		conn->phy_flags = 0;
-		conn->phy_tx_time = BIT(0);
-		conn->phy_pref_rx = _radio.default_phy_rx;
-		conn->phy_rx = BIT(0);
-#endif /* CONFIG_BT_CTLR_PHY */
-
-		conn->role = 1;
-		conn->connect_expire = 6;
-		conn->common.fex_valid = 0;
-		conn->slave.latency_enabled = 0;
-		conn->slave.latency_cancel = 0;
-		conn->slave.window_widening_prepare_us = 0;
-		conn->slave.window_widening_event_us = 0;
-		conn->slave.ticks_to_offset = 0;
-		conn->supervision_expire = 0;
-		conn->procedure_expire = 0;
-
-#if defined(CONFIG_BT_CTLR_LE_PING)
-		conn->apto_expire = 0;
-		conn->appto_expire = 0;
-#endif /* CONFIG_BT_CTLR_LE_PING */
-
-		conn->llcp_req = 0;
-		conn->llcp_ack = 0;
-		conn->llcp_version.tx = 0;
-		conn->llcp_version.rx = 0;
-		conn->llcp_terminate.req = 0;
-		conn->llcp_terminate.ack = 0;
-		conn->llcp_terminate.reason_peer = 0;
-		conn->llcp_terminate.radio_pdu_node_rx.hdr.onion.link = link;
-
-#if defined(CONFIG_BT_CTLR_CONN_PARAM_REQ)
-		conn->llcp_conn_param.req = 0;
-		conn->llcp_conn_param.ack = 0;
-		conn->llcp_conn_param.disabled = 0;
-#endif /* CONFIG_BT_CTLR_CONN_PARAM_REQ */
-
-#if defined(CONFIG_BT_CTLR_DATA_LENGTH)
-		conn->llcp_length.req = 0;
-		conn->llcp_length.ack = 0;
-#endif /* CONFIG_BT_CTLR_DATA_LENGTH */
-
-#if defined(CONFIG_BT_CTLR_PHY)
-		conn->llcp_phy.req = 0;
-		conn->llcp_phy.ack = 0;
-#endif /* CONFIG_BT_CTLR_PHY */
-
-		conn->sn = 0;
-		conn->nesn = 0;
-		conn->pause_rx = 0;
-		conn->pause_tx = 0;
-		conn->enc_rx = 0;
-		conn->enc_tx = 0;
-		conn->refresh = 0;
-		conn->empty = 0;
-		conn->pkt_tx_head = NULL;
-		conn->pkt_tx_ctrl = NULL;
-		conn->pkt_tx_ctrl_last = NULL;
-		conn->pkt_tx_data = NULL;
-		conn->pkt_tx_last = NULL;
-		conn->packet_tx_head_len = 0;
-		conn->packet_tx_head_offset = 0;
-
-#if defined(CONFIG_BT_CTLR_CONN_RSSI)
-		conn->rssi_latest = 0x7F;
-		conn->rssi_reported = 0x7F;
-		conn->rssi_sample_count = 0;
-#endif /* CONFIG_BT_CTLR_CONN_RSSI */
-#endif
 		/* NOTE: using same link as supplied for terminate ind */
 		adv->link_cc_free = link;
 		adv->node_rx_cc_free = node_rx;

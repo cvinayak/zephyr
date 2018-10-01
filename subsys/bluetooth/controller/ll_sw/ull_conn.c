@@ -119,9 +119,9 @@ u8_t ll_terminate_ind_send(u16_t handle, u8_t reason)
 		return -EINVAL;
 	}
 
-	conn->lll.llcp_terminate.reason_own = reason;
+	conn->llcp_terminate.reason_own = reason;
 
-	conn->lll.llcp_terminate.req++;
+	conn->llcp_terminate.req++;
 
 	return 0;
 }
@@ -223,6 +223,7 @@ void ull_conn_setup(memq_link_t *link, struct node_rx_hdr *rx)
 void ull_conn_done(struct node_rx_event_done *done)
 {
 	struct lll_conn *lll = (void *)HDR_ULL2LLL(done->param);
+	struct ll_conn *conn = (void *)HDR_LLL2EVT(lll);
 	u32_t ticks_drift_minus;
 	u32_t ticks_drift_plus;
 	u16_t latency_event;
@@ -245,16 +246,16 @@ void ull_conn_done(struct node_rx_event_done *done)
 		}
 
 		/* Reset connection failed to establish countdown */
-		lll->connect_expire = 0;
+		conn->connect_expire = 0;
 
 		/* Reset supervision countdown */
-		lll->supervision_expire = 0;
+		conn->supervision_expire = 0;
 	}
 
 	/* check connection failed to establish */
-	else if (lll->connect_expire) {
-		if (lll->connect_expire > elapsed_event) {
-			lll->connect_expire -= elapsed_event;
+	else if (conn->connect_expire) {
+		if (conn->connect_expire > elapsed_event) {
+			conn->connect_expire -= elapsed_event;
 		} else {
 			terminate_ind_rx_enqueue(lll, 0x3e);
 
@@ -269,16 +270,16 @@ void ull_conn_done(struct node_rx_event_done *done)
 	 */
 	else {
 		/* Start supervision timeout, if not started already */
-		if (!lll->supervision_expire) {
-			lll->supervision_expire = lll->supervision_reload;
+		if (!conn->supervision_expire) {
+			conn->supervision_expire = conn->supervision_reload;
 		}
 	}
 
 	/* check supervision timeout */
 	force = 0;
-	if (lll->supervision_expire) {
-		if (lll->supervision_expire > elapsed_event) {
-			lll->supervision_expire -= elapsed_event;
+	if (conn->supervision_expire) {
+		if (conn->supervision_expire > elapsed_event) {
+			conn->supervision_expire -= elapsed_event;
 
 			/* break latency */
 			lll->latency_event = 0;
@@ -286,16 +287,18 @@ void ull_conn_done(struct node_rx_event_done *done)
 			/* Force both master and slave when close to
 			 * supervision timeout.
 			 */
-			if (lll->supervision_expire <= 6) {
+			if (conn->supervision_expire <= 6) {
 				force = 1;
 			}
 			/* use randomness to force slave role when anchor
 			 * points are being missed.
 			 */
 			else if (lll->role) {
-				if (latency_event != 0) {
+				if (latency_event) {
 					force = 1;
 				} else {
+					/* FIXME:*/
+					#if 0
 					force = lll->slave.force & 0x01;
 
 					/* rotate force bits */
@@ -303,6 +306,7 @@ void ull_conn_done(struct node_rx_event_done *done)
 					if (force) {
 						lll->slave.force |= BIT(31);
 					}
+					#endif
 				}
 			}
 		} else {
@@ -315,9 +319,9 @@ void ull_conn_done(struct node_rx_event_done *done)
 	}
 
 	/* check procedure timeout */
-	if (lll->procedure_expire != 0) {
-		if (lll->procedure_expire > elapsed_event) {
-			lll->procedure_expire -= elapsed_event;
+	if (conn->procedure_expire != 0) {
+		if (conn->procedure_expire > elapsed_event) {
+			conn->procedure_expire -= elapsed_event;
 		} else {
 			terminate_ind_rx_enqueue(lll, 0x22);
 
@@ -391,9 +395,9 @@ void ull_conn_done(struct node_rx_event_done *done)
 #endif /* CONFIG_BT_CTLR_CONN_RSSI */
 
 	/* break latency based on ctrl procedure pending */
-	if ((lll->llcp_ack != lll->llcp_req) &&
-	    ((lll->llcp_type == LLCP_CONN_UPD) ||
-	     (lll->llcp_type == LLCP_CHAN_MAP))) {
+	if ((conn->llcp_ack != conn->llcp_req) &&
+	    ((conn->llcp_type == LLCP_CONN_UPD) ||
+	     (conn->llcp_type == LLCP_CHAN_MAP))) {
 		lll->latency_event = 0;
 	}
 
@@ -501,11 +505,12 @@ static struct ll_conn *is_connected_get(u16_t handle)
 
 static void terminate_ind_rx_enqueue(struct lll_conn *lll, u8_t reason)
 {
+	struct ll_conn *conn = (void *)HDR_LLL2EVT(lll);
 	struct node_rx_pdu *rx;
 	memq_link_t *link;
 
 	/* Prepare the rx packet structure */
-	rx = (void *)&lll->llcp_terminate.node_rx;
+	rx = (void *)&conn->llcp_terminate.node_rx;
 	LL_ASSERT(rx->hdr.link);
 
 	rx->hdr.handle = lll->handle;

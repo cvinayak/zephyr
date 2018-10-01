@@ -186,9 +186,6 @@ void lll_conn_isr_rx(void *param)
 
 		/* Reset CRC expiry counter */
 		crc_expire = 0;
-
-		/* Reset supervision counter */
-		lll->supervision_expire = 0;
 	} else {
 		/* Start CRC error countdown, if not already started */
 		if (crc_expire == 0) {

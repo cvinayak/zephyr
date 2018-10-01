@@ -91,10 +91,10 @@ void ull_slave_setup(memq_link_t *link, struct node_rx_hdr *rx,
 	lll->slave.window_size_event_us = pdu_adv->connect_ind.win_size * 1250;
 
 	/* procedure timeouts */
-	lll->supervision_reload =
+	conn->supervision_reload =
 		RADIO_CONN_EVENTS((pdu_adv->connect_ind.timeout * 10 * 1000),
 				  conn_interval_us);
-	lll->procedure_reload =
+	conn->procedure_reload =
 		RADIO_CONN_EVENTS((40 * 1000 * 1000), conn_interval_us);
 
 #if defined(CONFIG_BT_CTLR_LE_PING)
@@ -110,8 +110,11 @@ void ull_slave_setup(memq_link_t *link, struct node_rx_hdr *rx,
 			     lll->apto_reload;
 #endif /* CONFIG_BT_CTLR_LE_PING */
 
+	/* FIXME: */
+	#if 0
 	memcpy((void *)&lll->slave.force, &lll->access_addr[0],
 	       sizeof(lll->slave.force));
+	#endif
 
 	peer_addr_type = pdu_adv->tx_addr;
 	memcpy(peer_addr, pdu_adv->connect_ind.init_addr, BDADDR_SIZE);

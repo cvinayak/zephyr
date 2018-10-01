@@ -96,22 +96,15 @@ u32_t ll_create_connection(u16_t scan_interval, u16_t scan_window,
 	lll->conn_ticks_slot = 0; /* TODO: */
 
 	conn_lll = &conn->lll;
-	conn_lll->role = 0;
-	conn_lll->handle = 0xFFFF;
+
 	access_addr = access_addr_get();
 	memcpy(conn_lll->access_addr, &access_addr,
 	       sizeof(conn_lll->access_addr));
 	bt_rand(&conn_lll->crc_init[0], 3);
-	memcpy(conn_lll->data_chan_map, data_chan_map,
-	       sizeof(conn_lll->data_chan_map));
-	conn_lll->data_chan_count = data_chan_count;
-	bt_rand(&hop, sizeof(u8_t));
-	conn_lll->data_chan_hop = 5 + (hop % 12);
-	conn_lll->data_chan_sel = 0;
-	conn_lll->data_chan_use = 0;
-	conn_lll->event_counter = 0;
-	conn_lll->sn = 0;
-	conn_lll->nesn = 0;
+
+	conn_lll->handle = 0xFFFF;
+	conn_lll->interval = interval;
+	conn_lll->latency= latency;
 
 	if (!conn_lll->link_tx_free) {
 		conn_lll->link_tx_free = &conn_lll->link_tx;
@@ -124,25 +117,41 @@ u32_t ll_create_connection(u16_t scan_interval, u16_t scan_window,
 	conn_lll->packet_tx_head_len = 0;
 	conn_lll->packet_tx_head_offset = 0;
 
+	conn_lll->sn = 0;
+	conn_lll->nesn = 0;
+	conn_lll->enc_rx = 0;
+	conn_lll->enc_tx = 0;
+	conn_lll->empty = 0;
+
 #if defined(CONFIG_BT_CTLR_CONN_RSSI)
 	conn_lll->rssi_latest = 0x7F;
 	conn_lll->rssi_reported = 0x7F;
 	conn_lll->rssi_sample_count = 0;
 #endif /* CONFIG_BT_CTLR_CONN_RSSI */
 
-	/* TODO: move to ull? */
-	conn_lll->interval = interval;
+	/* FIXME: BEGIN: Move to ULL? */
 	conn_lll->latency_prepare = 0;
 	conn_lll->latency_event = 0;
-	conn_lll->latency = latency;
-	conn_lll->connect_expire = 6;
-	conn_lll->supervision_expire = 0;
+	conn_lll->event_counter = 0;
+
+	memcpy(conn_lll->data_chan_map, data_chan_map,
+	       sizeof(conn_lll->data_chan_map));
+	conn_lll->data_chan_count = data_chan_count;
+	bt_rand(&hop, sizeof(u8_t));
+	conn_lll->data_chan_sel = 0;
+	conn_lll->role = 0;
+	conn_lll->data_chan_hop = 5 + (hop % 12);
+	conn_lll->data_chan_use = 0;
+	/* FIXME: END: Move to ULL? */
+
+	conn->connect_expire = 6;
+	conn->supervision_expire = 0;
 	conn_interval_us = (u32_t)interval * 1250;
-	conn_lll->supervision_reload = RADIO_CONN_EVENTS(timeout * 10000,
+	conn->supervision_reload = RADIO_CONN_EVENTS(timeout * 10000,
 							 conn_interval_us);
 
-	conn_lll->procedure_expire = 0;
-	conn_lll->procedure_reload = RADIO_CONN_EVENTS(40000000,
+	conn->procedure_expire = 0;
+	conn->procedure_reload = RADIO_CONN_EVENTS(40000000,
 						       conn_interval_us);
 
 #if defined(CONFIG_BT_CTLR_LE_PING)
@@ -164,7 +173,7 @@ u32_t ll_create_connection(u16_t scan_interval, u16_t scan_window,
 	/* NOTE: use allocated link for generating dedicated
 	 * terminate ind rx node
 	 */
-	conn_lll->llcp_terminate.node_rx.hdr.link = link;
+	conn->llcp_terminate.node_rx.hdr.link = link;
 
 	lll->conn = conn_lll;
 
