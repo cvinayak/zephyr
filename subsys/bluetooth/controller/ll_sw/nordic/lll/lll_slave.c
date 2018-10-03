@@ -19,6 +19,7 @@
 #include "pdu.h"
 
 #include "lll.h"
+#include "lll_vendor.h"
 #include "lll_conn.h"
 #include "lll_slave.h"
 

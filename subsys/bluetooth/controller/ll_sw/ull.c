@@ -1113,10 +1113,11 @@ static inline void _rx_demux_event_done(memq_link_t *link,
 
 	/* Process role dependent event done */
 	switch (done->extra.type) {
+#if defined(CONFIG_BT_CONN)
 	case EVENT_DONE_EXTRA_TYPE_CONN:
 		ull_conn_done(done);
 		break;
-
+#endif /* CONFIG_BT_CONN */
 	case EVENT_DONE_EXTRA_TYPE_NONE:
 		/* ignore */
 		break;
