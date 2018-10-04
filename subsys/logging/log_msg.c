@@ -6,6 +6,7 @@
 #include <kernel.h>
 #include <logging/log_msg.h>
 #include <logging/log_ctrl.h>
+#include <logging/log_core.h>
 #include <string.h>
 
 #define MSG_SIZE sizeof(union log_msg_chunk)
@@ -38,9 +39,25 @@ static void cont_free(struct log_msg_cont *cont)
 
 static void msg_free(struct log_msg *msg)
 {
+	u32_t nargs = msg->hdr.params.std.nargs;
+
+	/* Free any transient string found in arguments. */
+	if (log_msg_is_std(msg) && nargs) {
+		int i;
+
+		for (i = 0; i < nargs; i++) {
+			void *buf = (void *)log_msg_arg_get(msg, i);
+
+			if (log_is_strdup(buf)) {
+				log_free(buf);
+			}
+		}
+	}
+
 	if (msg->hdr.params.generic.ext == 1) {
 		cont_free(msg->payload.ext.next);
 	}
+
 	k_mem_slab_free(&log_msg_pool, (void **)&msg);
 }
 
@@ -102,7 +119,7 @@ struct log_msg *log_msg_create_n(const char *str,
 					       u32_t *args,
 					       u32_t nargs)
 {
-	struct  log_msg *msg;
+	struct  log_msg *msg = NULL;
 
 	if (nargs <= LOG_MSG_NARGS_SINGLE_CHUNK) {
 		msg = _log_msg_std_alloc();
@@ -124,7 +141,9 @@ struct log_msg *log_msg_create_n(const char *str,
 			      (nargs - LOG_MSG_NARGS_HEAD_CHUNK)*sizeof(u32_t));
 		}
 	}
-	msg->str = str;
+	if (msg != NULL) {
+		msg->str = str;
+	}
 	return msg;
 }
 
@@ -241,8 +260,11 @@ static void log_msg_hexdump_data_op(struct log_msg *msg,
 	} else {
 		offset -= chunk_len;
 		chunk_len = HEXDUMP_BYTES_CONT_MSG;
+		if (cont == NULL) {
+			cont = msg->payload.ext.next;
+		}
 
-		while (offset > chunk_len) {
+		while (offset >= chunk_len) {
 			cont = cont->next;
 			offset -= chunk_len;
 		}

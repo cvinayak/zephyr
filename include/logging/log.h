@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef LOG_H_
-#define LOG_H_
+#ifndef ZEPHYR_INCLUDE_LOGGING_LOG_H_
+#define ZEPHYR_INCLUDE_LOGGING_LOG_H_
 
 #include <logging/log_instance.h>
 #include <logging/log_core.h>
@@ -255,13 +255,31 @@ extern "C" {
  */
 int log_printk(const char *fmt, va_list ap);
 
+/** @brief Copy transient string to a buffer from internal, logger pool.
+ *
+ * Function should be used when transient string is intended to be logged.
+ * Logger allocates a buffer and copies input string returning a pointer to the
+ * copy. Logger ensures that buffer is freed when logger message is freed.
+ *
+ * @param str Transient string.
+ *
+ * @return Copy of the string or default string if buffer could not be
+ *	   allocated. String may be truncated if input string does not fit in
+ *	   a buffer from the pool (see CONFIG_LOG_STRDUP_MAX_STRING).
+ */
+char *log_strdup(const char *str);
 
 #define __DYNAMIC_MODULE_REGISTER(_name)\
 	struct log_source_dynamic_data LOG_ITEM_DYNAMIC_DATA(_name)	\
 	__attribute__ ((section("." STRINGIFY(				\
 				     LOG_ITEM_DYNAMIC_DATA(_name))))	\
 				     )					\
-	__attribute__((used))
+	__attribute__((used));						\
+	static inline const struct log_source_dynamic_data  *		\
+				__log_current_dynamic_data_get(void)	\
+	{								\
+		return &LOG_ITEM_DYNAMIC_DATA(_name);			\
+	}
 
 #define _LOG_RUNTIME_MODULE_REGISTER(_name)				\
 	_LOG_EVAL(							\
@@ -277,7 +295,12 @@ int log_printk(const char *fmt, va_list ap);
 		.name = STRINGIFY(_name),				     \
 		.level = _level						     \
 	}								     \
-	_LOG_RUNTIME_MODULE_REGISTER(_name)
+	_LOG_RUNTIME_MODULE_REGISTER(_name);				     \
+	static inline const struct log_source_const_data *		     \
+				__log_current_const_data_get(void)	     \
+	{								     \
+		return &LOG_ITEM_CONST_DATA(_name);			     \
+	}
 
 /**
  * @brief Create module-specific state and register the module with Logger.
@@ -298,15 +321,20 @@ int log_printk(const char *fmt, va_list ap);
  *       In other cases, this macro has no effect.
  * @see LOG_MODULE_DECLARE
  */
-#define LOG_MODULE_REGISTER()						\
+#define LOG_MODULE_REGISTER(log_module_name)				\
 	_LOG_EVAL(							\
 		_LOG_LEVEL(),						\
-		(_LOG_MODULE_REGISTER(LOG_MODULE_NAME, _LOG_LEVEL())),	\
+		(_LOG_MODULE_REGISTER(log_module_name, _LOG_LEVEL())),	\
 		()/*Empty*/						\
 	)
 
-#define __DYNAMIC_MODULE_DECLARE(_name)				\
-	extern struct log_source_dynamic_data LOG_ITEM_DYNAMIC_DATA(_name)
+#define __DYNAMIC_MODULE_DECLARE(_name)					   \
+	extern struct log_source_dynamic_data LOG_ITEM_DYNAMIC_DATA(_name);\
+	static inline struct log_source_dynamic_data *			   \
+				__log_current_dynamic_data_get(void)	   \
+	{								   \
+		return &LOG_ITEM_DYNAMIC_DATA(_name);			   \
+	}
 
 #define _LOG_RUNTIME_MODULE_DECLARE(_name)			\
 	_LOG_EVAL(						\
@@ -315,9 +343,14 @@ int log_printk(const char *fmt, va_list ap);
 		()						\
 		)
 
-#define _LOG_MODULE_DECLARE(_name, _level)				\
+#define _LOG_MODULE_DECLARE(_name, _level)				     \
 	extern const struct log_source_const_data LOG_ITEM_CONST_DATA(_name) \
-	_LOG_RUNTIME_MODULE_DECLARE(_name)
+	_LOG_RUNTIME_MODULE_DECLARE(_name);				     \
+	static inline const struct log_source_const_data *		     \
+				__log_current_const_data_get(void)	     \
+	{								     \
+		return &LOG_ITEM_CONST_DATA(_name);			     \
+	}
 
 /**
  * @brief Macro for declaring a log module (not registering it).
@@ -336,10 +369,10 @@ int log_printk(const char *fmt, va_list ap);
  *       this macro has no effect.
  * @see LOG_MODULE_REGISTER
  */
-#define LOG_MODULE_DECLARE()						\
+#define LOG_MODULE_DECLARE(log_module_name)				\
 	_LOG_EVAL(							\
 		_LOG_LEVEL(),						\
-		(_LOG_MODULE_DECLARE(LOG_MODULE_NAME, _LOG_LEVEL())),	\
+		(_LOG_MODULE_DECLARE(log_module_name, _LOG_LEVEL())),	\
 		()							\
 		)							\
 
@@ -352,4 +385,4 @@ int log_printk(const char *fmt, va_list ap);
 }
 #endif
 
-#endif /* LOG_H_ */
+#endif /* ZEPHYR_INCLUDE_LOGGING_LOG_H_ */

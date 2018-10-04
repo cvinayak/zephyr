@@ -6,8 +6,8 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-#ifndef __BT_HCI_VS_H
-#define __BT_HCI_VS_H
+#ifndef ZEPHYR_INCLUDE_BLUETOOTH_HCI_VS_H_
+#define ZEPHYR_INCLUDE_BLUETOOTH_HCI_VS_H_
 
 #include <bluetooth/hci.h>
 
@@ -304,4 +304,4 @@ struct bt_hci_evt_mesh_scanning_report {
 }
 #endif
 
-#endif /* __BT_HCI_VS_H */
+#endif /* ZEPHYR_INCLUDE_BLUETOOTH_HCI_VS_H_ */

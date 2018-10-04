@@ -13,14 +13,14 @@
 #ifndef __LL_H
 #define __LL_H
 
-int cmd_advx(int argc, char *argv[]);
-int cmd_scanx(int argc, char *argv[]);
+int cmd_advx(const struct shell *shell, size_t  argc, char *argv[]);
+int cmd_scanx(const struct shell *shell, size_t  argc, char *argv[]);
 
-int cmd_test_tx(int argc, char *argv[]);
-int cmd_test_rx(int argc, char *argv[]);
-int cmd_test_end(int argc, char *argv[]);
+int cmd_test_tx(const struct shell *shell, size_t  argc, char *argv[]);
+int cmd_test_rx(const struct shell *shell, size_t  argc, char *argv[]);
+int cmd_test_end(const struct shell *shell, size_t  argc, char *argv[]);
 
-int cmd_ull_reset(int argc, char *argv[]);
-int cmd_ull_tmp_enable(int argc, char *argv[]);
-int cmd_ull_tmp_send(int argc, char *argv[]);
+int cmd_ull_reset(const struct shell *shell, size_t  argc, char *argv[]);
+int cmd_ull_tmp_enable(const struct shell *shell, size_t  argc, char *argv[]);
+int cmd_ull_tmp_send(const struct shell *shell, size_t  argc, char *argv[]);
 #endif /* __LL_H */

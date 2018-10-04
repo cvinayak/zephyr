@@ -121,6 +121,11 @@ def get_phandles(root, name, handles):
 
 
 def insert_defs(node_address, new_defs, new_aliases):
+
+    for key in new_defs.keys():
+        if key.startswith('CONFIG_DT_COMPAT_'):
+            node_address = 'Compatibles'
+
     if node_address in defs:
         if 'aliases' in defs[node_address]:
             defs[node_address]['aliases'].update(new_aliases)
@@ -165,8 +170,8 @@ def get_node_label(node_compat, node_address):
         def_label += '_' + \
                 convert_string_to_label(node_address.split('@')[-1])
     else:
-        def_label += convert_string_to_label(node_address)
-
+        def_label += '_' + \
+                convert_string_to_label(node_address.split('/')[-1])
     return def_label
 
 def find_parent_prop(node_address, prop):

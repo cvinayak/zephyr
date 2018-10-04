@@ -53,19 +53,24 @@ GTEXT(z_arch_user_string_nlen_fault_end)
 GTEXT(z_arch_user_string_nlen_fixup)
 /*
  * @brief Wrapper for _thread_entry in the case of user thread
+ * The init parameters are in privileged stack
  *
  * @return N/A
  */
 SECTION_FUNC(TEXT, _user_thread_entry_wrapper)
-	/* sp the  user stack pointer,  r0-r4 are in stack */
-	mov r5, sp
-	/* start of privilege stack */
-	add blink, r5, CONFIG_PRIVILEGED_STACK_SIZE+16
+	pop_s r3
+	pop_s r2
+	pop_s r1
+	pop_s r0
+/* the start of user sp is in r5 */
+	pop r5
+/* start of privilege stack in blink */
+	mov blink, sp
 
-	/* r4<- start  of user stack region */
-	mov r0, _kernel
-	ld_s r1, [r0, _kernel_offset_to_current]
-	ld r4, [r1, ___thread_stack_info_t_start_OFFSET]
+	st.aw r0, [r5, -4]
+	st.aw r1, [r5, -4]
+	st.aw r2, [r5, -4]
+	st.aw r3, [r5, -4]
 
 /*
  * when CONFIG_INIT_STACKS is enable, stack will be initialized
@@ -87,15 +92,23 @@ SECTION_FUNC(TEXT, _arc_userspace_enter)
 	 * In ARCv2, the U bit can only be set through exception return
 	 */
 #ifdef CONFIG_ARC_STACK_CHECKING
-	/* disable stack checking during swap */
+	/* disable stack checking as the stack should be initialized */
+#ifdef CONFIG_ARC_HAS_SECURE
+	lr blink, [_ARC_V2_SEC_STAT]
+	bclr blink, blink, _ARC_V2_SEC_STAT_SSC_BIT
+	/* sflag blink */
+	/* sflag instruction is not supported in current ARC GNU */
+	.long 0x07ff302f
+#else
 	lr blink, [_ARC_V2_STATUS32]
 	bclr blink, blink, _ARC_V2_STATUS32_SC_BIT
 	kflag blink
 #endif
+#endif
 	/* the end of user stack in r5 */
 	add r5, r4, r5
 	/* start of privilege stack */
-	add blink, r5, CONFIG_PRIVILEGED_STACK_SIZE
+	add blink, r5, CONFIG_PRIVILEGED_STACK_SIZE+STACK_GUARD_SIZE
 	mov sp, r5
 
 	push_s r0
@@ -121,9 +134,17 @@ _clear_user_stack:
 
 	_load_stack_check_regs
 
+#ifdef CONFIG_ARC_HAS_SECURE
+	lr r0, [_ARC_V2_SEC_STAT]
+	bset r0, r0, _ARC_V2_SEC_STAT_SSC_BIT
+	/* sflag r0 */
+	/* sflag instruction is not supported in current ARC GNU */
+	.long 0x003f302f
+#else
 	lr r0, [_ARC_V2_STATUS32]
 	bset r0, r0, _ARC_V2_STATUS32_SC_BIT
 	kflag r0
+#endif
 #endif
 
 _arc_go_to_user_space:

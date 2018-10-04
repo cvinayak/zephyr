@@ -320,7 +320,7 @@ static int upipe_init(struct device *dev)
 {
 	struct upipe_context *upipe = dev->driver_data;
 
-	memset(upipe, 0, sizeof(struct upipe_context));
+	(void)memset(upipe, 0, sizeof(struct upipe_context));
 
 	uart_pipe_register(upipe->uart_pipe_buf, 1, upipe_rx);
 
@@ -340,7 +340,7 @@ static inline u8_t *get_mac(struct device *dev)
 
 #if defined(CONFIG_IEEE802154_UPIPE_RANDOM_MAC)
 	UNALIGNED_PUT(sys_cpu_to_be32(sys_rand32_get()),
-		      (u32_t *) ((void *)upipe->mac_addr+4));
+		      (u32_t *) ((u8_t *)upipe->mac_addr+4));
 #else
 	upipe->mac_addr[4] = CONFIG_IEEE802154_UPIPE_MAC4;
 	upipe->mac_addr[5] = CONFIG_IEEE802154_UPIPE_MAC5;

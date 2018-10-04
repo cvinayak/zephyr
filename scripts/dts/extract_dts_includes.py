@@ -21,122 +21,109 @@ from devicetree import parse_file
 from extract.globals import *
 
 from extract.clocks import clocks
+from extract.compatible import compatible
 from extract.interrupts import interrupts
 from extract.reg import reg
 from extract.flash import flash
 from extract.pinctrl import pinctrl
 from extract.default import default
 
-class Loader(yaml.Loader):
-    def __init__(self, stream):
-        self._root = os.path.realpath(stream.name)
-        super(Loader, self).__init__(stream)
-        Loader.add_constructor('!include', Loader.include)
-        Loader.add_constructor('!import',  Loader.include)
+class Bindings(yaml.Loader):
 
-    def include(self, node):
+    ##
+    # List of all yaml files available for yaml loaders
+    # of this class. Must be preset before the first
+    # load operation.
+    _files = []
+
+    ##
+    # Files that are already included.
+    # Must be reset on the load of every new binding
+    _included = []
+
+    @classmethod
+    def bindings(cls, compatibles, yaml_dirs):
+        # find unique set of compatibles across all active nodes
+        s = set()
+        for k, v in compatibles.items():
+            if isinstance(v, list):
+                for item in v:
+                    s.add(item)
+            else:
+                s.add(v)
+
+        # scan YAML files and find the ones we are interested in
+        cls._files = []
+        for yaml_dir in yaml_dirs:
+            for root, dirnames, filenames in os.walk(yaml_dir):
+                for filename in fnmatch.filter(filenames, '*.yaml'):
+                    cls._files.append(os.path.join(root, filename))
+
+        yaml_list = {}
+        file_load_list = set()
+        for file in cls._files:
+            for line in open(file, 'r'):
+                if re.search('^\s+constraint:*', line):
+                    c = line.split(':')[1].strip()
+                    c = c.strip('"')
+                    if c in s:
+                        if file not in file_load_list:
+                            file_load_list.add(file)
+                            with open(file, 'r') as yf:
+                                cls._included = []
+                                yaml_list[c] = yaml.load(yf, cls)
+        return yaml_list
+
+    def __init__(self, stream):
+        filepath = os.path.realpath(stream.name)
+        if filepath in self._included:
+            print("Error:: circular inclusion for file name '{}'".
+                  format(stream.name))
+            raise yaml.constructor.ConstructorError
+        self._included.append(filepath)
+        super(Bindings, self).__init__(stream)
+        Bindings.add_constructor('!include', Bindings._include)
+        Bindings.add_constructor('!import',  Bindings._include)
+
+    def _include(self, node):
         if isinstance(node, yaml.ScalarNode):
-            return self.extractFile(self.construct_scalar(node))
+            return self._extract_file(self.construct_scalar(node))
 
         elif isinstance(node, yaml.SequenceNode):
             result = []
             for filename in self.construct_sequence(node):
-                result.append(self.extractFile(filename))
+                result.append(self._extract_file(filename))
             return result
 
         elif isinstance(node, yaml.MappingNode):
             result = {}
             for k, v in self.construct_mapping(node).iteritems():
-                result[k] = self.extractFile(v)
+                result[k] = self._extract_file(v)
             return result
 
         else:
             print("Error:: unrecognised node type in !include statement")
             raise yaml.constructor.ConstructorError
 
-    def extractFile(self, filename):
-        filepath = os.path.join(os.path.dirname(self._root), filename)
-        if not os.path.isfile(filepath):
-            # we need to look in bindings/* directories
-            # take path and back up 1 directory and parse in '/bindings/*'
-            filepath = os.path.dirname(os.path.dirname(self._root))
-            for root, dirnames, file in os.walk(filepath):
-                if fnmatch.filter(file, filename):
-                    filepath = os.path.join(root, filename)
-        with open(filepath, 'r') as f:
-            return yaml.load(f, Loader)
-
-
-def extract_reg_prop(node_address, names, def_label, div, post_label):
-
-    reg = reduced[node_address]['props']['reg']
-    if type(reg) is not list: reg = [ reg ]
-    props = list(reg)
-
-    address_cells = reduced['/']['props'].get('#address-cells')
-    size_cells = reduced['/']['props'].get('#size-cells')
-    address = ''
-    for comp in node_address.split('/')[1:-1]:
-        address += '/' + comp
-        address_cells = reduced[address]['props'].get(
-            '#address-cells', address_cells)
-        size_cells = reduced[address]['props'].get('#size-cells', size_cells)
-
-    if post_label is None:
-        post_label = "BASE_ADDRESS"
-
-    index = 0
-    l_base = def_label.split('/')
-    l_addr = [convert_string_to_label(post_label)]
-    l_size = ["SIZE"]
-
-    while props:
-        prop_def = {}
-        prop_alias = {}
-        addr = 0
-        size = 0
-        # Check is defined should be indexed (_0, _1)
-        if index == 0 and len(props) < 3:
-            # 1 element (len 2) or no element (len 0) in props
-            l_idx = []
-        else:
-            l_idx = [str(index)]
-
-        try:
-            name = [names.pop(0).upper()]
-        except:
-            name = []
-
-        for x in range(address_cells):
-            addr += props.pop(0) << (32 * x)
-        for x in range(size_cells):
-            size += props.pop(0) << (32 * x)
-
-        l_addr_fqn = '_'.join(l_base + l_addr + l_idx)
-        l_size_fqn = '_'.join(l_base + l_size + l_idx)
-        if address_cells:
-            prop_def[l_addr_fqn] = hex(addr)
-        if size_cells:
-            prop_def[l_size_fqn] = int(size / div)
-        if len(name):
-            if address_cells:
-                prop_alias['_'.join(l_base + name + l_addr)] = l_addr_fqn
-            if size_cells:
-                prop_alias['_'.join(l_base + name + l_size)] = l_size_fqn
-
-        # generate defs for node aliases
-        if node_address in aliases:
-            for i in aliases[node_address]:
-                alias_label = convert_string_to_label(i)
-                alias_addr = [alias_label] + l_addr
-                alias_size = [alias_label] + l_size
-                prop_alias['_'.join(alias_addr)] = '_'.join(l_base + l_addr)
-                prop_alias['_'.join(alias_size)] = '_'.join(l_base + l_size)
-
-        insert_defs(node_address, prop_def, prop_alias)
-
-        # increment index for definition creation
-        index += 1
+    def _extract_file(self, filename):
+        filepaths = [filepath for filepath in self._files if filepath.endswith(filename)]
+        if len(filepaths) == 0:
+            print("Error:: unknown file name '{}' in !include statement".
+                  format(filename))
+            raise yaml.constructor.ConstructorError
+        elif len(filepaths) > 1:
+            # multiple candidates for filename
+            files = []
+            for filepath in filepaths:
+                if os.path.basename(filename) == os.path.basename(filepath):
+                    files.append(filepath)
+            if len(files) > 1:
+                print("Error:: multiple candidates for file name '{}' in !include statement".
+                      format(filename), filepaths)
+                raise yaml.constructor.ConstructorError
+            filepaths = files
+        with open(filepaths[0], 'r') as f:
+            return yaml.load(f, Bindings)
 
 
 def extract_controller(node_address, yaml, prop, prop_values, index, def_label, generic):
@@ -380,15 +367,17 @@ def extract_property(node_compat, yaml, node_address, prop, prop_val, names,
     if prop == 'reg':
         if 'partition@' in node_address:
             # reg in partition is covered by flash handling
-            flash.extract(node_address, yaml, prop, names, def_label)
+            flash.extract(node_address, yaml, prop, def_label)
         else:
-            reg.extract(node_address, yaml, prop, names, def_label)
+            reg.extract(node_address, yaml, names, def_label, 1)
     elif prop == 'interrupts' or prop == 'interrupts-extended':
         interrupts.extract(node_address, yaml, prop, names, def_label)
+    elif prop == 'compatible':
+        compatible.extract(node_address, yaml, prop, def_label)
     elif 'pinctrl-' in prop:
-        pinctrl.extract(node_address, yaml, prop, names, def_label)
+        pinctrl.extract(node_address, yaml, prop, def_label)
     elif 'clocks' in prop:
-        clocks.extract(node_address, yaml, prop, names, def_label)
+        clocks.extract(node_address, yaml, prop, def_label)
     elif 'gpios' in prop:
         try:
             prop_values = list(reduced[node_address]['props'].get(prop))
@@ -400,7 +389,7 @@ def extract_property(node_compat, yaml, node_address, prop, prop_val, names,
         extract_cells(node_address, yaml, prop, prop_values,
                       names, 0, def_label, 'gpio')
     else:
-        default.extract(node_address, yaml, prop, names, def_label)
+        default.extract(node_address, yaml, prop, def_label)
 
 
 def extract_node_include_info(reduced, root_node_address, sub_node_address,
@@ -598,8 +587,8 @@ def output_include_lines(fd, fixups):
     fd.write(" *               DO NOT MODIFY\n")
     fd.write(" */\n")
     fd.write("\n")
-    fd.write("#ifndef _DEVICE_TREE_BOARD_H" + "\n")
-    fd.write("#define _DEVICE_TREE_BOARD_H" + "\n")
+    fd.write("#ifndef DEVICE_TREE_BOARD_H" + "\n")
+    fd.write("#define DEVICE_TREE_BOARD_H" + "\n")
     fd.write("\n")
 
     node_keys = sorted(defs.keys())
@@ -663,36 +652,10 @@ def load_and_parse_dts(dts_file):
     return dts
 
 
-def load_yaml_descriptions(dts, yaml_dir):
+def load_yaml_descriptions(dts, yaml_dirs):
     compatibles = get_all_compatibles(dts['/'], '/', {})
-    # find unique set of compatibles across all active nodes
-    s = set()
-    for k, v in compatibles.items():
-        if isinstance(v, list):
-            for item in v:
-                s.add(item)
-        else:
-            s.add(v)
 
-    # scan YAML files and find the ones we are interested in
-    yaml_files = []
-    for root, dirnames, filenames in os.walk(yaml_dir):
-        for filename in fnmatch.filter(filenames, '*.yaml'):
-            yaml_files.append(os.path.join(root, filename))
-
-    yaml_list = {}
-    file_load_list = set()
-    for file in yaml_files:
-        for line in open(file, 'r'):
-            if re.search('^\s+constraint:*', line):
-                c = line.split(':')[1].strip()
-                c = c.strip('"')
-                if c in s:
-                    if file not in file_load_list:
-                        file_load_list.add(file)
-                        with open(file, 'r') as yf:
-                            yaml_list[c] = yaml.load(yf, Loader)
-
+    yaml_list = Bindings.bindings(compatibles, yaml_dirs)
     if yaml_list == {}:
         raise Exception("Missing YAML information.  Check YAML sources")
 
@@ -715,17 +678,16 @@ def generate_node_definitions(yaml_list):
 
     for k, v in regs_config.items():
         if k in chosen:
-            extract_reg_prop(chosen[k], None, v, 1024, None)
+            reg.extract(chosen[k], None, None, v, 1024)
 
     for k, v in name_config.items():
         if k in chosen:
             extract_string_prop(chosen[k], None, "label", v)
 
     node_address = chosen.get('zephyr,flash', 'dummy-flash')
-    flash.extract(node_address, yaml_list, 'zephyr,flash', None, 'FLASH')
+    flash.extract(node_address, yaml_list, 'zephyr,flash', 'FLASH')
     node_address = chosen.get('zephyr,code-partition', node_address)
-    flash.extract(node_address, yaml_list, 'zephyr,code-partition', None,
-                  'FLASH')
+    flash.extract(node_address, yaml_list, 'zephyr,code-partition', 'FLASH')
 
     return defs
 
@@ -735,8 +697,8 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=rdh)
 
     parser.add_argument("-d", "--dts", nargs=1, required=True, help="DTS file")
-    parser.add_argument("-y", "--yaml", nargs=1, required=True,
-                        help="YAML file")
+    parser.add_argument("-y", "--yaml", nargs='+', required=True,
+                        help="YAML file directories, we allow multiple")
     parser.add_argument("-f", "--fixup", nargs='+',
                         help="Fixup file(s), we allow multiple")
     parser.add_argument("-i", "--include", nargs=1, required=True,
@@ -757,7 +719,7 @@ def main():
     get_aliases(dts['/'])
     get_chosen(dts['/'])
 
-    yaml_list = load_yaml_descriptions(dts, args.yaml[0])
+    yaml_list = load_yaml_descriptions(dts, args.yaml)
 
     defs = generate_node_definitions(yaml_list)
 

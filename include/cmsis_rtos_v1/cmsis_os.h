@@ -42,8 +42,8 @@
  *---------------------------------------------------------------------------*/
  
  
-#ifndef _CMSIS_OS_H
-#define _CMSIS_OS_H
+#ifndef ZEPHYR_INCLUDE_CMSIS_RTOS_V1_CMSIS_OS_H_
+#define ZEPHYR_INCLUDE_CMSIS_RTOS_V1_CMSIS_OS_H_
  
 /// \note MUST REMAIN UNCHANGED: \b osCMSIS identifies the CMSIS-RTOS API version.
 #define osCMSIS           0x10002      ///< API version (main [31:16] .sub [15:0])
@@ -61,7 +61,7 @@
 #define osFeature_MessageQ     1       ///< Message Queues:  1=available, 0=not available
 #define osFeature_Signals      8       ///< maximum number of Signal Flags available per thread
 #define osFeature_Semaphore    30      ///< maximum count for \ref osSemaphoreCreate function
-#define osFeature_Wait         1       ///< osWait function: 1=available, 0=not available
+#define osFeature_Wait         0       ///< osWait function: 1=available, 0=not available
 #define osFeature_SysTick      1       ///< osKernelSysTick functions: 1=available, 0=not available
  
 #include <stdint.h>
@@ -712,4 +712,4 @@ osStatus osMailFree (osMailQId queue_id, void *mail);
 }
 #endif
  
-#endif  // _CMSIS_OS_H
+#endif  /* ZEPHYR_INCLUDE_CMSIS_RTOS_V1_CMSIS_OS_H_ */

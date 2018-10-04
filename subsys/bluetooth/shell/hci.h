@@ -7,6 +7,6 @@
 #ifndef __HCI_H_
 #define __HCI_H_
 
-int cmd_mesh_adv(int argc, char *argv[]);
+int cmd_mesh_adv(const struct shell *shell, size_t argc, char *argv[]);
 
 #endif /* __HCI_H_ */

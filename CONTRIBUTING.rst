@@ -7,7 +7,7 @@ standards and methods for submitting changes help reduce the chaos that can resu
 from an active development community.
 
 This document briefly summarizes the full `Contribution
-Guidelines <http://docs.zephyrproject.org/contribute/contribute.html>`_
+Guidelines <http://docs.zephyrproject.org/latest/contribute/contribute.html>`_
 documentation.
 
 * Zephyr uses the permissive open source `Apache 2.0 license`_
@@ -18,11 +18,11 @@ documentation.
   use other licensing and are clearly identified.
 
 * The Developer Certificate of Origin (DCO) process is followed to
-  ensure developers are following licensing critera for their
+  ensure developers are following licensing criteria for their
   contributions, and documented with a ``Signed-of-by`` line in commits.
 
 * Zephyr development workflow is supported on Linux, macOS, and Windows,
-  (with afew exceptions).
+  (with a few exceptions).
 
 * Source code for the project is maintained in the GitHub repo:
   https://github.com/zephyrproject-rtos/zephyr

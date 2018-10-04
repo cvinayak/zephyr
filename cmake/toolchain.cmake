@@ -8,6 +8,15 @@ set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
 
+# Don't inherit compiler flags from the environment
+foreach(var CFLAGS CXXFLAGS)
+  if(DEFINED ENV{${var}})
+    message(WARNING "The environment variable '${var}' was set to $ENV{${var}},
+but Zephyr ignores flags from the environment. Use 'cmake -DEXTRA_${var}=$ENV{${var}}' instead.")
+    unset(ENV{${var}})
+  endif()
+endforeach()
+
 # Until we completely deprecate it
 if(NOT DEFINED ENV{ZEPHYR_TOOLCHAIN_VARIANT})
   if(DEFINED ENV{ZEPHYR_GCC_VARIANT})
@@ -25,7 +34,7 @@ if(NOT ZEPHYR_TOOLCHAIN_VARIANT)
 endif()
 
 # Until we completely deprecate it
-if(${ZEPHYR_TOOLCHAIN_VARIANT} STREQUAL "gccarmemb")
+if("${ZEPHYR_TOOLCHAIN_VARIANT}" STREQUAL "gccarmemb")
   message(WARNING "gccarmemb is deprecated, please use gnuarmemb instead")
   set(ZEPHYR_TOOLCHAIN_VARIANT "gnuarmemb")
 endif()

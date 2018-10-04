@@ -84,10 +84,10 @@ static inline int _is_idle(struct k_thread *thread)
 #endif
 }
 
-int _is_t1_higher_prio_than_t2(struct k_thread *t1, struct k_thread *t2)
+bool _is_t1_higher_prio_than_t2(struct k_thread *t1, struct k_thread *t2)
 {
 	if (t1->base.prio < t2->base.prio) {
-		return 1;
+		return true;
 	}
 
 #ifdef CONFIG_SCHED_DEADLINE
@@ -106,7 +106,7 @@ int _is_t1_higher_prio_than_t2(struct k_thread *t1, struct k_thread *t2)
 	}
 #endif
 
-	return 0;
+	return false;
 }
 
 static int should_preempt(struct k_thread *th, int preempt_ok)
@@ -169,7 +169,7 @@ static struct k_thread *next_up(void)
 
 	/* Choose the best thread that is not current */
 	struct k_thread *th = _priq_run_best(&_kernel.ready_q.runq);
-	if (!th) {
+	if (th == NULL) {
 		th = _current_cpu->idle_thread;
 	}
 
@@ -269,16 +269,14 @@ static void pend(struct k_thread *thread, _wait_q_t *wait_q, s32_t timeout)
 		irq_unlock(key);
 	}
 
-	if (wait_q) {
+	if (wait_q != NULL) {
 #ifdef CONFIG_WAITQ_SCALABLE
 		thread->base.pended_on = wait_q;
 #endif
 		_priq_wait_add(&wait_q->waitq, thread);
 	}
 
-#ifdef CONFIG_KERNEL_EVENT_LOGGER_THREAD
-	_sys_k_event_logger_thread_pend(thread);
-#endif
+	sys_trace_thread_pend(thread);
 }
 
 void _pend_thread(struct k_thread *thread, _wait_q_t *wait_q, s32_t timeout)
@@ -335,8 +333,8 @@ struct k_thread *_unpend_first_thread(_wait_q_t *wait_q)
 {
 	struct k_thread *t = _unpend1_no_timeout(wait_q);
 
-	if (t) {
-		_abort_thread_timeout(t);
+	if (t != NULL) {
+		(void)_abort_thread_timeout(t);
 	}
 
 	return t;
@@ -345,7 +343,7 @@ struct k_thread *_unpend_first_thread(_wait_q_t *wait_q)
 void _unpend_thread(struct k_thread *thread)
 {
 	_unpend_thread_no_timeout(thread);
-	_abort_thread_timeout(thread);
+	(void)_abort_thread_timeout(thread);
 }
 
 /* FIXME: this API is glitchy when used in SMP.  If the thread is
@@ -357,7 +355,7 @@ void _unpend_thread(struct k_thread *thread)
  */
 void _thread_priority_set(struct k_thread *thread, int prio)
 {
-	int need_sched = 0;
+	bool need_sched = 0;
 
 	LOCKED(&sched_lock) {
 		need_sched = _is_thread_ready(thread);
@@ -378,7 +376,7 @@ void _thread_priority_set(struct k_thread *thread, int prio)
 	}
 }
 
-int _reschedule(int key)
+void _reschedule(int key)
 {
 #ifdef CONFIG_SMP
 	if (!_current_cpu->swap_ok) {
@@ -396,13 +394,13 @@ int _reschedule(int key)
 	return _Swap(key);
 #else
 	if (_get_next_ready_thread() != _current) {
-		return _Swap(key);
+		(void)_Swap(key);
+		return;
 	}
 #endif
 
  noswap:
 	irq_unlock(key);
-	return 0;
 }
 
 void k_sched_lock(void)
@@ -498,7 +496,7 @@ struct k_thread *_priq_dumb_best(sys_dlist_t *pq)
 			    struct k_thread, base.qnode_dlist);
 }
 
-int _priq_rb_lessthan(struct rbnode *a, struct rbnode *b)
+bool _priq_rb_lessthan(struct rbnode *a, struct rbnode *b)
 {
 	struct k_thread *ta, *tb;
 
@@ -506,9 +504,9 @@ int _priq_rb_lessthan(struct rbnode *a, struct rbnode *b)
 	tb = CONTAINER_OF(b, struct k_thread, base.qnode_rb);
 
 	if (_is_t1_higher_prio_than_t2(ta, tb)) {
-		return 1;
+		return true;
 	} else if (_is_t1_higher_prio_than_t2(tb, ta)) {
-		return 0;
+		return false;
 	} else {
 		return ta->base.order_key < tb->base.order_key ? 1 : 0;
 	}
@@ -624,13 +622,22 @@ int _is_thread_time_slicing(struct k_thread *thread)
 	LOCKED(&sched_lock) {
 		struct k_thread *next = _priq_run_best(&_kernel.ready_q.runq);
 
-		if (next) {
+		if (next != NULL) {
 			ret = thread->base.prio == next->base.prio;
 		}
 	}
 
 	return ret;
 }
+
+#ifdef CONFIG_TICKLESS_KERNEL
+void z_reset_timeslice(void)
+{
+	if (_is_thread_time_slicing(_get_next_ready_thread())) {
+		_set_time(_time_slice_duration);
+	}
+}
+#endif
 
 /* Must be called with interrupts locked */
 /* Should be called only immediately before a thread switch */
@@ -663,7 +670,7 @@ int _unpend_all(_wait_q_t *waitq)
 	int need_sched = 0;
 	struct k_thread *th;
 
-	while ((th = _waitq_head(waitq))) {
+	while ((th = _waitq_head(waitq)) != NULL) {
 		_unpend_thread(th);
 		_ready_thread(th);
 		need_sched = 1;
@@ -782,10 +789,10 @@ void _impl_k_yield(void)
 	}
 
 #ifdef CONFIG_SMP
-	_Swap(irq_lock());
+	(void)_Swap(irq_lock());
 #else
 	if (_get_next_ready_thread() != _current) {
-		_Swap(irq_lock());
+		(void)_Swap(irq_lock());
 	}
 #endif
 }
@@ -820,7 +827,7 @@ void _impl_k_sleep(s32_t duration)
 	_remove_thread_from_ready_q(_current);
 	_add_thread_timeout(_current, NULL, ticks);
 
-	_Swap(key);
+	(void)_Swap(key);
 #endif
 }
 

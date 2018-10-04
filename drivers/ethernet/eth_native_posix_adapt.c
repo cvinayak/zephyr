@@ -11,8 +11,6 @@
  * because there is naming conflicts between host and zephyr network stacks.
  */
 
-#define _DEFAULT_SOURCE
-
 /* Host include files */
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,6 +22,7 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
+#include <sys/select.h>
 #include <net/if.h>
 #include <time.h>
 #include "posix_trace.h"
@@ -61,7 +60,7 @@ int eth_iface_create(const char *if_name, bool tun_only)
 		return -errno;
 	}
 
-	memset(&ifr, 0, sizeof(ifr));
+	(void)memset(&ifr, 0, sizeof(ifr));
 
 #ifdef __linux
 	ifr.ifr_flags = (tun_only ? IFF_TUN : IFF_TAP) | IFF_NO_PI;

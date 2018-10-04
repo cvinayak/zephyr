@@ -9,6 +9,7 @@
 
 #include <zephyr/types.h>
 #include <bluetooth/hci.h>
+#include <bluetooth/controller.h>
 
 #include "util/util.h"
 #include "util/memq.h"
@@ -72,4 +73,9 @@ u32_t ll_addr_set(u8_t addr_type, u8_t const *const bdaddr)
 	}
 
 	return 0;
+}
+
+void bt_ctlr_set_public_addr(const u8_t *addr)
+{
+    (void)memcpy(pub_addr, addr, sizeof(pub_addr));
 }

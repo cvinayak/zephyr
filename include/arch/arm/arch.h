@@ -10,11 +10,11 @@
  *
  * This header contains the ARM specific kernel interface.  It is
  * included by the kernel interface architecture-abstraction header
- * (include/arc/cpu.h)
+ * (include/arm/cpu.h)
  */
 
-#ifndef _ARM_ARCH__H_
-#define _ARM_ARCH__H_
+#ifndef ZEPHYR_INCLUDE_ARCH_ARM_ARCH_H_
+#define ZEPHYR_INCLUDE_ARCH_ARM_ARCH_H_
 
 /* Add include for DTS generated information */
 #include <generated_dts_board.h>
@@ -54,11 +54,11 @@ extern "C" {
 /**
  * @brief Declare a minimum MPU guard alignment and size
  *
- * This specifies the minimum MPU guard alignment/size for the MPU.  This
+ * This specifies the minimum MPU guard alignment/size for the MPU. This
  * will be used to denote the guard section of the stack, if it exists.
  *
  * One key note is that this guard results in extra bytes being added to
- * the stack.  APIs which give the stack ptr and stack size will take this
+ * the stack. APIs which give the stack ptr and stack size will take this
  * guard size into account.
  *
  * Stack is allocated, but initial stack pointer is at the end
@@ -98,27 +98,6 @@ extern "C" {
 #endif
 
 /**
- * @brief Declare a toplevel thread stack memory region
- *
- * This declares a region of memory suitable for use as a thread's stack.
- *
- * This is the generic, historical definition. Align to STACK_ALIGN_SIZE and
- * put in * 'noinit' section so that it isn't zeroed at boot
- *
- * The declared symbol will always be a character array which can be passed to
- * k_thread_create, but should otherwise not be manipulated.
- *
- * It is legal to precede this definition with the 'static' keyword.
- *
- * It is NOT legal to take the sizeof(sym) and pass that to the stackSize
- * parameter of k_thread_create(), it may not be the same as the
- * 'size' parameter. Use K_THREAD_STACK_SIZEOF() instead.
- *
- * @param sym Thread stack symbol name
- * @param size Size of the stack memory region
- */
-
-/**
  * @brief Define alignment of a stack buffer
  *
  * This is used for two different things:
@@ -141,6 +120,26 @@ extern "C" {
 		1 << (31 - __builtin_clz(x) + 1) : \
 		1 << (31 - __builtin_clz(x)))
 
+/**
+ * @brief Declare a top level thread stack memory region
+ *
+ * This declares a region of memory suitable for use as a thread's stack.
+ *
+ * This is the generic, historical definition. Align to STACK_ALIGN_SIZE and
+ * put in * 'noinit' section so that it isn't zeroed at boot
+ *
+ * The declared symbol will always be a character array which can be passed to
+ * k_thread_create, but should otherwise not be manipulated.
+ *
+ * It is legal to precede this definition with the 'static' keyword.
+ *
+ * It is NOT legal to take the sizeof(sym) and pass that to the stackSize
+ * parameter of k_thread_create(), it may not be the same as the
+ * 'size' parameter. Use K_THREAD_STACK_SIZEOF() instead.
+ *
+ * @param sym Thread stack symbol name
+ * @param size Size of the stack memory region
+ */
 #if defined(CONFIG_USERSPACE) && \
 	defined(CONFIG_MPU_REQUIRES_POWER_OF_TWO_ALIGNMENT)
 #define _ARCH_THREAD_STACK_DEFINE(sym, size) \
@@ -170,7 +169,7 @@ extern "C" {
 #endif
 
 /**
- * @brief Declare a toplevel array of thread stack memory regions
+ * @brief Declare a top level array of thread stack memory regions
  *
  * Create an array of equally sized stacks. See K_THREAD_STACK_DEFINE
  * definition for additional details and constraints.
@@ -254,7 +253,7 @@ extern "C" {
 		((char *)(sym) + MPU_GUARD_ALIGN_AND_SIZE)
 
 #ifdef CONFIG_USERSPACE
-#ifdef CONFIG_ARM_MPU
+#ifdef CONFIG_CPU_HAS_ARM_MPU
 #ifndef _ASMLANGUAGE
 #include <arch/arm/cortex_m/mpu/arm_mpu.h>
 #endif /* _ASMLANGUAGE */
@@ -264,8 +263,8 @@ extern "C" {
 		"the size of the partition must be power of 2" \
 		" and greater than or equal to 32." \
 		"start address of the partition must align with size.")
-#endif /* CONFIG_ARM_MPU*/
-#ifdef CONFIG_NXP_MPU
+#endif /* CONFIG_CPU_HAS_ARM_MPU */
+#ifdef CONFIG_CPU_HAS_NXP_MPU
 #ifndef _ASMLANGUAGE
 #include <arch/arm/cortex_m/mpu/nxp_mpu.h>
 
@@ -319,7 +318,7 @@ extern "C" {
 		"the size of the partition must align with 32" \
 		" and greater than or equal to 32." \
 		"start address of the partition must align with 32.")
-#endif  /* CONFIG_NXP_MPU */
+#endif  /* CONFIG_CPU_HAS_ARM_MPU */
 #endif /* CONFIG_USERSPACE */
 
 #ifndef _ASMLANGUAGE
@@ -331,4 +330,4 @@ typedef u32_t k_mem_partition_attr_t;
 }
 #endif
 
-#endif /* _ARM_ARCH__H_ */
+#endif /* ZEPHYR_INCLUDE_ARCH_ARM_ARCH_H_ */

@@ -183,7 +183,7 @@ static void ipsp_disconnected(struct bt_l2cap_chan *chan)
 #endif
 }
 
-static void ipsp_recv(struct bt_l2cap_chan *chan, struct net_buf *buf)
+static int ipsp_recv(struct bt_l2cap_chan *chan, struct net_buf *buf)
 {
 	struct bt_context *ctxt = CHAN_CTXT(chan);
 	struct net_pkt *pkt;
@@ -194,18 +194,18 @@ static void ipsp_recv(struct bt_l2cap_chan *chan, struct net_buf *buf)
 	/* Get packet for bearer / protocol related data */
 	pkt = net_pkt_get_reserve_rx(0, BUF_TIMEOUT);
 	if (!pkt) {
-		return;
+		return -ENOMEM;
 	}
 
 	/* Set destination address */
-	net_pkt_ll_dst(pkt)->addr = ctxt->src.val;
-	net_pkt_ll_dst(pkt)->len = sizeof(ctxt->src);
-	net_pkt_ll_dst(pkt)->type = NET_LINK_BLUETOOTH;
+	net_pkt_lladdr_dst(pkt)->addr = ctxt->src.val;
+	net_pkt_lladdr_dst(pkt)->len = sizeof(ctxt->src);
+	net_pkt_lladdr_dst(pkt)->type = NET_LINK_BLUETOOTH;
 
 	/* Set source address */
-	net_pkt_ll_src(pkt)->addr = ctxt->dst.val;
-	net_pkt_ll_src(pkt)->len = sizeof(ctxt->dst);
-	net_pkt_ll_src(pkt)->type = NET_LINK_BLUETOOTH;
+	net_pkt_lladdr_src(pkt)->addr = ctxt->dst.val;
+	net_pkt_lladdr_src(pkt)->len = sizeof(ctxt->dst);
+	net_pkt_lladdr_src(pkt)->type = NET_LINK_BLUETOOTH;
 
 	/* Add data buffer as fragment of RX buffer, take a reference while
 	 * doing so since L2CAP will unref the buffer after return.
@@ -216,6 +216,8 @@ static void ipsp_recv(struct bt_l2cap_chan *chan, struct net_buf *buf)
 		NET_DBG("Packet dropped by NET stack");
 		net_pkt_unref(pkt);
 	}
+
+	return 0;
 }
 
 static struct net_buf *ipsp_alloc_buf(struct bt_l2cap_chan *chan)

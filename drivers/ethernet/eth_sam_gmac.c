@@ -803,6 +803,45 @@ static int eth_sam_gmac_setup_qav_delta_bandwidth(Gmac *gmac, int queue_id,
 }
 #endif
 
+#if defined(CONFIG_PTP_CLOCK_SAM_GMAC)
+static void gmac_setup_ptp_clock_divisors(Gmac *gmac)
+{
+	int mck_divs[] = {10, 5, 2};
+	double min_cycles;
+	double min_period;
+	int div;
+	int i;
+
+	u8_t cns, acns, nit;
+
+	min_cycles = SOC_ATMEL_SAM_MCK_FREQ_HZ;
+	min_period = NSEC_PER_SEC;
+
+	for (i = 0; i < ARRAY_SIZE(mck_divs); ++i) {
+		div = mck_divs[i];
+		while ((double)(min_cycles / div) == (int)(min_cycles / div) &&
+		       (double)(min_period / div) == (int)(min_period / div)) {
+			min_cycles /= div;
+			min_period /= div;
+		}
+	}
+
+	nit = min_cycles - 1;
+	cns = 0;
+	acns = 0;
+
+	while ((cns + 2) * nit < min_period) {
+		cns++;
+	}
+
+	acns = min_period - (nit * cns);
+
+	gmac->GMAC_TI =
+		GMAC_TI_CNS(cns) | GMAC_TI_ACNS(acns) | GMAC_TI_NIT(nit);
+	gmac->GMAC_TISUBN = 0;
+}
+#endif
+
 static int gmac_init(Gmac *gmac, u32_t gmac_ncfgr_val)
 {
 	int mck_divisor;
@@ -838,8 +877,8 @@ static int gmac_init(Gmac *gmac, u32_t gmac_ncfgr_val)
 
 #if defined(CONFIG_PTP_CLOCK_SAM_GMAC)
 	/* Initialize PTP Clock Registers */
-	gmac->GMAC_TI = GMAC_TI_CNS(1);
-	gmac->GMAC_TISUBN = 0;
+	gmac_setup_ptp_clock_divisors(gmac);
+
 	gmac->GMAC_TN = 0;
 	gmac->GMAC_TSH = 0;
 	gmac->GMAC_TSL = 0;
@@ -1509,7 +1548,7 @@ static int eth_initialize(struct device *dev)
 }
 
 #ifdef CONFIG_ETH_SAM_GMAC_MAC_I2C_EEPROM
-void get_mac_addr_from_i2c_eeprom(u8_t mac_addr[6])
+static void get_mac_addr_from_i2c_eeprom(u8_t mac_addr[6])
 {
 	struct device *dev;
 	u32_t iaddr = CONFIG_ETH_SAM_GMAC_MAC_I2C_INT_ADDRESS;
@@ -1526,6 +1565,34 @@ void get_mac_addr_from_i2c_eeprom(u8_t mac_addr[6])
 			    mac_addr, 6);
 }
 #endif
+
+#if defined(CONFIG_ETH_SAM_GMAC_RANDOM_MAC)
+static void generate_random_mac(u8_t mac_addr[6])
+{
+	u32_t entropy;
+
+	entropy = sys_rand32_get();
+
+	/* Atmel's OUI */
+	mac_addr[0] = 0x00;
+	mac_addr[1] = 0x04;
+	mac_addr[2] = 0x25;
+
+	mac_addr[3] = entropy >> 8;
+	mac_addr[4] = entropy >> 16;
+	/* Locally administered, unicast */
+	mac_addr[5] = ((entropy >> 0) & 0xfc) | 0x02;
+}
+#endif
+
+static void generate_mac(u8_t mac_addr[6])
+{
+#if defined(CONFIG_ETH_SAM_GMAC_MAC_I2C_EEPROM)
+	get_mac_addr_from_i2c_eeprom(mac_addr);
+#elif defined(CONFIG_ETH_SAM_GMAC_RANDOM_MAC)
+	generate_random_mac(mac_addr);
+#endif
+}
 
 static void eth0_iface_init(struct net_if *iface)
 {
@@ -1563,11 +1630,7 @@ static void eth0_iface_init(struct net_if *iface)
 		return;
 	}
 
-#ifdef CONFIG_ETH_SAM_GMAC_MAC_I2C_EEPROM
-	/* Read MAC address from an external EEPROM */
-	get_mac_addr_from_i2c_eeprom(dev_data->mac_addr);
-#endif
-
+	generate_mac(dev_data->mac_addr);
 	SYS_LOG_INF("MAC: %x:%x:%x:%x:%x:%x",
 		    dev_data->mac_addr[0], dev_data->mac_addr[1],
 		    dev_data->mac_addr[2], dev_data->mac_addr[3],
@@ -1978,55 +2041,7 @@ static int ptp_clock_sam_gmac_adjust(struct device *dev, int increment)
 
 static int ptp_clock_sam_gmac_rate_adjust(struct device *dev, float ratio)
 {
-	struct ptp_context *ptp_context = dev->driver_data;
-	const struct eth_sam_dev_cfg *const cfg = DEV_CFG(ptp_context->eth_dev);
-	Gmac *gmac = cfg->regs;
-	u8_t nanos;
-	u16_t subnanos;
-	float increment;
-
-	/* No change needed. */
-	if (ratio == 1.0) {
-		return 0;
-	}
-
-	if (ratio < 0) {
-		return -EINVAL;
-	}
-
-	/* Do not allow drastic rate changes */
-	if (ratio < 0.5) {
-		ratio = 0.5;
-	} else if (ratio > 2.0) {
-		ratio = 2.0;
-	}
-
-	/* Get current increment values */
-	nanos = gmac->GMAC_TI & GMAC_TI_CNS_Msk;
-	subnanos = gmac->GMAC_TISUBN & GMAC_TISUBN_Msk;
-
-	/* Convert to a single float */
-	increment = (nanos + (subnanos / UINT16_MAX));
-	increment *= ratio;
-
-	/* Limit and calculate new increment values */
-	if (increment > 255) {
-		increment = 255;
-	}
-
-	nanos = (u8_t)increment;
-	subnanos = (u16_t)((increment - (u16_t)increment) * UINT16_MAX);
-
-	/* Validate, not validating subnanos, 1 nano is the least we accept */
-	if (nanos == 0) {
-		return -EINVAL;
-	}
-
-	/* Write the registers (clears ACNS and NIT fields on purpose) */
-	gmac->GMAC_TI = GMAC_TI_CNS(nanos);
-	gmac->GMAC_TISUBN = GMAC_TISUBN_LSBTIR(subnanos);
-
-	return 0;
+	return -ENOTSUP;
 }
 
 static const struct ptp_clock_driver_api ptp_api = {

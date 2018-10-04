@@ -100,16 +100,25 @@ SECTION_FUNC(TEXT, __swap)
 	 */
 	lr r3, [_ARC_V2_STATUS32]
 	push_s r3
-#ifdef CONFIG_ARC_STACK_CHECKING
-	/* disable stack checking during swap */
-	bclr r3, r3, _ARC_V2_STATUS32_SC_BIT
-	kflag r3
-#endif
 
 #ifdef CONFIG_ARC_HAS_SECURE
 	lr r3, [_ARC_V2_SEC_STAT]
 	push_s r3
 #endif
+
+#ifdef CONFIG_ARC_STACK_CHECKING
+#ifdef CONFIG_ARC_HAS_SECURE
+	bclr r3, r3, _ARC_V2_SEC_STAT_SSC_BIT
+	/* sflag r3 */
+	/* sflag instruction is not supported in current ARC GNU */
+	.long 0x00ff302f
+#else
+	/* disable stack checking during swap */
+	bclr r3, r3, _ARC_V2_STATUS32_SC_BIT
+	kflag r3
+#endif
+#endif
+
 	push_s blink
 
 	_save_callee_saved_regs

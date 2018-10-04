@@ -202,7 +202,7 @@ static struct net_pkt *dhcpv4_prepare_message(struct net_if *iface, u8_t type,
 	}
 
 	msg = (struct dhcp_msg *)(frag->data + NET_IPV4UDPH_LEN);
-	memset(msg, 0, sizeof(struct dhcp_msg));
+	(void)memset(msg, 0, sizeof(struct dhcp_msg));
 
 	msg->op = DHCPV4_MSG_BOOT_REQUEST;
 
@@ -322,7 +322,7 @@ static u32_t dhcpv4_send_request(struct net_if *iface)
 	NET_DBG("send request dst=%s xid=0x%x ciaddr=%s%s%s timeout=%us",
 		net_sprint_ipv4_addr(server_addr),
 		iface->config.dhcpv4.xid,
-		net_sprint_ipv4_addr(ciaddr),
+		ciaddr ? net_sprint_ipv4_addr(ciaddr) : "<unknown>",
 		with_server_id ? " +server-id" : "",
 		with_requested_ip ? " +requested-ip" : "",
 		timeout);
@@ -699,7 +699,7 @@ static enum net_verdict dhcpv4_parse_options(struct net_if *iface,
 				return NET_DROP;
 			}
 
-			memset(&dns, 0, sizeof(dns));
+			(void)memset(&dns, 0, sizeof(dns));
 			frag = net_frag_read(frag, pos, &pos, 4,
 					     dns.sin_addr.s4_addr);
 			frag = net_frag_skip(frag, pos, &pos, length - 4);

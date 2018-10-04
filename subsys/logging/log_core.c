@@ -9,7 +9,6 @@
 #include <logging/log_backend.h>
 #include <logging/log_ctrl.h>
 #include <logging/log_output.h>
-#include <logging/log_backend_uart.h>
 #include <misc/printk.h>
 #include <assert.h>
 #include <atomic.h>
@@ -18,12 +17,19 @@
 #define CONFIG_LOG_PRINTK_MAX_STRING_LENGTH 1
 #endif
 
-#ifdef CONFIG_LOG_BACKEND_UART
-LOG_BACKEND_UART_DEFINE(log_backend_uart);
-const struct log_backend *uart_backend = &log_backend_uart;
-#else
-const struct log_backend *uart_backend;
-#endif
+#define LOG_STRBUF_STR_SIZE \
+	(CONFIG_LOG_STRDUP_MAX_STRING + 1) /* additional byte for termination */
+
+#define LOG_STRBUF_BUF_SIZE \
+	ROUND_UP(LOG_STRBUF_STR_SIZE + 1, sizeof(u32_t))
+
+#define LOG_STRDUP_POOL_BUFFER_SIZE \
+	(LOG_STRBUF_BUF_SIZE * CONFIG_LOG_STRDUP_BUF_COUNT)
+
+static const char *log_strdup_fail_msg = "log_strdup pool empty!";
+struct k_mem_slab log_strdup_pool;
+static u8_t __noinit __aligned(sizeof(u32_t))
+		log_strdup_pool_buf[LOG_STRDUP_POOL_BUFFER_SIZE];
 
 static struct log_list_t list;
 static atomic_t initialized;
@@ -250,20 +256,27 @@ void log_init(void)
 		return;
 	}
 
+	k_mem_slab_init(&log_strdup_pool, log_strdup_pool_buf,
+			CONFIG_LOG_STRDUP_MAX_STRING,
+			CONFIG_LOG_STRDUP_BUF_COUNT);
+
 	/* Set default timestamp. */
 	timestamp_func = timestamp_get;
 	log_output_timestamp_freq_set(CONFIG_SYS_CLOCK_HW_CYCLES_PER_SEC);
 
 	/* Assign ids to backends. */
 	for (i = 0; i < log_backend_count_get(); i++) {
-		log_backend_id_set(log_backend_get(i),
-				   i + LOG_FILTER_FIRST_BACKEND_SLOT_IDX);
-	}
+		const struct log_backend *backend = log_backend_get(i);
 
-	if (IS_ENABLED(CONFIG_LOG_BACKEND_UART)) {
-		backend_filter_init(uart_backend);
-		log_backend_uart_init();
-		log_backend_activate(uart_backend, NULL);
+		log_backend_id_set(backend,
+				   i + LOG_FILTER_FIRST_BACKEND_SLOT_IDX);
+
+		backend_filter_init(backend);
+		if (backend->api->init) {
+			backend->api->init();
+		}
+
+		log_backend_activate(backend, NULL);
 	}
 }
 
@@ -303,6 +316,10 @@ int log_set_timestamp_func(timestamp_get_t timestamp_getter, u32_t freq)
 void log_panic(void)
 {
 	struct log_backend const *backend;
+
+	if (panic_mode) {
+		return;
+	}
 
 	for (int i = 0; i < log_backend_count_get(); i++) {
 		backend = log_backend_get(i);
@@ -381,9 +398,7 @@ u32_t log_src_cnt_get(u32_t domain_id)
 
 const char *log_source_name_get(u32_t domain_id, u32_t src_id)
 {
-	assert(src_id < log_sources_count());
-
-	return log_name_get(src_id);
+	return src_id < log_sources_count() ? log_name_get(src_id) : NULL;
 }
 
 static u32_t max_filter_get(u32_t filters)
@@ -485,6 +500,55 @@ u32_t log_filter_get(struct log_backend const *const backend,
 	}
 }
 
+char *log_strdup(const char *str)
+{
+	u32_t *dupl;
+	char *sdupl;
+	int err;
+
+	err = k_mem_slab_alloc(&log_strdup_pool, (void **)&dupl, K_NO_WAIT);
+	if (err) {
+		/* failed to allocate */
+		return (char *)log_strdup_fail_msg;
+	}
+
+	/* Set 'allocated' flag. */
+	*dupl = 1;
+	dupl++;
+	sdupl = (char *)dupl;
+
+	strncpy(sdupl, str, CONFIG_LOG_STRDUP_MAX_STRING - 1);
+	sdupl[LOG_STRBUF_STR_SIZE - 1] = '\0';
+	sdupl[LOG_STRBUF_STR_SIZE - 2] = '~';
+
+	return sdupl;
+}
+
+bool log_is_strdup(void *buf)
+{
+	/* Lowest possible address is located at the second word of the first
+	 * buffer in the pool. First word is dedicated for 'allocated' flag.
+	 *
+	 * Highest possible address is the second word of the last buffer in the
+	 * pool.
+	 */
+	static const void *start = log_strdup_pool_buf + sizeof(u32_t);
+	static const void *end = &log_strdup_pool_buf[LOG_STRDUP_POOL_BUFFER_SIZE
+					       - LOG_STRBUF_BUF_SIZE
+					       + sizeof(u32_t)];
+	return (buf >= start) && (buf <= end);
+}
+
+void log_free(void *str)
+{
+	u32_t *buf = (u32_t *)str;
+
+	buf--;
+	if (atomic_dec((atomic_t *)buf) == 1) {
+		k_mem_slab_free(&log_strdup_pool, (void **)&buf);
+	}
+}
+
 #ifdef CONFIG_LOG_PROCESS_THREAD
 static void log_process_thread_func(void *dummy1, void *dummy2, void *dummy3)
 {
@@ -498,7 +562,16 @@ static void log_process_thread_func(void *dummy1, void *dummy2, void *dummy3)
 	}
 }
 
-K_THREAD_DEFINE(log_process_thread, CONFIG_LOG_PROCESS_THREAD_STACK_SIZE,
+K_THREAD_DEFINE(logging, CONFIG_LOG_PROCESS_THREAD_STACK_SIZE,
 		log_process_thread_func, NULL, NULL, NULL,
 		CONFIG_LOG_PROCESS_THREAD_PRIO, 0, K_NO_WAIT);
+#else
+#include <init.h>
+static int enable_logger(struct device *arg)
+{
+	ARG_UNUSED(arg);
+	log_init();
+	return 0;
+}
+SYS_INIT(enable_logger, POST_KERNEL, 0);
 #endif /* CONFIG_LOG_PROCESS_THREAD */

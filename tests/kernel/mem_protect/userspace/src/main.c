@@ -408,7 +408,7 @@ static void pass_noperms_object(void)
 
 __kernel struct k_thread kthread_thread;
 
-#define STACKSIZE 512
+#define STACKSIZE 1024
 K_THREAD_STACK_DEFINE(kthread_stack, STACKSIZE);
 
 void thread_body(void)
@@ -689,7 +689,18 @@ void test_main(void)
 	 * Next, the app_memory must be initialized in order to
 	 * calculate size of the dynamically created subsections.
 	 */
+#if defined(CONFIG_ARC)
+	/*
+	 * appmem_init_app_memory will accees all partitions
+	 * For CONFIG_ARC_MPU_VER == 3, these partiontons are not added
+	 * into MPU now, so need to disable mpu first to do app_bss_zero()
+	 */
+	arc_core_mpu_disable();
 	appmem_init_app_memory();
+	arc_core_mpu_enable();
+#else
+	appmem_init_app_memory();
+#endif
 	/* Domain is initialized with partition part0 */
 	appmem_init_domain_dom0(part0);
 	/* Next, the partition must be added to the domain */
@@ -698,7 +709,9 @@ void test_main(void)
 	appmem_add_thread_dom0(k_current_get());
 
 #if defined(CONFIG_ARM)
-	priv_stack_ptr = (int *)_k_priv_stack_find(ztest_thread_stack);
+	priv_stack_ptr = (int *)_k_priv_stack_find(ztest_thread_stack) -
+		MPU_GUARD_ALIGN_AND_SIZE;
+
 #endif
 	k_thread_access_grant(k_current_get(),
 			      &kthread_thread, &kthread_stack,

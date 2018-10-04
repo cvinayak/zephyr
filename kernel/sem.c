@@ -101,36 +101,13 @@ static void do_sem_give(struct k_sem *sem)
 {
 	struct k_thread *thread = _unpend_first_thread(&sem->wait_q);
 
-	if (thread) {
+	if (thread != NULL) {
 		_ready_thread(thread);
 		_set_thread_return_value(thread, 0);
 	} else {
 		increment_count_up_to_limit(sem);
 		handle_poll_events(sem);
 	}
-}
-
-/*
- * This function is meant to be called only by
- * _sys_event_logger_put_non_preemptible(), which itself is really meant to be
- * called only by _sys_k_event_logger_context_switch(), used within a context
- * switch to log the event.
- *
- * WARNING:
- * It must be called with interrupts already locked.
- * It cannot be called for a sempahore part of a group.
- */
-void _sem_give_non_preemptible(struct k_sem *sem)
-{
-	struct k_thread *thread;
-
-	thread = _unpend1_no_timeout(&sem->wait_q);
-	if (!thread) {
-		increment_count_up_to_limit(sem);
-		return;
-	}
-
-	_set_thread_return_value(thread, 0);
 }
 
 void _impl_k_sem_give(struct k_sem *sem)

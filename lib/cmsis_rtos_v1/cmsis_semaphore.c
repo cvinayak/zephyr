@@ -28,7 +28,7 @@ osSemaphoreId osSemaphoreCreate(const osSemaphoreDef_t *semaphore_def,
 
 	if (k_mem_slab_alloc(&cmsis_semaphore_slab,
 				(void **)&semaphore, 100) == 0) {
-		memset(semaphore, 0, sizeof(struct k_sem));
+		(void)memset(semaphore, 0, sizeof(struct k_sem));
 	} else {
 		return NULL;
 	}
@@ -68,11 +68,9 @@ int32_t osSemaphoreWait(osSemaphoreId semaphore_id, uint32_t timeout)
 	 */
 	if (status == 0) {
 		return k_sem_count_get(semaphore) + 1;
-	} else if (status == -EAGAIN) {
+	} else {
 		return 0;
 	}
-
-	return -1;
 }
 
 /**

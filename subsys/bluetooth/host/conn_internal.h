@@ -10,6 +10,7 @@
 typedef enum __packed {
 	BT_CONN_DISCONNECTED,
 	BT_CONN_CONNECT_SCAN,
+	BT_CONN_CONNECT_DIR_ADV,
 	BT_CONN_CONNECT,
 	BT_CONN_CONNECTED,
 	BT_CONN_DISCONNECT,
@@ -26,6 +27,8 @@ enum {
 	BT_CONN_CLEANUP,                /* Disconnected, pending cleanup */
 	BT_CONN_AUTO_PHY_UPDATE,        /* Auto-update PHY */
 	BT_CONN_AUTO_DATA_LEN,          /* Auto data len change in progress */
+	BT_CONN_SLAVE_PARAM_UPDATE,	/* If slave param update timer fired */
+	BT_CONN_SLAVE_PARAM_SET,	/* If slave param were set from app */
 
 	/* Total number of flags - must be at the end of the enum */
 	BT_CONN_NUM_FLAGS,

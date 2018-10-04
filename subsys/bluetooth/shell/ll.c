@@ -12,18 +12,22 @@
 #include <stdlib.h>
 #include <string.h>
 #include <zephyr.h>
-#include <shell/shell.h>
-#include <misc/printk.h>
 
 #include <bluetooth/hci.h>
+#include <bluetooth/bluetooth.h>
+#include <bluetooth/conn.h>
+
+#include <shell/shell.h>
 
 #include "../controller/util/memq.h"
 #include "../controller/include/ll.h"
 
+#include "bt.h"
+
 #if defined(CONFIG_BT_CTLR_DTM)
 #include "../controller/ll_sw/ll_test.h"
 
-int cmd_test_tx(int argc, char *argv[])
+int cmd_test_tx(const struct shell *shell, size_t  argc, char *argv[])
 {
 	u8_t chan, len, type, phy;
 	u32_t err;
@@ -42,12 +46,12 @@ int cmd_test_tx(int argc, char *argv[])
 		return -EINVAL;
 	}
 
-	printk("test_tx...\n");
+	print(shell, "test_tx...");
 
 	return 0;
 }
 
-int cmd_test_rx(int argc, char *argv[])
+int cmd_test_rx(const struct shell *shell, size_t  argc, char *argv[])
 {
 	u8_t chan, phy, mod_idx;
 	u32_t err;
@@ -65,12 +69,12 @@ int cmd_test_rx(int argc, char *argv[])
 		return -EINVAL;
 	}
 
-	printk("test_rx...\n");
+	print(shell, "test_rx...");
 
 	return 0;
 }
 
-int cmd_test_end(int argc, char *argv[])
+int cmd_test_end(const struct shell *shell, size_t  argc, char *argv[])
 {
 	u16_t num_rx;
 	u32_t err;
@@ -80,7 +84,7 @@ int cmd_test_end(int argc, char *argv[])
 		return -EINVAL;
 	}
 
-	printk("num_rx= %u.\n", num_rx);
+	print(shell, "num_rx= %u.", num_rx);
 
 	return 0;
 }
@@ -113,7 +117,7 @@ int cmd_test_end(int argc, char *argv[])
 #define SCAN_FILTER_POLICY 0
 
 #if defined(CONFIG_BT_BROADCASTER)
-int cmd_advx(int argc, char *argv[])
+int cmd_advx(const struct shell *shell, size_t argc, char *argv[])
 {
 	u16_t adv_interval = 0x20;
 	u16_t handle = 0;
@@ -206,11 +210,9 @@ int cmd_advx(int argc, char *argv[])
 	}
 
 	if (argc > 6) {
-		} else {
-			handle = strtoul(argv[6], NULL, 16);
-			if (handle >= CONFIG_BT_ADV_MAX) {
-				return -EINVAL;
-			}
+		handle = strtoul(argv[6], NULL, 16);
+		if (handle >= CONFIG_BT_ADV_MAX) {
+			return -EINVAL;
 		}
 	}
 
@@ -219,7 +221,7 @@ int cmd_advx(int argc, char *argv[])
 	}
 
 do_enable:
-	printk("adv param set...");
+	print(shell, "adv param set...");
 	err = ll_adv_params_set(handle, evt_prop, adv_interval, adv_type,
 				OWN_ADDR_TYPE, PEER_ADDR_TYPE, PEER_ADDR,
 				ADV_CHAN_MAP, FILTER_POLICY, ADV_TX_PWR,
@@ -239,7 +241,7 @@ do_enable:
 #endif
 
 disable:
-	printk("adv enable (%u)...", enable);
+	print(shell, "adv enable (%u)...", enable);
 #if defined(CONFIG_BT_HCI_MESH_EXT)
 	err = ll_adv_enable(handle, enable, 0, 0, 0, 0, 0);
 #else /* !CONFIG_BT_HCI_MESH_EXT */
@@ -250,14 +252,14 @@ disable:
 	}
 
 exit:
-	printk("done (err= %d).\n", err);
+	print(shell, "done (err= %d).", err);
 
 	return 0;
 }
 #endif /* CONFIG_BT_BROADCASTER */
 
 #if defined(CONFIG_BT_OBSERVER)
-int cmd_scanx(int argc, char *argv[])
+int cmd_scanx(const struct shell *shell, size_t  argc, char *argv[])
 {
 	u8_t type = 0;
 	u8_t enable;
@@ -293,7 +295,7 @@ int cmd_scanx(int argc, char *argv[])
 		}
 	}
 
-	printk("scan param set...");
+	print(shell, "scan param set...");
 	err = ll_scan_params_set(type, SCAN_INTERVAL, SCAN_WINDOW,
 				 SCAN_OWN_ADDR_TYPE, SCAN_FILTER_POLICY);
 	if (err) {
@@ -301,16 +303,16 @@ int cmd_scanx(int argc, char *argv[])
 	}
 
 disable:
-	printk("scan enable (%u)...", enable);
+	print(shell, "scan enable (%u)...", enable);
 	err = ll_scan_enable(enable);
 	if (err) {
 		goto exit;
 	}
 
 exit:
-	printk("done (err= %d).\n", err);
+	print(shell, "done (err= %d).", err);
 
-	return 0;
+	return err;
 }
 #endif /* CONFIG_BT_OBSERVER */
 #endif /* CONFIG_BT_CTLR_ADV_EXT */
@@ -318,7 +320,7 @@ exit:
 #if defined(CONFIG_BT_LL_SW_SPLIT)
 #include "../controller/ll_sw/ull.h"
 
-int cmd_ull_reset(int argc, char *argv[])
+int cmd_ull_reset(const struct shell *shell, size_t  argc, char *argv[])
 {
 	ll_reset();
 
@@ -328,7 +330,7 @@ int cmd_ull_reset(int argc, char *argv[])
 #if defined(CONFIG_BT_TMP)
 #include "../controller/ll_sw/ull_tmp.h"
 
-int cmd_ull_tmp_enable(int argc, char *argv[])
+int cmd_ull_tmp_enable(const struct shell *shell, size_t  argc, char *argv[])
 {
 	u16_t handle = 0;
 	int enable;
@@ -363,7 +365,7 @@ int cmd_ull_tmp_enable(int argc, char *argv[])
 	return err;
 }
 
-int cmd_ull_tmp_send(int argc, char *argv[])
+int cmd_ull_tmp_send(const struct shell *shell, size_t  argc, char *argv[])
 {
 	u16_t handle = 0;
 	int err;
