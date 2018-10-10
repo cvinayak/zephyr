@@ -1196,9 +1196,7 @@ static inline void _rx_demux_rx(memq_link_t *link, struct node_rx_hdr *rx)
 
 	case NODE_RX_TYPE_DC_PDU:
 	{
-		/* TODO: process and pass through to thread */
-		ll_rx_put(link, rx);
-		ll_rx_sched();
+		ull_conn_rx(link, rx);
 	}
 	break;
 #endif /* CONFIG_BT_CONN */

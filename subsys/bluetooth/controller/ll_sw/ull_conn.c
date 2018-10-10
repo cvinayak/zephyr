@@ -234,6 +234,12 @@ void ull_conn_setup(memq_link_t *link, struct node_rx_hdr *rx)
 	}
 }
 
+void ull_conn_rx(memq_link_t *link, struct node_rx_hdr *rx)
+{
+	ll_rx_put(link, rx);
+	ll_rx_sched();
+}
+
 void ull_conn_llcp(struct ll_conn *conn)
 {
 	/* Terminate Procedure Request */
