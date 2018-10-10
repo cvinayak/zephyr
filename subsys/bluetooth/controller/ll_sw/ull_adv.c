@@ -1011,10 +1011,10 @@ static void ticker_op_stop_cb(u32_t status, void *param)
 
 static void disabled_cb(void *param)
 {
-	struct node_rx_pdu *node_rx;
 	struct ll_adv_set *adv;
-	struct node_rx_cc *cc;
 	memq_link_t *link;
+	struct node_rx_pdu *rx;
+	struct node_rx_cc *cc;
 
 	adv = ((struct lll_hdr *)param)->parent;
 
@@ -1023,17 +1023,17 @@ static void disabled_cb(void *param)
 	adv->link_cc_free = NULL;
 
 	LL_ASSERT(adv->node_rx_cc_free);
-	node_rx = adv->node_rx_cc_free;
+	rx = adv->node_rx_cc_free;
 	adv->node_rx_cc_free = NULL;
 
-	node_rx->hdr.type = NODE_RX_TYPE_CONNECTION;
-	node_rx->hdr.handle = 0xffff;
+	rx->hdr.type = NODE_RX_TYPE_CONNECTION;
+	rx->hdr.handle = 0xffff;
 
-	cc = (void *)node_rx->pdu;
+	cc = (void *)rx->pdu;
 	memset(cc, 0x00, sizeof(struct node_rx_cc));
 	cc->status = 0x3c;
 
-	ll_rx_put(link, node_rx);
+	ll_rx_put(link, rx);
 	ll_rx_sched();
 }
 
