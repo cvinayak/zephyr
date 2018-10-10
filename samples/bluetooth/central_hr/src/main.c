@@ -19,8 +19,6 @@
 #include <bluetooth/gatt.h>
 #include <misc/byteorder.h>
 
-static struct bt_conn *default_conn;
-
 static struct bt_uuid_16 uuid = BT_UUID_INIT_16(0);
 static struct bt_gatt_discover_params discover_params;
 static struct bt_gatt_subscribe_params subscribe_params;
@@ -94,36 +92,6 @@ static u8_t discover_func(struct bt_conn *conn,
 	return BT_GATT_ITER_STOP;
 }
 
-static void connected(struct bt_conn *conn, u8_t conn_err)
-{
-	char addr[BT_ADDR_LE_STR_LEN];
-	int err;
-
-	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
-
-	if (conn_err) {
-		printk("Failed to connect to %s (%u)\n", addr, conn_err);
-		return;
-	}
-
-	printk("Connected: %s\n", addr);
-
-	if (conn == default_conn) {
-		memcpy(&uuid, BT_UUID_HRS, sizeof(uuid));
-		discover_params.uuid = &uuid.uuid;
-		discover_params.func = discover_func;
-		discover_params.start_handle = 0x0001;
-		discover_params.end_handle = 0xffff;
-		discover_params.type = BT_GATT_DISCOVER_PRIMARY;
-
-		err = bt_gatt_discover(default_conn, &discover_params);
-		if (err) {
-			printk("Discover failed(err %d)\n", err);
-			return;
-		}
-	}
-}
-
 static bool eir_found(struct bt_data *data, void *user_data)
 {
 	bt_addr_le_t *addr = user_data;
@@ -156,8 +124,8 @@ static bool eir_found(struct bt_data *data, void *user_data)
 				continue;
 			}
 
-			default_conn = bt_conn_create_le(addr,
-							 BT_LE_CONN_PARAM_DEFAULT);
+			(void)bt_conn_create_le(addr, BT_LE_CONN_PARAM_DEFAULT);
+
 			return false;
 		}
 	}
@@ -180,6 +148,38 @@ static void device_found(const bt_addr_le_t *addr, s8_t rssi, u8_t type,
 	}
 }
 
+static void connected(struct bt_conn *conn, u8_t conn_err)
+{
+	char addr[BT_ADDR_LE_STR_LEN];
+	int err;
+
+	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
+
+	if (conn_err) {
+		printk("Failed to connect to %s (%u)\n", addr, conn_err);
+		return;
+	}
+
+	printk("Connected: %s\n", addr);
+
+	err = bt_le_scan_start(BT_LE_SCAN_ACTIVE, device_found);
+	if (err) {
+		printk("Scanning failed to start (err %d)\n", err);
+	}
+
+	memcpy(&uuid, BT_UUID_HRS, sizeof(uuid));
+	discover_params.uuid = &uuid.uuid;
+	discover_params.func = discover_func;
+	discover_params.start_handle = 0x0001;
+	discover_params.end_handle = 0xffff;
+	discover_params.type = BT_GATT_DISCOVER_PRIMARY;
+
+	err = bt_gatt_discover(conn, &discover_params);
+	if (err) {
+		printk("Discover failed (err %d)\n", err);
+	}
+}
+
 static void disconnected(struct bt_conn *conn, u8_t reason)
 {
 	char addr[BT_ADDR_LE_STR_LEN];
@@ -189,15 +189,9 @@ static void disconnected(struct bt_conn *conn, u8_t reason)
 
 	printk("Disconnected: %s (reason %u)\n", addr, reason);
 
-	if (default_conn != conn) {
-		return;
-	}
+	bt_conn_unref(conn);
 
-	bt_conn_unref(default_conn);
-	default_conn = NULL;
-
-	/* This demo doesn't require active scan */
-	err = bt_le_scan_start(BT_LE_SCAN_PASSIVE, device_found);
+	err = bt_le_scan_start(BT_LE_SCAN_ACTIVE, device_found);
 	if (err) {
 		printk("Scanning failed to start (err %d)\n", err);
 	}
