@@ -34,6 +34,8 @@ static struct ll_conn *is_connected_get(u16_t handle);
 static void ticker_op_update_cb(u32_t status, void *param);
 static void terminate_ind_rx_enqueue(struct lll_conn *lll, u8_t reason);
 static void conn_cleanup(struct lll_conn *lll);
+static void ctrl_tx_enqueue(struct ll_conn *conn, struct node_tx *node_tx);
+static void ctrl_tx_sec_enqueue(struct ll_conn *conn, struct node_tx *node_tx);
 
 static struct ll_conn _conn[CONFIG_BT_MAX_CONN];
 static void *_conn_free;
@@ -42,6 +44,12 @@ static void *_conn_free;
 				 offsetof(struct pdu_data, lldata) + \
 				 (CONFIG_BT_CTLR_TX_BUFFER_SIZE)) * \
 			  (CONFIG_BT_CTLR_TX_BUFFERS))
+
+#define CONN_TX_CTRL_BUFFERS 2
+#define CONN_TX_CTRL_BUF_SIZE (MROUND(offsetof(struct node_tx, pdu) + \
+				      offsetof(struct pdu_data, llctrl) + \
+				      sizeof(struct pdu_data_llctrl)) * \
+			       CONN_TX_CTRL_BUFFERS)
 
 static MFIFO_DEFINE(conn_tx, sizeof(struct lll_tx),
 		    CONFIG_BT_CTLR_TX_BUFFERS);
@@ -55,6 +63,17 @@ static struct {
 	void *free;
 	u8_t pool[sizeof(memq_link_t) * CONFIG_BT_CTLR_TX_BUFFERS];
 } mem_link_tx;
+
+static struct {
+	void *free;
+	u8_t pool[CONN_TX_CTRL_BUF_SIZE * CONN_TX_CTRL_BUFFERS];
+} mem_conn_tx_ctrl;
+
+static struct {
+	void *free;
+	u8_t pool[sizeof(memq_link_t) * CONN_TX_CTRL_BUFFERS];
+} mem_link_tx_ctrl;
+
 
 struct ll_conn *ll_conn_acquire(void)
 {
@@ -217,6 +236,46 @@ void ull_conn_setup(memq_link_t *link, struct node_rx_hdr *rx)
 	default:
 		LL_ASSERT(0);
 		break;
+	}
+}
+
+void ull_conn_llcp(struct ll_conn *conn)
+{
+	/* Terminate Procedure Request */
+	if (conn->llcp_terminate.ack != conn->llcp_terminate.req) {
+		struct node_tx *node_tx;
+
+		node_tx = mem_acquire(&mem_conn_tx_ctrl.free);
+		if (node_tx) {
+			struct pdu_data *pdu_ctrl_tx = (void *)node_tx->pdu;
+
+			/* Terminate Procedure acked */
+			conn->llcp_terminate.ack = conn->llcp_terminate.req;
+
+			/* place the terminate ind packet in tx queue */
+			pdu_ctrl_tx->ll_id = PDU_DATA_LLID_CTRL;
+			pdu_ctrl_tx->len = offsetof(struct pdu_data_llctrl,
+						    terminate_ind) +
+				sizeof(struct pdu_data_llctrl_terminate_ind);
+			pdu_ctrl_tx->llctrl.opcode =
+				PDU_DATA_LLCTRL_TYPE_TERMINATE_IND;
+			pdu_ctrl_tx->llctrl.terminate_ind.error_code =
+				conn->llcp_terminate.reason_own;
+
+			ctrl_tx_enqueue(conn, node_tx);
+
+			/* Terminate Procedure timeout is started, will
+			 * replace any other timeout running
+			 */
+			conn->procedure_expire = conn->supervision_reload;
+
+			/* NOTE: if supervision timeout equals connection
+			 * interval, dont timeout in current event.
+			 */
+			if (conn->procedure_expire <= 1) {
+				conn->procedure_expire++;
+			}
+		}
 	}
 }
 
@@ -447,6 +506,21 @@ void ull_conn_tx_demux(u8_t count)
 
 		conn = ll_conn_get(tx->handle);
 		if (conn && (conn->lll.handle == tx->handle)) {
+			struct node_tx *node_tx_new = tx->node;
+
+			if (!conn->tx_data) {
+				conn->tx_data = node_tx_new;
+				if (!conn->tx_head) {
+					conn->tx_head = node_tx_new;
+					conn->tx_data_last = NULL;
+				}
+			}
+
+			if (conn->tx_data_last) {
+				conn->tx_data_last->next = node_tx_new;
+			}
+
+			conn->tx_data_last = node_tx_new;
 			memq_link_t *link;
 
 			link = mem_acquire(&mem_link_tx.free);
@@ -483,6 +557,14 @@ static int _init_reset(void)
 	/* Initialize tx link pool. */
 	mem_init(mem_link_tx.pool, sizeof(memq_link_t),
 		 CONFIG_BT_CTLR_TX_BUFFERS, &mem_link_tx.free);
+
+	/* Initialize tx ctrl pool. */
+	mem_init(mem_conn_tx_ctrl.pool, CONN_TX_CTRL_BUF_SIZE,
+		 CONN_TX_CTRL_BUFFERS, &mem_conn_tx_ctrl.free);
+
+	/* Initialize tx ctrl link pool. */
+	mem_init(mem_link_tx_ctrl.pool, sizeof(memq_link_t),
+		 CONN_TX_CTRL_BUFFERS, &mem_link_tx_ctrl.free);
 
 	return 0;
 }
@@ -561,4 +643,79 @@ static void conn_cleanup(struct lll_conn *lll)
 				    ticker_op_stop_cb, (void *)lll);
 	LL_ASSERT((ticker_status == TICKER_STATUS_SUCCESS) ||
 		  (ticker_status == TICKER_STATUS_BUSY));
+}
+
+static void ctrl_tx_data_last_enqueue(struct ll_conn *conn, struct node_tx *node_tx)
+{
+	node_tx->next = conn->tx_ctrl_last->next;
+	conn->tx_ctrl_last->next = node_tx;
+	conn->tx_ctrl_last = node_tx;
+}
+
+static void ctrl_tx_enqueue(struct ll_conn *conn, struct node_tx *node_tx)
+{
+	/* check if a packet was tx-ed and not acked by peer */
+	if (
+	    /* data/ctrl packet is in the head */
+	    conn->tx_head &&
+	    /* data PDU tx is not paused */
+	    !conn->pause_tx) {
+		/* data or ctrl may have been transmitted once, but not acked
+		 * by peer, hence place this new ctrl after head
+		 */
+
+		/* if data transmited once, keep it at head of the tx list,
+		 * as we will insert a ctrl after it, hence advance the
+		 * data pointer
+		 */
+		if (conn->tx_head == conn->tx_data) {
+			conn->tx_data = conn->tx_data->next;
+		}
+
+		/* if no ctrl packet already queued, new ctrl added will be
+		 * the ctrl pointer and is inserted after head.
+		 */
+		if (!conn->tx_ctrl) {
+			node_tx->next = conn->tx_head->next;
+			conn->tx_head->next = node_tx;
+			conn->tx_ctrl = node_tx;
+			conn->tx_ctrl_last = node_tx;
+		} else {
+			ctrl_tx_data_last_enqueue(conn, node_tx);
+		}
+	} else {
+		/* No packet needing ACK. */
+
+		/* If first ctrl packet then add it as head else add it to the
+		 * tail of the ctrl packets.
+		 */
+		if (!conn->tx_ctrl) {
+			node_tx->next = conn->tx_head;
+			conn->tx_head = node_tx;
+			conn->tx_ctrl = node_tx;
+			conn->tx_ctrl_last = node_tx;
+		} else {
+			ctrl_tx_data_last_enqueue(conn, node_tx);
+		}
+	}
+
+	/* Update last pointer if ctrl added at end of tx list */
+	if (node_tx->next == 0) {
+		conn->tx_data_last = node_tx;
+	}
+}
+
+static void ctrl_tx_sec_enqueue(struct ll_conn *conn, struct node_tx *node_tx)
+{
+	if (conn->pause_tx) {
+		if (!conn->tx_ctrl) {
+			node_tx->next = conn->tx_head;
+			conn->tx_head = node_tx;
+		} else {
+			node_tx->next = conn->tx_ctrl_last->next;
+			conn->tx_ctrl_last->next = node_tx;
+		}
+	} else {
+		ctrl_tx_enqueue(conn, node_tx);
+	}
 }

@@ -394,7 +394,6 @@ static void ticker_cb(u32_t ticks_at_expire, u32_t remainder, u16_t lazy,
 	static struct mayfly _mfy = {0, 0, &_link, NULL, lll_slave_prepare};
 	static struct lll_prepare_param p;
 	struct ll_conn *conn = param;
-	struct lll_conn *lll;
 	u32_t ret;
 	u8_t ref;
 
@@ -404,13 +403,14 @@ static void ticker_cb(u32_t ticks_at_expire, u32_t remainder, u16_t lazy,
 	ref = ull_ref_inc(&conn->ull);
 	LL_ASSERT(ref);
 
-	lll = &conn->lll;
+	/* Handle any LL Control Procedures */
+	ull_conn_llcp(conn);
 
 	/* Append timing parameters */
 	p.ticks_at_expire = ticks_at_expire;
 	p.remainder = remainder;
 	p.lazy = lazy;
-	p.param = lll;
+	p.param = &conn->lll;
 	_mfy.param = &p;
 
 	/* Kick LLL prepare */

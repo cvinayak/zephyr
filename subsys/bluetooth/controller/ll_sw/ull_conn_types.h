@@ -31,6 +31,14 @@ struct ll_conn {
 			u8_t reason;
 		} node_rx;
 	} llcp_terminate;
+
+	u8_t  pause_tx:1;
+
+	struct node_tx *tx_head;
+	struct node_tx *tx_ctrl;
+	struct node_tx *tx_ctrl_last;
+	struct node_tx *tx_data;
+	struct node_tx *tx_data_last;
 };
 
 struct node_rx_cc {

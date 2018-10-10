@@ -484,6 +484,9 @@ static void ticker_cb(u32_t ticks_at_expire, u32_t remainder, u16_t lazy,
 	ref = ull_ref_inc(&conn->ull);
 	LL_ASSERT(ref);
 
+	/* Handle any LL Control Procedures */
+	ull_conn_llcp(conn);
+
 	/* De-mux 1 tx node from FIFO */
 	ull_conn_tx_demux(1);
 
