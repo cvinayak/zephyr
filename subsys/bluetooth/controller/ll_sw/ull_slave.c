@@ -74,6 +74,7 @@ void ull_slave_setup(memq_link_t *link, struct node_rx_hdr *rx,
 	lll->data_chan_count = util_ones_count_get(&lll->data_chan_map[0],
 			       sizeof(lll->data_chan_map));
 	lll->data_chan_hop = pdu_adv->connect_ind.hop;
+	lll->data_chan_sel = 0;
 	lll->interval = pdu_adv->connect_ind.interval;
 	lll->latency = pdu_adv->connect_ind.latency;
 
