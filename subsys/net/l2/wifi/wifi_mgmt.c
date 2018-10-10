@@ -4,10 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#if defined(CONFIG_NET_DEBUG_L2_WIFI_MGMT)
-#define SYS_LOG_DOMAIN "net/wifi_mgmt"
-#define NET_LOG_ENABLED 1
-#endif
+#define LOG_MODULE_NAME net_wifi_mgmt
+#define NET_LOG_LEVEL CONFIG_NET_L2_WIFI_MGMT_LOG_LEVEL
 
 #include <errno.h>
 
@@ -21,10 +19,10 @@ static int wifi_connect(u32_t mgmt_request, struct net_if *iface,
 	struct wifi_connect_req_params *params =
 		(struct wifi_connect_req_params *)data;
 
-	SYS_LOG_DBG("%s %u %u %u %s %u",
-		    params->ssid, params->ssid_length,
-		    params->channel, params->security,
-		    params->psk, params->psk_length);
+	NET_DBG("%s %u %u %u %s %u",
+		params->ssid, params->ssid_length,
+		params->channel, params->security,
+		params->psk, params->psk_length);
 
 	if ((params->security > WIFI_SECURITY_TYPE_PSK) ||
 	    (params->ssid_length > WIFI_SSID_MAX_LEN) ||

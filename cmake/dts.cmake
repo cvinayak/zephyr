@@ -42,14 +42,14 @@ foreach(shield_path ${shields_refs_list})
 
   if(${shield_config})
     # if shield config flag is on, add shield overlay to the shield overlays
-    # list and dts.fixup file to the shield fixup file
+    # list and dts_fixup file to the shield fixup file
     list(APPEND
       dts_files
       ${shield_dir}/${shield_path}
       )
     list(APPEND
       dts_fixups
-      ${shield_dir}/${shield}/dts.fixup
+      ${shield_dir}/${shield}/dts_fixup.h
       )
   endif()
 endforeach()
@@ -86,14 +86,12 @@ if(CONFIG_HAS_DTS)
     COMMAND ${CMAKE_C_COMPILER}
     -x assembler-with-cpp
     -nostdinc
-    -I${ZEPHYR_BASE}/soc/${ARCH}
     -isystem ${ZEPHYR_BASE}/include
     -isystem ${ZEPHYR_BASE}/dts/${ARCH}
     -isystem ${ZEPHYR_BASE}/dts
     -include ${AUTOCONF_H}
     ${DTC_INCLUDE_FLAG_FOR_DTS}  # include the DTS source and overlays
     -I${ZEPHYR_BASE}/dts/common
-    -I${ZEPHYR_BASE}/drivers
     -undef -D__DTS__
     -P
     -E ${ZEPHYR_BASE}/misc/empty_file.c
@@ -121,15 +119,31 @@ if(CONFIG_HAS_DTS)
     message(FATAL_ERROR "command failed with return code: ${ret}")
   endif()
 
+  # Error-out when the deprecated naming convention is found (until
+  # after 1.14.0 has been released)
+  foreach(path
+	  ${BOARD_DIR}/dts.fixup
+	  ${PROJECT_SOURCE_DIR}/soc/${ARCH}/${SOC_PATH}/dts.fixup
+      ${APPLICATION_SOURCE_DIR}/dts.fixup
+	  )
+	if(EXISTS ${path})
+	  message(FATAL_ERROR
+		"A deprecated filename has been detected. Porting is required."
+		"The file '${path}' exists, but it should be named dts_fixup.h instead."
+		"See https://github.com/zephyrproject-rtos/zephyr/pull/10352 for more details"
+		)
+	endif()
+  endforeach()
+
   # Run extract_dts_includes.py for the header file
   # generated_dts_board.h
-  set_ifndef(DTS_BOARD_FIXUP_FILE ${BOARD_DIR}/dts.fixup)
-  set_ifndef(DTS_SOC_FIXUP_FILE   ${PROJECT_SOURCE_DIR}/soc/${ARCH}/${SOC_PATH}/dts.fixup)
+  set_ifndef(DTS_BOARD_FIXUP_FILE ${BOARD_DIR}/dts_fixup.h)
+  set_ifndef(DTS_SOC_FIXUP_FILE   ${PROJECT_SOURCE_DIR}/soc/${ARCH}/${SOC_PATH}/dts_fixup.h)
 
   list(APPEND dts_fixups
     ${DTS_BOARD_FIXUP_FILE}
     ${DTS_SOC_FIXUP_FILE}
-    ${APPLICATION_SOURCE_DIR}/dts.fixup
+    ${APPLICATION_SOURCE_DIR}/dts_fixup.h
     )
 
   foreach(fixup ${dts_fixups})

@@ -463,9 +463,9 @@ Z_SYSCALL_HANDLER(k_thread_create,
 	 * size and not allocated in addition to the stack size
 	 */
 	guard_size = (u32_t)K_THREAD_STACK_BUFFER(stack) - (u32_t)stack;
-	Z_OOPS(Z_SYSCALL_VERIFY_MSG(__builtin_uadd_overflow(guard_size,
+	Z_OOPS(Z_SYSCALL_VERIFY_MSG(!__builtin_uadd_overflow(guard_size,
 							     stack_size,
-							     &total_size) == 0,
+							     &total_size),
 				    "stack size overflow (%u+%u)", stack_size,
 				    guard_size));
 #else
@@ -513,32 +513,6 @@ Z_SYSCALL_HANDLER(k_thread_create,
 }
 #endif /* CONFIG_USERSPACE */
 #endif /* CONFIG_MULTITHREADING */
-
-/* LCOV_EXCL_START */
-int _impl_k_thread_cancel(k_tid_t tid)
-{
-	struct k_thread *thread = tid;
-
-	unsigned int key = irq_lock();
-
-	if (_has_thread_started(thread) ||
-	    !_is_thread_timeout_active(thread)) {
-		irq_unlock(key);
-		return -EINVAL;
-	}
-
-	(void)_abort_thread_timeout(thread);
-	_thread_monitor_exit(thread);
-
-	irq_unlock(key);
-
-	return 0;
-}
-
-#ifdef CONFIG_USERSPACE
-Z_SYSCALL_HANDLER1_SIMPLE(k_thread_cancel, K_OBJ_THREAD, struct k_thread *);
-#endif
-/* LCOV_EXCL_STOP */
 
 void _k_thread_single_suspend(struct k_thread *thread)
 {

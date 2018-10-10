@@ -97,8 +97,8 @@ static u64_t event_mask_page_2 = DEFAULT_EVENT_MASK_PAGE_2;
 static u64_t le_event_mask = DEFAULT_LE_EVENT_MASK;
 
 #if defined(CONFIG_BT_CONN)
-static void le_conn_complete(u8_t status, struct node_rx_cc *node_rx,
-			     u16_t handle, struct net_buf *buf);
+static void le_conn_complete(struct pdu_data *pdu_data, u16_t handle,
+			     struct net_buf *buf);
 #endif /* CONFIG_BT_CONN */
 
 static void evt_create(struct net_buf *buf, u8_t evt, u8_t len)
@@ -1072,32 +1072,16 @@ static void le_create_connection(struct net_buf *buf, struct net_buf **evt)
 	*evt = cmd_status((!status) ? 0x00 : BT_HCI_ERR_CMD_DISALLOWED);
 }
 
-static void le_create_conn_cancel(struct net_buf *buf, struct net_buf **evt)
+static void le_create_conn_cancel(struct net_buf *buf, struct net_buf **evt,
+				  void **node_rx)
 {
 	struct bt_hci_evt_cc_status *ccst;
-	struct net_buf *cc;
-	u8_t cmd_status;
 	u32_t status;
 
-	status = ll_connect_disable();
-	cmd_status = status ? BT_HCI_ERR_CMD_DISALLOWED : 0x00;
-
-	if (!cmd_status) {
-		*evt = bt_buf_get_rx(BT_BUF_EVT, K_FOREVER);
-		le_conn_complete(BT_HCI_ERR_UNKNOWN_CONN_ID, NULL, 0x0000,
-				 *evt);
-		if ((*evt)->len) {
-			ccst = cmd_complete(&cc, sizeof(*ccst));
-			ccst->status = cmd_status;
-			bt_recv_prio(cc);
-			return;
-		} else {
-			net_buf_unref(*evt);
-		}
-	}
+	status = ll_connect_disable(node_rx);
 
 	ccst = cmd_complete(evt, sizeof(*ccst));
-	ccst->status = cmd_status;
+	ccst->status = (!status) ? 0x00 : BT_HCI_ERR_CMD_DISALLOWED;
 }
 
 static void le_set_host_chan_classif(struct net_buf *buf, struct net_buf **evt)
@@ -1577,7 +1561,7 @@ static void le_enh_tx_test(struct net_buf *buf, struct net_buf **evt)
 #endif /* CONFIG_BT_CTLR_DTM_HCI */
 
 static int controller_cmd_handle(u16_t  ocf, struct net_buf *cmd,
-				 struct net_buf **evt)
+				 struct net_buf **evt, void **node_rx)
 {
 	switch (ocf) {
 	case BT_OCF(BT_HCI_OP_LE_SET_EVENT_MASK):
@@ -1665,7 +1649,7 @@ static int controller_cmd_handle(u16_t  ocf, struct net_buf *cmd,
 		break;
 
 	case BT_OCF(BT_HCI_OP_LE_CREATE_CONN_CANCEL):
-		le_create_conn_cancel(cmd, evt);
+		le_create_conn_cancel(cmd, evt, node_rx);
 		break;
 
 	case BT_OCF(BT_HCI_OP_LE_SET_HOST_CHAN_CLASSIF):
@@ -2199,7 +2183,7 @@ uint8_t bt_read_static_addr(bt_addr_le_t *addr)
 }
 #endif /* !CONFIG_BT_HCI_VS_EXT */
 
-struct net_buf *hci_cmd_handle(struct net_buf *cmd)
+struct net_buf *hci_cmd_handle(struct net_buf *cmd, void **node_rx)
 {
 	struct bt_hci_evt_cc_status *ccst;
 	struct bt_hci_cmd_hdr *chdr;
@@ -2239,7 +2223,7 @@ struct net_buf *hci_cmd_handle(struct net_buf *cmd)
 		err = status_cmd_handle(ocf, cmd, &evt);
 		break;
 	case BT_OGF_LE:
-		err = controller_cmd_handle(ocf, cmd, &evt);
+		err = controller_cmd_handle(ocf, cmd, &evt, node_rx);
 		break;
 #if defined(CONFIG_BT_HCI_VS)
 	case BT_OGF_VS:
@@ -2709,10 +2693,12 @@ static void le_scan_req_received(struct pdu_data *pdu_data, u8_t *b,
 #endif /* CONFIG_BT_CTLR_SCAN_REQ_NOTIFY */
 
 #if defined(CONFIG_BT_CONN)
-static void le_conn_complete(u8_t status, struct node_rx_cc *node_rx,
-			     u16_t handle, struct net_buf *buf)
+static void le_conn_complete(struct pdu_data *pdu_data, u16_t handle,
+			     struct net_buf *buf)
 {
+	struct node_rx_cc *node_rx = (void *)pdu_data;
 	struct bt_hci_evt_le_conn_complete *lecc;
+	u8_t status = node_rx->status;
 
 #if defined(CONFIG_BT_CTLR_PRIVACY)
 	if (!status) {
@@ -2837,7 +2823,7 @@ static void le_conn_update_complete(struct pdu_data *pdu_data, u16_t handle,
 		return;
 	}
 
-	cu = (void *)pdu_data->lldata;
+	cu = (void *)pdu_data;
 
 	sep = meta_evt(buf, BT_HCI_EVT_LE_CONN_UPDATE_COMPLETE, sizeof(*sep));
 
@@ -2911,7 +2897,7 @@ static void le_phy_upd_complete(struct pdu_data *pdu_data, u16_t handle,
 	struct bt_hci_evt_le_phy_update_complete *sep;
 	struct node_rx_pu *pu;
 
-	pu = (void *)pdu_data->lldata;
+	pu = (void *)pdu_data;
 
 	if (!(event_mask & BT_EVT_MASK_LE_META_EVENT) ||
 	    !(le_event_mask & BT_EVT_MASK_LE_PHY_UPDATE_COMPLETE)) {
@@ -2978,12 +2964,7 @@ static void encode_control(struct node_rx_pdu *node_rx,
 
 #if defined(CONFIG_BT_CONN)
 	case NODE_RX_TYPE_CONNECTION:
-		{
-			struct node_rx_cc *cc;
-
-			cc = (void *)pdu_data;
-			le_conn_complete(cc->status, cc, handle, buf);
-		}
+		le_conn_complete(pdu_data, handle, buf);
 		break;
 
 	case NODE_RX_TYPE_TERMINATE:
