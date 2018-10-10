@@ -138,10 +138,10 @@ u32_t ll_create_connection(u16_t scan_interval, u16_t scan_window,
 	       sizeof(conn_lll->data_chan_map));
 	conn_lll->data_chan_count = data_chan_count;
 	bt_rand(&hop, sizeof(u8_t));
-	conn_lll->data_chan_sel = 0;
-	conn_lll->role = 0;
 	conn_lll->data_chan_hop = 5 + (hop % 12);
+	conn_lll->data_chan_sel = 0;
 	conn_lll->data_chan_use = 0;
+	conn_lll->role = 0;
 	/* FIXME: END: Move to ULL? */
 
 	conn->connect_expire = 6;
