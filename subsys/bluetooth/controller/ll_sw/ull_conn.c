@@ -521,12 +521,14 @@ void ull_conn_tx_demux(u8_t count)
 			}
 
 			conn->tx_data_last = node_tx_new;
+			#if 0
 			memq_link_t *link;
 
 			link = mem_acquire(&mem_link_tx.free);
 			LL_ASSERT(link);
 
 			memq_enqueue(link, tx->node, &conn->lll.memq_tx.tail);
+			#endif
 		} else {
 			struct node_tx *node_tx = tx->node;
 			struct pdu_data *p = (void *)node_tx->pdu;
