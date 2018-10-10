@@ -421,5 +421,8 @@ static void ticker_cb(u32_t ticks_at_expire, u32_t remainder, u16_t lazy,
 	/* De-mux remaining tx nodes from FIFO */
 	ull_conn_tx_demux(UINT8_MAX);
 
+	/* Enqueue towards LLL */
+	ull_conn_tx_lll_enqueue(conn, UINT8_MAX);
+
 	DEBUG_RADIO_PREPARE_S(1);
 }

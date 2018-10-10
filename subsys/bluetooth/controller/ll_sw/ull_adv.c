@@ -591,6 +591,13 @@ u32_t ll_adv_enable(u8_t enable)
 		conn->supervision_expire = 0;
 		conn->procedure_expire = 0;
 
+		conn->llcp_req = conn->llcp_ack = conn->llcp_type = 0;
+
+		conn->pause_tx = 0;
+
+		conn->tx_head = conn->tx_ctrl = conn->tx_ctrl_last =
+		conn->tx_data = conn->tx_data_last = 0;
+
 		/* NOTE: use allocated link for generating dedicated
 		 * terminate ind rx node
 		 */

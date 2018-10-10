@@ -1098,15 +1098,23 @@ static inline void _rx_demux_conn_tx_ack(u8_t ack_last, u16_t handle,
 					 struct node_tx *node_tx)
 {
 	do {
+		struct ll_conn *conn;
+
 		ull_tx_ack_put(handle, node_tx);
 		lll_conn_ack_dequeue();
 		ull_conn_link_tx_release(link);
 
+		/* De-mux 1 tx node from FIFO */
+		ull_conn_tx_demux(1);
+
+		conn = ll_conn_get(handle);
+		LL_ASSERT(conn);
+
+		/* Enqueue towards LLL */
+		ull_conn_tx_lll_enqueue(conn, 1);
+
 		link = lll_conn_ack_by_last_peek(ack_last, &handle, &node_tx);
 	} while (link);
-
-	/* De-mux tx nodes from FIFO */
-	ull_conn_tx_demux(UINT8_MAX);
 
 	/* trigger thread to call ll_rx_get() */
 	ll_rx_sched();

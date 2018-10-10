@@ -61,19 +61,14 @@ static struct {
 
 static struct {
 	void *free;
-	u8_t pool[sizeof(memq_link_t) * CONFIG_BT_CTLR_TX_BUFFERS];
-} mem_link_tx;
-
-static struct {
-	void *free;
 	u8_t pool[CONN_TX_CTRL_BUF_SIZE * CONN_TX_CTRL_BUFFERS];
 } mem_conn_tx_ctrl;
 
 static struct {
 	void *free;
-	u8_t pool[sizeof(memq_link_t) * CONN_TX_CTRL_BUFFERS];
-} mem_link_tx_ctrl;
-
+	u8_t pool[sizeof(memq_link_t) *
+		  (CONFIG_BT_CTLR_TX_BUFFERS + CONN_TX_CTRL_BUFFERS)];
+} mem_link_tx;
 
 struct ll_conn *ll_conn_acquire(void)
 {
@@ -508,6 +503,7 @@ void ull_conn_tx_demux(u8_t count)
 		if (conn && (conn->lll.handle == tx->handle)) {
 			struct node_tx *node_tx_new = tx->node;
 
+			node_tx_new->next = NULL;
 			if (!conn->tx_data) {
 				conn->tx_data = node_tx_new;
 				if (!conn->tx_head) {
@@ -521,14 +517,6 @@ void ull_conn_tx_demux(u8_t count)
 			}
 
 			conn->tx_data_last = node_tx_new;
-			#if 0
-			memq_link_t *link;
-
-			link = mem_acquire(&mem_link_tx.free);
-			LL_ASSERT(link);
-
-			memq_enqueue(link, tx->node, &conn->lll.memq_tx.tail);
-			#endif
 		} else {
 			struct node_tx *node_tx = tx->node;
 			struct pdu_data *p = (void *)node_tx->pdu;
@@ -539,6 +527,44 @@ void ull_conn_tx_demux(u8_t count)
 
 		MFIFO_DEQUEUE(conn_tx);
 	} while (--count);
+}
+
+void ull_conn_tx_lll_enqueue(struct ll_conn *conn, u8_t count)
+{
+	struct node_tx *node_tx;
+
+	node_tx = conn->tx_head;
+	while (node_tx &&
+	       (!conn->pause_tx || (node_tx == conn->tx_ctrl)) &&
+	       count--) {
+		struct node_tx *node_tx_lll;
+		memq_link_t *link;
+
+		node_tx_lll = node_tx;
+
+		if (node_tx == conn->tx_ctrl) {
+			node_tx = conn->tx_head = conn->tx_head->next;
+			if (conn->tx_ctrl == conn->tx_ctrl_last) {
+				conn->tx_ctrl = NULL;
+				conn->tx_ctrl_last = NULL;
+			} else {
+				conn->tx_ctrl = node_tx;
+			}
+
+			/* point to self to indicate a control PDU mem alloc */
+			node_tx_lll->next = node_tx_lll;
+		} else {
+			if (node_tx == conn->tx_data) {
+				conn->tx_data = conn->tx_data->next;
+			}
+			node_tx = conn->tx_head = conn->tx_head->next;
+		}
+
+		link = mem_acquire(&mem_link_tx.free);
+		LL_ASSERT(link);
+
+		memq_enqueue(link, node_tx_lll, &conn->lll.memq_tx.tail);
+	}
 }
 
 void ull_conn_link_tx_release(void *link)
@@ -556,17 +582,13 @@ static int _init_reset(void)
 	mem_init(mem_conn_tx.pool, CONN_TX_BUF_SIZE, CONFIG_BT_CTLR_TX_BUFFERS,
 		 &mem_conn_tx.free);
 
-	/* Initialize tx link pool. */
-	mem_init(mem_link_tx.pool, sizeof(memq_link_t),
-		 CONFIG_BT_CTLR_TX_BUFFERS, &mem_link_tx.free);
-
 	/* Initialize tx ctrl pool. */
 	mem_init(mem_conn_tx_ctrl.pool, CONN_TX_CTRL_BUF_SIZE,
 		 CONN_TX_CTRL_BUFFERS, &mem_conn_tx_ctrl.free);
 
-	/* Initialize tx ctrl link pool. */
-	mem_init(mem_link_tx_ctrl.pool, sizeof(memq_link_t),
-		 CONN_TX_CTRL_BUFFERS, &mem_link_tx_ctrl.free);
+	/* Initialize tx link pool. */
+	mem_init(mem_link_tx.pool, sizeof(memq_link_t),
+		 CONFIG_BT_CTLR_TX_BUFFERS, &mem_link_tx.free);
 
 	return 0;
 }

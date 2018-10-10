@@ -21,4 +21,5 @@ void ull_conn_setup(memq_link_t *link, struct node_rx_hdr *rx);
 void ull_conn_llcp(struct ll_conn *conn);
 void ull_conn_done(struct node_rx_event_done *done);
 void ull_conn_tx_demux(u8_t count);
+void ull_conn_tx_lll_enqueue(struct ll_conn *conn, u8_t count);
 void ull_conn_link_tx_release(void *link);

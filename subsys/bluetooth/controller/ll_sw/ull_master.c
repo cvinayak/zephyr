@@ -170,6 +170,13 @@ u32_t ll_create_connection(u16_t scan_interval, u16_t scan_window,
 				 conn_lll->apto_reload;
 #endif /* CONFIG_BT_CTLR_LE_PING */
 
+	conn->llcp_req = conn->llcp_ack = conn->llcp_type = 0;
+
+	conn->pause_tx = 0;
+
+	conn->tx_head = conn->tx_ctrl = conn->tx_ctrl_last =
+	conn->tx_data = conn->tx_data_last = 0;
+
 	/* NOTE: use allocated link for generating dedicated
 	 * terminate ind rx node
 	 */
@@ -490,6 +497,9 @@ static void ticker_cb(u32_t ticks_at_expire, u32_t remainder, u16_t lazy,
 	/* De-mux 1 tx node from FIFO */
 	ull_conn_tx_demux(1);
 
+	/* Enqueue towards LLL */
+	ull_conn_tx_lll_enqueue(conn, 1);
+
 	/* Append timing parameters */
 	p.ticks_at_expire = ticks_at_expire;
 	p.remainder = remainder;
@@ -504,6 +514,9 @@ static void ticker_cb(u32_t ticks_at_expire, u32_t remainder, u16_t lazy,
 
 	/* De-mux remaining tx nodes from FIFO */
 	ull_conn_tx_demux(UINT8_MAX);
+
+	/* Enqueue towards LLL */
+	ull_conn_tx_lll_enqueue(conn, UINT8_MAX);
 
 	DEBUG_RADIO_PREPARE_M(1);
 }
