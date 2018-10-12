@@ -182,13 +182,13 @@ Simple command handler implementation:
 		ARG_UNUSED(argv);
 
 		shell_fprintf(shell, SHELL_NORMAL,
-			      "Print simple text.\r\n");
+			      "Print simple text.\n");
 
 		shell_fprintf(shell, SHELL_WARNING,
-			      "Print warning text.\r\n");
+			      "Print warning text.\n");
 
 		shell_fprintf(shell, SHELL_ERROR,
-			      "Print error text.\r\n");
+			      "Print error text.\n");
 
 		return 0;
 	}
@@ -234,7 +234,7 @@ checks for valid arguments count.
 
 		shell_fprintf(shell, SHELL_NORMAL,
 			      "Command called with no -h or --help option."
-			      "\r\n");
+			      "\n");
 		return 0;
 	}
 
@@ -249,7 +249,7 @@ checks for valid arguments count.
 		} else {
 			shell_fprintf(shell, SHELL_NORMAL,
 			      "Command called with no -h or --help option."
-			      "\r\n");
+			      "\n");
 		}
 
 		return 0;
@@ -296,19 +296,19 @@ in command handler.
 		/* checking if command was called with test option */
 		if (!strcmp(argv[1], "-t") || !strcmp(argv[1], "--test")) {
 		    shell_fprintf(shell, SHELL_NORMAL, "Command called with -t"
-				  " or --test option.\r\n");
+				  " or --test option.\n");
 		    return 0;
 		}
 
 		/* checking if command was called with dummy option */
 		if (!strcmp(argv[1], "-d") || !strcmp(argv[1], "--dummy")) {
 		    shell_fprintf(shell, SHELL_NORMAL, "Command called with -d"
-				  " or --dummy option.\r\n");
+				  " or --dummy option.\n");
 		    return 0;
 		}
 
 		shell_fprintf(shell, SHELL_WARNING,
-			      "Command called with no valid option.\r\n");
+			      "Command called with no valid option.\n");
 		return 0;
 	}
 
@@ -334,17 +334,16 @@ commands or the parent commands, depending on how you index ``argv``.
 		 * can be found using argv[-1].
 		 */
 		shell_fprintf(shell, SHELL_NORMAL,
-			      "This command has a parent command: %s\r\n",
+			      "This command has a parent command: %s\n",
 			      argv[-1]);
 
 		/* Print this command syntax */
 		shell_fprintf(shell, SHELL_NORMAL,
-			      "This command syntax is: %s\r\n",
+			      "This command syntax is: %s\n",
 			      argv[0]);
 
 		/* Print first argument */
 		shell_fprintf(shell, SHELL_NORMAL,
-			      "This command has an argument: %s\r\n",
 			      argv[1]);
 
 		return 0;
@@ -417,21 +416,16 @@ The shell module supports the following meta keys:
 Usage
 *****
 
-Use the :c:macro:`SHELL_DEFINE` macro to create an instance of the shell.
+To create a new shell instance user needs to activate requested
+backend using `menuconfig`.
 
 The following code shows a simple use case of this library:
 
 .. code-block:: c
 
-	/* Defining shell backend */
-	SHELL_UART_DEFINE(shell_transport_uart);
-
-	/* Creating shell instance */
-	SHELL_DEFINE(uart_shell, "uart:~$ ", &shell_transport_uart, 10);
-
 	void main(void)
 	{
-		(void)shell_init(&uart_shell, NULL, true, true, LOG_LEVEL_INF);
+
 	}
 
 	static int cmd_demo_ping(const struct shell *shell, size_t argc,
@@ -440,7 +434,7 @@ The following code shows a simple use case of this library:
 		ARG_UNUSED(argc);
 		ARG_UNUSED(argv);
 
-		shell_fprintf(shell, SHELL_NORMAL, "pong\r\n");
+		shell_fprintf(shell, SHELL_NORMAL, "pong\n");
 		return 0;
 	}
 
@@ -449,10 +443,10 @@ The following code shows a simple use case of this library:
 	{
 		int cnt;
 
-		shell_fprintf(shell, SHELL_NORMAL, "argc = %d\r\n", argc);
+		shell_fprintf(shell, SHELL_NORMAL, "argc = %d\n", argc);
 		for (cnt = 0; cnt < argc; cnt++) {
 			shell_fprintf(shell, SHELL_NORMAL,
-					"  argv[%d] = %s\r\n", cnt, argv[cnt]);
+					"  argv[%d] = %s\n", cnt, argv[cnt]);
 		}
 		return 0;
 	}

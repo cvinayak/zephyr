@@ -14,9 +14,6 @@
 
 LOG_MODULE_REGISTER(app);
 
-SHELL_UART_DEFINE(shell_transport_uart);
-SHELL_DEFINE(uart_shell, "uart:~$ ", &shell_transport_uart, 10);
-
 extern void foo(void);
 
 void timer_expired_handler(struct k_timer *timer)
@@ -37,7 +34,7 @@ static int cmd_log_test_start(const struct shell *shell, size_t argc,
 	}
 
 	k_timer_start(&log_timer, period, period);
-	shell_fprintf(shell, SHELL_NORMAL, "Log test started\r\n");
+	shell_fprintf(shell, SHELL_NORMAL, "Log test started\n");
 	return 0;
 }
 
@@ -66,7 +63,7 @@ static int cmd_log_test_stop(const struct shell *shell, size_t argc,
 	}
 
 	k_timer_stop(&log_timer);
-	shell_fprintf(shell, SHELL_NORMAL, "Log test stopped\r\n");
+	shell_fprintf(shell, SHELL_NORMAL, "Log test stopped\n");
 
 	return 0;
 }
@@ -96,7 +93,7 @@ static int cmd_demo_ping(const struct shell *shell, size_t argc, char **argv)
 	ARG_UNUSED(argc);
 	ARG_UNUSED(argv);
 
-	shell_fprintf(shell, SHELL_NORMAL, "pong\r\n");
+	shell_fprintf(shell, SHELL_NORMAL, "pong\n");
 
 	return 0;
 }
@@ -105,10 +102,10 @@ static int cmd_demo_params(const struct shell *shell, size_t argc, char **argv)
 {
 	int cnt;
 
-	shell_fprintf(shell, SHELL_NORMAL, "argc = %d\r\n", argc);
+	shell_fprintf(shell, SHELL_NORMAL, "argc = %d\n", argc);
 	for (cnt = 0; cnt < argc; cnt++) {
 		shell_fprintf(shell, SHELL_NORMAL,
-				"  argv[%d] = %s\r\n", cnt, argv[cnt]);
+				"  argv[%d] = %s\n", cnt, argv[cnt]);
 	}
 	return 0;
 }
@@ -119,7 +116,7 @@ static int cmd_version(const struct shell *shell, size_t argc, char **argv)
 	ARG_UNUSED(argv);
 
 	shell_fprintf(shell, SHELL_NORMAL,
-		      "Zephyr version %s\r\n", KERNEL_VERSION_STRING);
+		      "Zephyr version %s\n", KERNEL_VERSION_STRING);
 	return 0;
 }
 
@@ -138,5 +135,5 @@ SHELL_CMD_REGISTER(version, NULL, "Show kernel version", cmd_version);
 
 void main(void)
 {
-	(void)shell_init(&uart_shell, NULL, true, true, LOG_LEVEL_INF);
+
 }

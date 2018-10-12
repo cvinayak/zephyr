@@ -149,7 +149,7 @@ static struct usb_dev_priv {
 	/** Installed vendor request handler */
 	usb_request_handler vendor_req_handler;
 	/** USB stack status clalback */
-	usb_status_callback status_callback;
+	usb_dc_status_callback status_callback;
 	/** Pointer to registered descriptors */
 	const u8_t *descriptors;
 	/** Array of installed request handler callbacks */
@@ -880,7 +880,7 @@ static void usb_register_custom_req_handler(usb_request_handler handler)
  *
  * @param [in] cb Callback function pointer
  */
-static void usb_register_status_callback(usb_status_callback cb)
+static void usb_register_status_callback(usb_dc_status_callback cb)
 {
 	usb_dev.status_callback = cb;
 }
@@ -1362,7 +1362,7 @@ int usb_transfer_sync(u8_t ep, u8_t *data, size_t dlen, unsigned int flags)
 
 static u8_t iface_data_buf[CONFIG_USB_COMPOSITE_BUFFER_SIZE];
 
-static void forward_status_cb(enum usb_dc_status_code status, u8_t *param)
+static void forward_status_cb(enum usb_dc_status_code status, const u8_t *param)
 {
 	size_t size = (__usb_data_end - __usb_data_start);
 
@@ -1463,7 +1463,7 @@ static int composite_setup_ep_cb(void)
 	for (size_t i = 0; i < size; i++) {
 		ep_data = __usb_data_start[i].endpoint;
 		for (u8_t n = 0; n < __usb_data_start[i].num_endpoints; n++) {
-			USB_ERR("set cb, ep: 0x%x\n", ep_data[n].ep_addr);
+			USB_DBG("set cb, ep: 0x%x", ep_data[n].ep_addr);
 			if (usb_dc_ep_set_callback(ep_data[n].ep_addr,
 						   ep_data[n].ep_cb)) {
 				return -1;

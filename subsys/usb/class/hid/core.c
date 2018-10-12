@@ -80,14 +80,7 @@ USBD_CLASS_DESCR_DEFINE(primary) struct usb_hid_config hid_cfg = {
 		.bInterval = 0x09,
 	},
 #endif
-
 };
-
-static void usb_set_hid_report_size(u16_t report_desc_size)
-{
-	hid_cfg.if0_hid.subdesc[0].wDescriptorLength =
-		sys_cpu_to_le16(report_desc_size);
-}
 
 static struct hid_device_info {
 	const u8_t *report_desc;
@@ -96,35 +89,44 @@ static struct hid_device_info {
 	const struct hid_ops *ops;
 } hid_device;
 
-static void hid_status_cb(enum usb_dc_status_code status, u8_t *param)
+static void usb_set_hid_report_size(u16_t report_desc_size)
 {
-	/* Check the USB status and do needed action if required */
-	switch (status) {
-	case USB_DC_ERROR:
-		USB_DBG("USB device error");
-		break;
-	case USB_DC_RESET:
-		USB_DBG("USB device reset detected");
-		break;
-	case USB_DC_CONNECTED:
-		USB_DBG("USB device connected");
-		break;
-	case USB_DC_CONFIGURED:
-		USB_DBG("USB device configured");
-		break;
-	case USB_DC_DISCONNECTED:
-		USB_DBG("USB device disconnected");
-		break;
-	case USB_DC_SUSPEND:
-		USB_DBG("USB device suspended");
-		break;
-	case USB_DC_RESUME:
-		USB_DBG("USB device resumed");
-		break;
-	case USB_DC_UNKNOWN:
-	default:
-		USB_DBG("USB unknown state");
-		break;
+	hid_cfg.if0_hid.subdesc[0].wDescriptorLength =
+		sys_cpu_to_le16(report_desc_size);
+}
+
+static void hid_status_cb(enum usb_dc_status_code status, const u8_t *param)
+{
+	if (hid_device.ops->status_cb) {
+		hid_device.ops->status_cb(status, param);
+	} else {
+		switch (status) {
+		case USB_DC_ERROR:
+			USB_DBG("USB device error");
+			break;
+		case USB_DC_RESET:
+			USB_DBG("USB device reset detected");
+			break;
+		case USB_DC_CONNECTED:
+			USB_DBG("USB device connected");
+			break;
+		case USB_DC_CONFIGURED:
+			USB_DBG("USB device configured");
+			break;
+		case USB_DC_DISCONNECTED:
+			USB_DBG("USB device disconnected");
+			break;
+		case USB_DC_SUSPEND:
+			USB_DBG("USB device suspended");
+			break;
+		case USB_DC_RESUME:
+			USB_DBG("USB device resumed");
+			break;
+		case USB_DC_UNKNOWN:
+		default:
+			USB_DBG("USB unknown state");
+			break;
+		}
 	}
 }
 
@@ -175,7 +177,7 @@ static int hid_class_handle_req(struct usb_setup_packet *setup,
 }
 
 static int hid_custom_handle_req(struct usb_setup_packet *setup,
-				s32_t *len, u8_t **data)
+				 s32_t *len, u8_t **data)
 {
 	USB_DBG("Standard request: bRequest 0x%x bmRequestType 0x%x len %d",
 		setup->bRequest, setup->bmRequestType, *len);
