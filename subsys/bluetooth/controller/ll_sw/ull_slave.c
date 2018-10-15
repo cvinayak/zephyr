@@ -59,6 +59,7 @@ void ull_slave_setup(memq_link_t *link, struct node_rx_hdr *rx,
 	u8_t peer_addr_type;
 	u16_t win_offset;
 	u16_t timeout;
+	u8_t chan_sel;
 
 	((struct lll_adv *)ftr->param)->conn = NULL;
 
@@ -74,7 +75,6 @@ void ull_slave_setup(memq_link_t *link, struct node_rx_hdr *rx,
 	lll->data_chan_count = util_ones_count_get(&lll->data_chan_map[0],
 			       sizeof(lll->data_chan_map));
 	lll->data_chan_hop = pdu_adv->connect_ind.hop;
-	lll->data_chan_sel = 0;
 	lll->interval = pdu_adv->connect_ind.interval;
 	lll->latency = pdu_adv->connect_ind.latency;
 
@@ -116,6 +116,7 @@ void ull_slave_setup(memq_link_t *link, struct node_rx_hdr *rx,
 	       sizeof(lll->slave.force));
 	#endif
 
+	chan_sel = pdu_adv->chan_sel;
 	peer_addr_type = pdu_adv->tx_addr;
 	memcpy(peer_addr, pdu_adv->connect_ind.init_addr, BDADDR_SIZE);
 	timeout = pdu_adv->connect_ind.timeout;
@@ -134,6 +135,40 @@ void ull_slave_setup(memq_link_t *link, struct node_rx_hdr *rx,
 	rx->handle = lll->handle;
 
 	ll_rx_put(link, rx);
+
+	/* Use Channel Selection Algorithm #2 if peer too supports it */
+	if (IS_ENABLED(CONFIG_BT_CTLR_CHAN_SEL_2)) {
+		/* TODO: */
+		#if 0
+		struct radio_le_chan_sel_algo *le_chan_sel_algo;
+
+		/* Generate LE Channel Selection Algorithm event */
+		node_rx = packet_rx_reserve_get(3);
+		LL_ASSERT(node_rx);
+
+		node_rx->hdr.handle = conn->handle;
+		node_rx->hdr.type = NODE_RX_TYPE_CHAN_SEL_ALGO;
+
+		pdu_data = (void *)node_rx->pdu_data;
+		le_chan_sel_algo = (void *)pdu_data->lldata;
+		#endif
+
+		if (chan_sel) {
+			u16_t aa_ls = ((u16_t)lll->access_addr[1] << 8) |
+				      lll->access_addr[0];
+			u16_t aa_ms = ((u16_t)lll->access_addr[3] << 8) |
+				      lll->access_addr[2];
+
+			lll->data_chan_sel = 1;
+			lll->data_chan_id = aa_ms ^ aa_ls;
+		#if 0
+			le_chan_sel_algo->chan_sel_algo = 0x01;
+		} else {
+			le_chan_sel_algo->chan_sel_algo = 0x00;
+		#endif
+		}
+	}
+
 	ll_rx_sched();
 #if 0
 		/* Prepare the rx packet structure */

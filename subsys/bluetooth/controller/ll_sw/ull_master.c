@@ -235,14 +235,19 @@ void ull_master_setup(memq_link_t *link, struct node_rx_hdr *rx,
 	struct ll_scan_set *scan;
 	struct node_rx_cc *cc;
 	struct ll_conn *conn;
+	struct pdu_adv *pdu;
 	u32_t ticker_status;
+	u8_t chan_sel;
 
 	((struct lll_scan *)ftr->param)->conn = NULL;
 
 	scan = ((struct lll_scan *)ftr->param)->hdr.parent;
 	conn = lll->hdr.parent;
 
-	cc = (void *)((struct node_rx_pdu *)rx)->pdu;
+	pdu = (void *)((struct node_rx_pdu *)rx)->pdu;
+	chan_sel = pdu->chan_sel;
+
+	cc = (void *)pdu;
 	cc->status = 0;
 	cc->role = 0;
 	cc->peer_addr_type = scan->lll.adv_addr_type;
@@ -256,6 +261,41 @@ void ull_master_setup(memq_link_t *link, struct node_rx_hdr *rx,
 	rx->handle = lll->handle;
 
 	ll_rx_put(link, rx);
+
+	/* Use Channel Selection Algorithm #2 if peer too supports it */
+	if (IS_ENABLED(CONFIG_BT_CTLR_CHAN_SEL_2)) {
+		/* TODO: */
+		#if 0
+		struct node_rx_cs *cs;
+
+		/* Generate LE Channel Selection Algorithm event */
+		node_rx = packet_rx_reserve_get(3);
+		LL_ASSERT(node_rx);
+
+		node_rx->hdr.handle = conn->handle;
+		node_rx->hdr.type = NODE_RX_TYPE_CHAN_SEL_ALGO;
+
+		pdu_data = (void *)node_rx->pdu;
+		cs = (void *)pdu_data->lldata;
+		#endif
+
+		if (chan_sel) {
+			u16_t aa_ls = ((u16_t)lll->access_addr[1] << 8) |
+				      lll->access_addr[0];
+			u16_t aa_ms = ((u16_t)lll->access_addr[3] << 8) |
+				      lll->access_addr[2];
+
+			lll->data_chan_sel = 1;
+			lll->data_chan_id = aa_ms ^ aa_ls;
+
+		#if 0
+			cs->csa = 0x01;
+		} else {
+			cs->csa = 0x00;
+		#endif
+		}
+	}
+
 	ll_rx_sched();
 
 	/* TODO: active_to_start feature port */
