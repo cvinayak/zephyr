@@ -162,10 +162,12 @@ static void connected(struct bt_conn *conn, u8_t conn_err)
 
 	printk("Connected: %s\n", addr);
 
+	#if 0
 	err = bt_le_scan_start(BT_LE_SCAN_ACTIVE, device_found);
 	if (err) {
 		printk("Scanning failed to start (err %d)\n", err);
 	}
+	#endif
 
 	memcpy(&uuid, BT_UUID_HRS, sizeof(uuid));
 	discover_params.uuid = &uuid.uuid;
