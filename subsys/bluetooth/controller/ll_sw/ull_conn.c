@@ -612,6 +612,27 @@ void ull_conn_link_tx_release(void *link)
 	mem_release(link, &mem_link_tx.free);
 }
 
+void ull_conn_tx_ack(struct lll_conn *lll, memq_link_t *link,
+		     struct node_tx *tx)
+{
+	struct pdu_data *pdu;
+
+	pdu = (void *)tx->pdu;
+	LL_ASSERT(pdu->len);
+
+	if (pdu->ll_id == PDU_DATA_LLID_CTRL) {
+		ctrl_tx_ack(lll, pdu);
+
+		/* release mem if points to itself */
+		if (link->next == tx) {
+			mem_release(tx, &mem_conn_tx_ctrl.free);
+			return;
+		}
+	}
+
+	ull_tx_ack_put(lll->handle, tx);
+}
+
 static int _init_reset(void)
 {
 	/* Initialize conn pool. */
@@ -806,6 +827,27 @@ static u8_t unknown_rsp_send(struct ll_conn *conn, u8_t type)
 	ctrl_tx_enqueue(conn, node_tx);
 
 	return 0;
+}
+
+static inline void ctrl_tx_ack(struct lll_conn *lll, struct pdu_data *pdu)
+{
+	switch (pdu->llctrl.opcode) {
+	case PDU_DATA_LLCTRL_TYPE_TERMINATE_IND:
+	{
+		u8_t reason = (pdu->llctrl.terminate_ind.error_code ==
+			       BT_HCI_ERR_REMOTE_USER_TERM_CONN) ?
+			      BT_HCI_ERR_LOCALHOST_TERM_CONN :
+			      pdu->llctrl.terminate_ind.error_code;
+
+		terminate_ind_rx_enqueue(lll, reason);
+		conn_cleanup(lll);
+	}
+	break;
+
+	default:
+		/* Do nothing for other ctrl packet ack */
+		break;
+	}
 }
 
 static inline bool pdu_len_cmp(u8_t opcode, u8_t len)

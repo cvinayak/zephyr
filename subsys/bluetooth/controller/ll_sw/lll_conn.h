@@ -17,7 +17,6 @@ struct lll_tx {
 struct node_tx {
 	union {
 		void        *next;
-		void        *pool;
 		memq_link_t *link;
 	};
 

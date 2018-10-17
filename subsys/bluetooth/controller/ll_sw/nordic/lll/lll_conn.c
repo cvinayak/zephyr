@@ -650,6 +650,7 @@ void lll_conn_tx_flush(void *param)
 
 		tx->handle = lll->handle;
 		tx->node = node_tx;
+		link->next = node_tx->next;
 		node_tx->link = link;
 		p = (void *)node_tx->pdu;
 		p->ll_id = PDU_DATA_LLID_RESV;
@@ -780,6 +781,7 @@ static u32_t isr_rx_pdu(struct lll_conn *lll, struct pdu_data *pdu_data_rx,
 				link = memq_dequeue(lll->memq_tx.tail,
 						    &lll->memq_tx.head,
 						    (void **)tx_release);
+				link->next = (*tx_release)->next;
 				(*tx_release)->link = link;
 			}
 		} else {
