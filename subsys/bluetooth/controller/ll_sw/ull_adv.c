@@ -598,6 +598,8 @@ u32_t ll_adv_enable(u8_t enable)
 		conn->tx_head = conn->tx_ctrl = conn->tx_ctrl_last =
 		conn->tx_data = conn->tx_data_last = 0;
 
+		conn->llcp_terminate.reason_peer = 0;
+
 		/* NOTE: use allocated link for generating dedicated
 		 * terminate ind rx node
 		 */

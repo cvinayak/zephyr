@@ -36,6 +36,8 @@ static void terminate_ind_rx_enqueue(struct lll_conn *lll, u8_t reason);
 static void conn_cleanup(struct lll_conn *lll);
 static void ctrl_tx_enqueue(struct ll_conn *conn, struct node_tx *node_tx);
 static void ctrl_tx_sec_enqueue(struct ll_conn *conn, struct node_tx *node_tx);
+static inline void ctrl_tx_ack(struct lll_conn *lll, struct pdu_data *pdu);
+static inline u8_t ctrl_rx(u16_t handle, struct pdu_data *pdu);
 
 static struct ll_conn _conn[CONFIG_BT_MAX_CONN];
 static void *_conn_free;
@@ -234,10 +236,27 @@ void ull_conn_setup(memq_link_t *link, struct node_rx_hdr *rx)
 	}
 }
 
-void ull_conn_rx(memq_link_t *link, struct node_rx_hdr *rx)
+int ull_conn_rx(struct node_rx_pdu *rx)
 {
-	ll_rx_put(link, rx);
-	ll_rx_sched();
+	struct pdu_data *pdu;
+	int nack = 0;
+
+	pdu = (void *)rx->pdu;
+	switch (pdu->ll_id) {
+	case PDU_DATA_LLID_CTRL:
+		nack = ctrl_rx(rx->hdr.handle, pdu);
+		break;
+
+	case PDU_DATA_LLID_DATA_CONTINUE:
+	case PDU_DATA_LLID_DATA_START:
+		/* enqueue data packet, as-is */
+	case PDU_DATA_LLID_RESV:
+	default:
+		/* Invalid LL id, drop it. */
+		break;
+	}
+
+	return nack;
 }
 
 void ull_conn_llcp(struct ll_conn *conn)
@@ -264,7 +283,9 @@ void ull_conn_llcp(struct ll_conn *conn)
 				conn->llcp_terminate.reason_own;
 
 			ctrl_tx_enqueue(conn, node_tx);
+		}
 
+		if (!conn->procedure_expire) {
 			/* Terminate Procedure timeout is started, will
 			 * replace any other timeout running
 			 */
@@ -288,21 +309,34 @@ void ull_conn_done(struct node_rx_event_done *done)
 	u32_t ticks_drift_plus;
 	u16_t latency_event;
 	u16_t elapsed_event;
+	u8_t reason_peer;
 	u16_t trx_cnt;
 	u16_t lazy;
 	u8_t force;
 
-	trx_cnt = done->extra.trx_cnt;
+	/* Master transmitted ack for the received terminate ind or
+	 * Slave received terminate ind.
+	 */
+	reason_peer = conn->llcp_terminate.reason_peer;
+	if (reason_peer && (lll->role || lll->master.terminate_ack)) {
+		terminate_ind_rx_enqueue(lll, reason_peer);
+		conn_cleanup(lll);
+
+		return;
+	}
 
 	ticks_drift_plus = 0;
 	ticks_drift_minus = 0;
 	latency_event = lll->latency_event;
 	elapsed_event = latency_event + 1;
 
+	trx_cnt = done->extra.trx_cnt;
 	if (trx_cnt) {
 		if (IS_ENABLED(CONFIG_BT_PERIPHERAL) && lll->role) {
 			ull_slave_done(done, &ticks_drift_plus,
 				       &ticks_drift_minus);
+		} else if (reason_peer) {
+			lll->master.terminate_ack = 1;
 		}
 
 		/* Reset connection failed to establish countdown */
@@ -528,7 +562,7 @@ void ull_conn_tx_demux(u8_t count)
 			struct pdu_data *p = (void *)node_tx->pdu;
 
 			p->ll_id = PDU_DATA_LLID_RESV;
-			ull_tx_ack_put(tx->handle, tx->node);
+			ull_tx_ack_put(tx->handle, node_tx);
 		}
 
 		MFIFO_DEQUEUE(conn_tx);
@@ -675,7 +709,8 @@ static void conn_cleanup(struct lll_conn *lll)
 		  (ticker_status == TICKER_STATUS_BUSY));
 }
 
-static void ctrl_tx_data_last_enqueue(struct ll_conn *conn, struct node_tx *node_tx)
+static void ctrl_tx_data_last_enqueue(struct ll_conn *conn,
+				      struct node_tx *node_tx)
 {
 	node_tx->next = conn->tx_ctrl_last->next;
 	conn->tx_ctrl_last->next = node_tx;
@@ -748,4 +783,118 @@ static void ctrl_tx_sec_enqueue(struct ll_conn *conn, struct node_tx *node_tx)
 	} else {
 		ctrl_tx_enqueue(conn, node_tx);
 	}
+}
+
+static u8_t unknown_rsp_send(struct ll_conn *conn, u8_t type)
+{
+	struct node_tx *node_tx;
+	struct pdu_data *pdu;
+
+	/* acquire ctrl tx mem */
+	node_tx = mem_acquire(&mem_conn_tx_ctrl.free);
+	if (!node_tx) {
+		return 1;
+	}
+
+	pdu = (void *)node_tx->pdu;
+	pdu->ll_id = PDU_DATA_LLID_CTRL;
+	pdu->len = offsetof(struct pdu_data_llctrl, unknown_rsp) +
+			   sizeof(struct pdu_data_llctrl_unknown_rsp);
+	pdu->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_UNKNOWN_RSP;
+	pdu->llctrl.unknown_rsp.type = type;
+
+	ctrl_tx_enqueue(conn, node_tx);
+
+	return 0;
+}
+
+static inline bool pdu_len_cmp(u8_t opcode, u8_t len)
+{
+	const u8_t ctrl_len_lut[] = {
+		(offsetof(struct pdu_data_llctrl, conn_update_ind) +
+		 sizeof(struct pdu_data_llctrl_conn_update_ind)),
+		(offsetof(struct pdu_data_llctrl, chan_map_ind) +
+		 sizeof(struct pdu_data_llctrl_chan_map_ind)),
+		(offsetof(struct pdu_data_llctrl, terminate_ind) +
+		 sizeof(struct pdu_data_llctrl_terminate_ind)),
+		(offsetof(struct pdu_data_llctrl, enc_req) +
+		 sizeof(struct pdu_data_llctrl_enc_req)),
+		(offsetof(struct pdu_data_llctrl, enc_rsp) +
+		 sizeof(struct pdu_data_llctrl_enc_rsp)),
+		(offsetof(struct pdu_data_llctrl, start_enc_req) +
+		 sizeof(struct pdu_data_llctrl_start_enc_req)),
+		(offsetof(struct pdu_data_llctrl, start_enc_rsp) +
+		 sizeof(struct pdu_data_llctrl_start_enc_rsp)),
+		(offsetof(struct pdu_data_llctrl, unknown_rsp) +
+		 sizeof(struct pdu_data_llctrl_unknown_rsp)),
+		(offsetof(struct pdu_data_llctrl, feature_req) +
+		 sizeof(struct pdu_data_llctrl_feature_req)),
+		(offsetof(struct pdu_data_llctrl, feature_rsp) +
+		 sizeof(struct pdu_data_llctrl_feature_rsp)),
+		(offsetof(struct pdu_data_llctrl, pause_enc_req) +
+		 sizeof(struct pdu_data_llctrl_pause_enc_req)),
+		(offsetof(struct pdu_data_llctrl, pause_enc_rsp) +
+		 sizeof(struct pdu_data_llctrl_pause_enc_rsp)),
+		(offsetof(struct pdu_data_llctrl, version_ind) +
+		 sizeof(struct pdu_data_llctrl_version_ind)),
+		(offsetof(struct pdu_data_llctrl, reject_ind) +
+		 sizeof(struct pdu_data_llctrl_reject_ind)),
+		(offsetof(struct pdu_data_llctrl, slave_feature_req) +
+		 sizeof(struct pdu_data_llctrl_slave_feature_req)),
+		(offsetof(struct pdu_data_llctrl, conn_param_req) +
+		 sizeof(struct pdu_data_llctrl_conn_param_req)),
+		(offsetof(struct pdu_data_llctrl, conn_param_rsp) +
+		 sizeof(struct pdu_data_llctrl_conn_param_rsp)),
+		(offsetof(struct pdu_data_llctrl, reject_ext_ind) +
+		 sizeof(struct pdu_data_llctrl_reject_ext_ind)),
+		(offsetof(struct pdu_data_llctrl, ping_req) +
+		 sizeof(struct pdu_data_llctrl_ping_req)),
+		(offsetof(struct pdu_data_llctrl, ping_rsp) +
+		 sizeof(struct pdu_data_llctrl_ping_rsp)),
+		(offsetof(struct pdu_data_llctrl, length_req) +
+		 sizeof(struct pdu_data_llctrl_length_req)),
+		(offsetof(struct pdu_data_llctrl, length_rsp) +
+		 sizeof(struct pdu_data_llctrl_length_rsp)),
+		(offsetof(struct pdu_data_llctrl, phy_req) +
+		 sizeof(struct pdu_data_llctrl_phy_req)),
+		(offsetof(struct pdu_data_llctrl, phy_rsp) +
+		 sizeof(struct pdu_data_llctrl_phy_rsp)),
+		(offsetof(struct pdu_data_llctrl, phy_upd_ind) +
+		 sizeof(struct pdu_data_llctrl_phy_upd_ind)),
+		(offsetof(struct pdu_data_llctrl, min_used_chans_ind) +
+		 sizeof(struct pdu_data_llctrl_min_used_chans_ind)),
+	};
+
+	return ctrl_len_lut[opcode] == len;
+}
+
+static inline u8_t ctrl_rx(u16_t handle, struct pdu_data *pdu)
+{
+	struct ll_conn *conn;
+	u8_t nack = 0;
+	u8_t opcode;
+
+	conn = ll_conn_get(handle);
+	LL_ASSERT(conn);
+
+	opcode = pdu->llctrl.opcode;
+	switch (opcode) {
+	case PDU_DATA_LLCTRL_TYPE_TERMINATE_IND:
+		if (!pdu_len_cmp(PDU_DATA_LLCTRL_TYPE_TERMINATE_IND,
+				 pdu->len)) {
+			goto ull_conn_rx_unknown_rsp_send;
+		}
+
+		/* Ack and then terminate */
+		conn->llcp_terminate.reason_peer =
+			pdu->llctrl.terminate_ind.error_code;
+		break;
+
+	default:
+ull_conn_rx_unknown_rsp_send:
+		nack = unknown_rsp_send(conn, opcode);
+		break;
+	}
+
+	return nack;
 }

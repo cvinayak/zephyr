@@ -78,6 +78,10 @@ struct lll_conn {
 
 	union {
 		struct {
+			u8_t terminate_ack:1;
+		} master;
+
+		struct {
 			u8_t  latency_enabled:1;
 			u8_t  latency_cancel:1;
 			u8_t  sca:3;

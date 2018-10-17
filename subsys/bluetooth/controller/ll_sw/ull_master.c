@@ -177,6 +177,8 @@ u32_t ll_create_connection(u16_t scan_interval, u16_t scan_window,
 	conn->tx_head = conn->tx_ctrl = conn->tx_ctrl_last =
 	conn->tx_data = conn->tx_data_last = 0;
 
+	conn->llcp_terminate.reason_peer = 0;
+
 	/* NOTE: use allocated link for generating dedicated
 	 * terminate ind rx node
 	 */
@@ -347,7 +349,7 @@ void ull_master_setup(memq_link_t *link, struct node_rx_hdr *rx,
 	ticker_stop(TICKER_INSTANCE_ID_CTLR, TICKER_USER_ID_ULL_HIGH,
 		    TICKER_ID_SCAN_STOP, NULL, NULL);
 
-	/* Start Slave */
+	/* Start master */
 	ticker_id_conn = TICKER_ID_CONN_BASE + ll_conn_handle_get(conn);
 	ticker_status = ticker_start(TICKER_INSTANCE_ID_CTLR,
 				     TICKER_USER_ID_ULL_HIGH,

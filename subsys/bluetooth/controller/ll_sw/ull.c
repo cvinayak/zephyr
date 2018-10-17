@@ -1133,13 +1133,11 @@ static inline void _rx_demux_tx_ack(u16_t handle, memq_link_t *link,
 
 static inline void _rx_demux_rx(memq_link_t *link, struct node_rx_hdr *rx)
 {
-	/* NOTE: dequeue before releasing resources */
-	memq_dequeue(memq_ull_rx.tail, &memq_ull_rx.head, NULL);
-
 	/* Demux Rx objects */
 	switch (rx->type) {
 	case NODE_RX_TYPE_EVENT_DONE:
 	{
+		memq_dequeue(memq_ull_rx.tail, &memq_ull_rx.head, NULL);
 		_rx_demux_event_done(link, rx);
 	}
 	break;
@@ -1175,6 +1173,7 @@ static inline void _rx_demux_rx(memq_link_t *link, struct node_rx_hdr *rx)
 	case NODE_RX_TYPE_SCAN_INDICATION:
 #endif /* CONFIG_BT_CTLR_SCAN_INDICATION */
 	{
+		memq_dequeue(memq_ull_rx.tail, &memq_ull_rx.head, NULL);
 		ll_rx_put(link, rx);
 		ll_rx_sched();
 	}
@@ -1190,13 +1189,21 @@ static inline void _rx_demux_rx(memq_link_t *link, struct node_rx_hdr *rx)
 	/* fallthrough */
 	case NODE_RX_TYPE_CONNECTION:
 	{
+		memq_dequeue(memq_ull_rx.tail, &memq_ull_rx.head, NULL);
 		ull_conn_setup(link, rx);
 	}
 	break;
 
 	case NODE_RX_TYPE_DC_PDU:
 	{
-		ull_conn_rx(link, rx);
+		int nack;
+
+		nack = ull_conn_rx(rx);
+		if (!nack) {
+			memq_dequeue(memq_ull_rx.tail, &memq_ull_rx.head, NULL);
+			ll_rx_put(link, rx);
+			ll_rx_sched();
+		}
 	}
 	break;
 #endif /* CONFIG_BT_CONN */
