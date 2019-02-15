@@ -11495,25 +11495,6 @@ u8_t ll_terminate_ind_send(u16_t handle, u8_t reason)
 	return 0;
 }
 
-u8_t ll_tx_pwr_lvl_get(u16_t handle, u8_t type, s8_t *tx_pwr_lvl)
-{
-	struct connection *conn;
-
-	conn = connection_get(handle);
-	if (!conn) {
-		return BT_HCI_ERR_UNKNOWN_CONN_ID;
-	}
-
-	/*TODO: check type here for current or maximum */
-
-	/* TODO: Support TX Power Level other than default when dynamic
-	 *       updates is implemented.
-	 */
-	*tx_pwr_lvl = RADIO_TXP_DEFAULT;
-
-	return 0;
-}
-
 #if defined(CONFIG_BT_CTLR_CONN_RSSI)
 u8_t ll_rssi_get(u16_t handle, u8_t *rssi)
 {
@@ -11668,6 +11649,18 @@ u8_t ll_phy_req_send(u16_t handle, u8_t tx, u8_t flags, u8_t rx)
 }
 #endif /* CONFIG_BT_CTLR_PHY */
 #endif /* CONFIG_BT_CONN */
+
+u8_t ll_tx_pwr_lvl_get(u16_t handle, u8_t type, s8_t *tx_pwr_lvl)
+{
+	/*TODO: check type here for current or maximum */
+
+	/* TODO: Support TX Power Level other than default when dynamic
+	 *       updates is implemented.
+	 */
+	*tx_pwr_lvl = RADIO_TXP_DEFAULT;
+
+	return 0;
+}
 
 static u8_t tx_cmplt_get(u16_t *handle, u8_t *first, u8_t last)
 {
