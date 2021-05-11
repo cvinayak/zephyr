@@ -199,12 +199,22 @@
 
 static inline void hal_radio_reset(void)
 {
-	if (nrf52_errata_102() || nrf52_errata_106() || nrf52_errata_107()) {
-		/* Workaround for nRF52 anomalies 102, 106, and 107. */
+	/* Anomaly 182 */
+	*(volatile uint32_t *)0x4000173c |= BIT(10);
+	if (!(*(volatile uint32_t *)0x4000173c & BIT(11))) {
+		/* Anomalies 102, 106 and 107 */
 		*(volatile uint32_t *)0x40001774 =
-			((*(volatile uint32_t *)0x40001774) & 0xfffffffe)
-			| 0x01000000;
+			((*(volatile uint32_t *)0x40001774) & 0xfffffffe) |
+			0x01000000;
 	}
+
+	/* FTPAN-188 */
+	*(volatile uint32_t *)0x4000173c = (*(volatile uint32_t *)0x4000173c &
+					    0x7fffff00UL) | 0x80000096UL;
+
+	/* IC-9803 */
+	*(volatile uint32_t *)0x40001740 = (*(volatile uint32_t *)0x40001740 &
+					    0xffff00ffUL) | 0x00001600UL;
 }
 
 static inline void hal_radio_stop(void)

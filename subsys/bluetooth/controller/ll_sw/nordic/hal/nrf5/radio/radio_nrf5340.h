@@ -385,8 +385,22 @@ static inline void hal_radio_tx_power_high_voltage_clear(void);
 
 static inline void hal_radio_reset(void)
 {
-	/* TODO: Add any required setup for each radio event
-	 */
+	/* Anomaly 182 */
+	*(volatile uint32_t *)0x4100873c |= BIT(10);
+	if (!(*(volatile uint32_t *)0x4100873c & BIT(11))) {
+		/* Anomalies 102, 106 and 107 */
+		*(volatile uint32_t *)0x41008774 =
+			((*(volatile uint32_t *)0x41008774) & 0xfffffffe) |
+			0x01000000;
+	}
+
+	/* FTPAN-188 */
+	*(volatile uint32_t *)0x4100873c = (*(volatile uint32_t *)0x4100873c &
+					    0x7fffff00UL) | 0x80000096UL;
+
+	/* IC-9803 */
+	*(volatile uint32_t *)0x41008740 = (*(volatile uint32_t *)0x41008740 &
+					    0xffff00ffUL) | 0x00001600UL;
 }
 
 static inline void hal_radio_stop(void)
@@ -402,7 +416,30 @@ static inline void hal_radio_stop(void)
 
 static inline void hal_radio_ram_prio_setup(void)
 {
-	/* TODO */
+	struct {
+		uint32_t volatile RESERVED[(0x0E00 >> 2)];
+		struct {
+			uint32_t volatile CPU;
+			uint32_t volatile RESERVED[1];
+		} RAMPRI;
+	} volatile *NRF_AMLI = (void volatile *)0x41000000UL;
+
+	struct {
+		uint32_t volatile RESERVED[(0x0E00 >> 2)];
+		struct {
+			uint32_t volatile SERIAL;
+			uint32_t volatile RESERVED[(0x0040 >> 2) - 1];
+			uint32_t volatile RADIO;
+			uint32_t volatile CRYPTO;
+		} RAMPRI;
+	} volatile *NRF_PAMLI = (void volatile *)0x41007000UL;
+
+
+	NRF_AMLI->RAMPRI.CPU     = 0xFFFFFFFFUL;
+
+	NRF_PAMLI->RAMPRI.SERIAL = 0xFFFFFFFFUL;
+	NRF_PAMLI->RAMPRI.RADIO  = 0x00000000UL;
+	NRF_PAMLI->RAMPRI.CRYPTO = 0x00000000UL;
 }
 
 static inline uint32_t hal_radio_phy_mode_get(uint8_t phy, uint8_t flags)
