@@ -90,6 +90,11 @@ static void init_set(struct ll_adv_set *adv);
 
 static struct ll_adv_set ll_adv[BT_CTLR_ADV_SET];
 
+static struct {
+	uint8_t len;
+	uint8_t data[PDU_AC_DATA_SIZE_MAX];
+} ad_data_backup;
+
 #if defined(CONFIG_BT_TICKER_EXT)
 static struct ticker_ext ll_adv_ticker_ext[BT_CTLR_ADV_SET];
 #endif /* CONFIG_BT_TICKER_EXT */
@@ -213,6 +218,7 @@ uint8_t ll_adv_params_set(uint16_t interval, uint8_t adv_type,
 #endif /* !CONFIG_BT_CTLR_ADV_EXT */
 
 	struct ll_adv_set *adv;
+	uint8_t pdu_type_prev;
 	struct pdu_adv *pdu;
 
 	adv = is_disabled_get(handle);
@@ -299,8 +305,9 @@ uint8_t ll_adv_params_set(uint16_t interval, uint8_t adv_type,
 	adv->lll.scan_req_notify = sreq;
 #endif
 
-	/* update the "current" primary adv data */
+	/* update the "current" primary adv PDU */
 	pdu = lll_adv_data_peek(&adv->lll);
+	pdu_type_prev = pdu->type;
 #if defined(CONFIG_BT_CTLR_ADV_EXT)
 	if (is_new_set) {
 		is_pdu_type_changed = 1;
@@ -382,6 +389,15 @@ uint8_t ll_adv_params_set(uint16_t interval, uint8_t adv_type,
 #endif /* CONFIG_BT_CTLR_PRIVACY */
 
 	if (pdu->type == PDU_ADV_TYPE_DIRECT_IND) {
+		if (pdu_type_prev != PDU_ADV_TYPE_DIRECT_IND) {
+			/* Backup the AD Data */
+			ad_data_backup.len = pdu->len -
+					     offsetof(struct pdu_adv_adv_ind,
+						      data);
+			memcpy(ad_data_backup.data, pdu->adv_ind.data,
+			       ad_data_backup.len);
+		}
+
 		pdu->tx_addr = own_addr_type & 0x1;
 		pdu->rx_addr = direct_addr_type;
 		memcpy(&pdu->direct_ind.tgt_addr[0], direct_addr, BDADDR_SIZE);
@@ -584,6 +600,14 @@ uint8_t ll_adv_params_set(uint16_t interval, uint8_t adv_type,
 		pdu->rx_addr = 0;
 		pdu->len = BDADDR_SIZE;
 	} else {
+		if (pdu_type_prev == PDU_ADV_TYPE_DIRECT_IND) {
+			/* Restore the AD Data */
+			memcpy(pdu->adv_ind.data, ad_data_backup.data,
+			       ad_data_backup.len);
+			pdu->len = offsetof(struct pdu_adv_adv_ind, data) +
+				   ad_data_backup.len;
+		}
+
 		pdu->tx_addr = own_addr_type & 0x1;
 		pdu->rx_addr = 0;
 	}
@@ -1561,17 +1585,19 @@ uint8_t ull_adv_data_set(struct ll_adv_set *adv, uint8_t len,
 	struct pdu_adv *pdu;
 	uint8_t idx;
 
-	/* Dont update data if directed */
-	prev = lll_adv_data_peek(&adv->lll);
-	if (prev->type == PDU_ADV_TYPE_DIRECT_IND) {
-		/* TODO: remember data, to be used if type is changed using
-		 * parameter set function ll_adv_params_set afterwards.
-		 */
-		return 0;
-	}
-
+	/* Check invalid AD Data length */
 	if (len > PDU_AC_DATA_SIZE_MAX) {
 		return BT_HCI_ERR_INVALID_PARAM;
+	}
+
+	/* Dont update data if directed, back it up */
+	prev = lll_adv_data_peek(&adv->lll);
+	if (prev->type == PDU_ADV_TYPE_DIRECT_IND) {
+		/* Update the backup AD Data */
+		ad_data_backup.len = len;
+		memcpy(ad_data_backup.data, data, ad_data_backup.len);
+
+		return 0;
 	}
 
 	/* update adv pdu fields. */
