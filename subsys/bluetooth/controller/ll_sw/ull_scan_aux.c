@@ -50,7 +50,6 @@ static inline uint8_t aux_handle_get(struct ll_scan_aux_set *aux);
 static inline struct ll_sync_set *sync_create_get(struct ll_scan_set *scan);
 static inline struct ll_sync_iso_set *
 	sync_iso_create_get(struct ll_sync_set *sync);
-static void last_disabled_cb(void *param);
 static void done_disabled_cb(void *param);
 static void flush(void *param);
 static void ticker_cb(uint32_t ticks_at_expire, uint32_t ticks_drift,
@@ -158,7 +157,8 @@ void ull_scan_aux_setup(memq_link_t *link, struct node_rx_hdr *rx)
 			/* aux parent will be NULL for periodic sync */
 			lll = aux->parent;
 
-		} else if (ull_scan_is_valid_get(HDR_LLL2ULL(ftr->param))) {
+		} else if (!IS_ENABLED(CONFIG_BT_CTLR_SYNC_PERIODIC) ||
+			   ull_scan_is_valid_get(HDR_LLL2ULL(ftr->param))) {
 			sync_lll = NULL;
 
 			/* Node that does not have valid aux context but has
@@ -185,7 +185,7 @@ void ull_scan_aux_setup(memq_link_t *link, struct node_rx_hdr *rx)
 			aux = HDR_LLL2ULL(lll_aux);
 		}
 
-		if (lll) {
+		if (!IS_ENABLED(CONFIG_BT_CTLR_SYNC_PERIODIC) || lll) {
 			scan = HDR_LLL2ULL(lll);
 			sync = (void *)scan;
 			scan = ull_scan_is_valid_get(scan);
@@ -198,7 +198,7 @@ void ull_scan_aux_setup(memq_link_t *link, struct node_rx_hdr *rx)
 		}
 
 		phy = lll_aux->phy;
-		if (scan) {
+		if (!IS_ENABLED(CONFIG_BT_CTLR_SYNC_PERIODIC) || scan) {
 			/* Here we are scanner context */
 			sync = sync_create_get(scan);
 
@@ -295,7 +295,7 @@ void ull_scan_aux_setup(memq_link_t *link, struct node_rx_hdr *rx)
 			data_len = 0U;
 		}
 
-		if (sync_lll) {
+		if (IS_ENABLED(CONFIG_BT_CTLR_SYNC_PERIODIC) && sync_lll) {
 			struct ll_sync_set *sync;
 
 			sync = HDR_LLL2ULL(sync_lll);
@@ -369,15 +369,14 @@ void ull_scan_aux_setup(memq_link_t *link, struct node_rx_hdr *rx)
 		si = (void *)ptr;
 		ptr += sizeof(*si);
 
-#if defined(CONFIG_BT_CTLR_SYNC_PERIODIC)
 		/* Check if Periodic Advertising Synchronization to be created.
 		 * Setup synchronization if address and SID match in the
 		 * Periodic Advertiser List or with the explicitly supplied.
 		 */
-		if (sync && adi && ull_sync_setup_sid_match(scan, adi->sid)) {
+		if (IS_ENABLED(CONFIG_BT_CTLR_SYNC_PERIODIC) && sync && adi &&
+		    ull_sync_setup_sid_match(scan, adi->sid)) {
 			ull_sync_setup(scan, aux, rx, si);
 		}
-#endif /* CONFIG_BT_CTLR_SYNC_PERIODIC */
 	}
 
 	if (h->tx_pwr) {
@@ -423,7 +422,7 @@ void ull_scan_aux_setup(memq_link_t *link, struct node_rx_hdr *rx)
 	 */
 	if (!aux_ptr || !aux_ptr->offs || is_scan_req ||
 	    (aux_ptr->phy > EXT_ADV_AUX_PHY_LE_CODED)) {
-		if (sync_lll) {
+		if (IS_ENABLED(CONFIG_BT_CTLR_SYNC_PERIODIC) && sync_lll) {
 			struct ll_sync_set *sync;
 
 			sync = HDR_LLL2ULL(sync_lll);
@@ -452,7 +451,8 @@ void ull_scan_aux_setup(memq_link_t *link, struct node_rx_hdr *rx)
 	if (!aux) {
 		aux = aux_acquire();
 		if (!aux) {
-			if (sync_lll) {
+			if (IS_ENABLED(CONFIG_BT_CTLR_SYNC_PERIODIC) &&
+			    sync_lll) {
 				struct ll_sync_set *sync;
 
 				sync = HDR_LLL2ULL(sync_lll);
@@ -490,16 +490,12 @@ void ull_scan_aux_setup(memq_link_t *link, struct node_rx_hdr *rx)
 	/* In scan context we enqueue rx in aux context and will flush them
 	 * after scan is complete.
 	 */
-	if (0) {
-#if defined(CONFIG_BT_CTLR_SYNC_PERIODIC)
-	} else if (sync_lll) {
+	if (IS_ENABLED(CONFIG_BT_CTLR_SYNC_PERIODIC) && sync_lll) {
 		struct ll_sync_set *sync;
 
 		sync = HDR_LLL2ULL(sync_lll);
 		sync->data_len += data_len;
 		ftr->aux_data_len = sync->data_len;
-
-#endif /* CONFIG_BT_CTLR_SYNC_PERIODIC */
 	} else {
 		if (aux->rx_last) {
 			aux->rx_last->rx_ftr.extra = rx;
@@ -518,16 +514,12 @@ void ull_scan_aux_setup(memq_link_t *link, struct node_rx_hdr *rx)
 	if (ftr->aux_lll_sched) {
 		ftr->aux_sched = 1U;
 
-		if (0) {
-#if defined(CONFIG_BT_CTLR_SYNC_PERIODIC)
-		} else if (sync_lll) {
+		if (IS_ENABLED(CONFIG_BT_CTLR_SYNC_PERIODIC) && sync_lll) {
 			sync_lll->lll_aux = lll_aux;
 
 			/* In sync context, dispatch immediately */
 			ll_rx_put(link, rx);
 			ll_rx_sched();
-
-#endif /* CONFIG_BT_CTLR_SYNC_PERIODIC */
 		} else {
 			lll->lll_aux = lll_aux;
 		}
@@ -541,7 +533,7 @@ void ull_scan_aux_setup(memq_link_t *link, struct node_rx_hdr *rx)
 	}
 
 	/* Switching to ULL scheduling to receive auxiliary PDUs */
-	if (lll) {
+	if (!IS_ENABLED(CONFIG_BT_CTLR_SYNC_PERIODIC) || lll) {
 		lll->lll_aux = NULL;
 	} else {
 		LL_ASSERT(sync_lll &&
@@ -654,7 +646,7 @@ ull_scan_aux_rx_flush:
 		/* Enqueue last rx in aux context if possible, otherwise send
 		 * immediately since we are in sync context.
 		 */
-		if (aux->rx_last) {
+		if (!IS_ENABLED(CONFIG_BT_CTLR_SYNC_PERIODIC) || aux->rx_last) {
 			aux->rx_last->rx_ftr.extra = rx;
 		} else {
 			LL_ASSERT(sync_lll);
@@ -680,7 +672,7 @@ ull_scan_aux_rx_flush:
 			LL_ASSERT(!hdr->disabled_cb);
 
 			hdr->disabled_param = aux;
-			hdr->disabled_cb = last_disabled_cb;
+			hdr->disabled_cb = done_disabled_cb;
 		}
 
 		return;
@@ -708,9 +700,8 @@ void ull_scan_aux_done(struct node_rx_event_done *done)
 	/* Get reference to ULL context */
 	aux = CONTAINER_OF(done->param, struct ll_scan_aux_set, ull);
 
-	if (0) {
-#if defined(CONFIG_BT_CTLR_SYNC_PERIODIC)
-	} else if (!ull_scan_aux_is_valid_get(aux)) {
+	if (IS_ENABLED(CONFIG_BT_CTLR_SYNC_PERIODIC) &&
+	    !ull_scan_aux_is_valid_get(aux)) {
 		struct ll_sync_set *sync;
 
 		sync = CONTAINER_OF(done->param, struct ll_sync_set, ull);
@@ -722,7 +713,6 @@ void ull_scan_aux_done(struct node_rx_event_done *done)
 		}
 
 		aux = HDR_LLL2ULL(sync->lll.lll_aux);
-#endif /* CONFIG_BT_CTLR_SYNC_PERIODIC */
 	} else {
 		/* Setup the disabled callback to flush the auxiliary PDUs */
 		hdr = &aux->ull;
@@ -785,12 +775,14 @@ void ull_scan_aux_release(memq_link_t *link, struct node_rx_hdr *rx)
 
 		lll = rx->rx_ftr.param;
 		lll_aux = lll->lll_aux;
-	} else if (ull_scan_aux_is_valid_get(param_ull)) {
+
+	} else if (!IS_ENABLED(CONFIG_BT_CTLR_SYNC_PERIODIC) ||
+		   ull_scan_aux_is_valid_get(param_ull)) {
 		/* Mark for buffer for release */
 		rx->type = NODE_RX_TYPE_RELEASE;
 
 		lll_aux = rx->rx_ftr.param;
-#if defined(CONFIG_BT_CTLR_SYNC_PERIODIC)
+
 	} else if (ull_sync_is_valid_get(param_ull)) {
 		struct ll_sync_set *sync;
 		struct lll_sync *lll;
@@ -813,7 +805,7 @@ void ull_scan_aux_release(memq_link_t *link, struct node_rx_hdr *rx)
 		 * pointer to NULL.
 		 */
 		rx->rx_ftr.extra = NULL;
-#endif /* CONFIG_BT_CTLR_SYNC_PERIODIC */
+
 	} else {
 		LL_ASSERT(0);
 		lll_aux = NULL;
@@ -835,7 +827,7 @@ void ull_scan_aux_release(memq_link_t *link, struct node_rx_hdr *rx)
 			LL_ASSERT(!hdr->disabled_cb);
 
 			hdr->disabled_param = aux;
-			hdr->disabled_cb = last_disabled_cb;
+			hdr->disabled_cb = done_disabled_cb;
 		}
 	}
 
@@ -921,30 +913,9 @@ static inline struct ll_sync_iso_set *
 #endif /* !CONFIG_BT_CTLR_SYNC_ISO */
 }
 
-static void last_disabled_cb(void *param)
-{
-	flush(param);
-}
-
 static void done_disabled_cb(void *param)
 {
-	struct ll_scan_aux_set *aux;
-
-	aux = param;
-	LL_ASSERT(ull_scan_aux_is_valid_get(aux));
-
-	aux = ull_scan_aux_is_valid_get(aux);
-#if defined(CONFIG_BT_CTLR_SYNC_PERIODIC)
-	if (!aux) {
-		struct lll_sync *sync_lll;
-
-		sync_lll = param;
-		LL_ASSERT(sync_lll->lll_aux);
-		aux = HDR_LLL2ULL(sync_lll->lll_aux);
-	}
-#endif /* CONFIG_BT_CTLR_SYNC_PERIODIC */
-
-	flush(aux);
+	flush(param);
 }
 
 static void flush(void *param)
@@ -974,7 +945,7 @@ static void flush(void *param)
 	lll = aux->parent;
 	scan = HDR_LLL2ULL(lll);
 	scan = ull_scan_is_valid_get(scan);
-	if (scan) {
+	if (!IS_ENABLED(CONFIG_BT_CTLR_SYNC_PERIODIC) || scan) {
 		lll->lll_aux = NULL;
 	} else {
 		struct lll_sync *sync_lll;
@@ -1109,8 +1080,6 @@ static void ticker_op_cb(uint32_t status, void *param)
 		} else {
 			return;
 		}
-
-		mfy.fp = dispatch;
 	} else {
 		if (0) {
 
