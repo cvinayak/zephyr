@@ -934,6 +934,9 @@ static void isr_done(void *param)
 
 	lll_isr_status_reset();
 
+	/* Generate incomplete data status and release aux context when
+	 * sync event is using LLL scheduling.
+	 */
 	lll = param;
 	if (lll->is_aux_sched) {
 		struct node_rx_pdu *node_rx;
