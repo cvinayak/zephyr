@@ -1690,6 +1690,7 @@ int ull_ticker_stop_with_mark(uint8_t ticker_handle, void *param,
 	uint32_t volatile ret_cb;
 	uint32_t ret;
 	void *mark;
+	int err;
 
 	mark = ull_disable_mark(param);
 	if (mark != param) {
@@ -1710,14 +1711,15 @@ int ull_ticker_stop_with_mark(uint8_t ticker_handle, void *param,
 		return -EALREADY;
 	}
 
-	ret = ull_disable(lll_disable);
-	if (ret) {
-		return -EBUSY;
-	}
+	err = ull_disable(lll_disable);
 
 	mark = ull_disable_unmark(param);
 	if (mark != param) {
 		return -ENOLCK;
+	}
+
+	if (err && (err != -EALREADY)) {
+		return err;
 	}
 
 	return 0;
@@ -1749,8 +1751,8 @@ int ull_disable(void *lll)
 	uint32_t ret;
 
 	hdr = HDR_LLL2ULL(lll);
-	if (!hdr || !ull_ref_get(hdr)) {
-		return 0;
+	if (!ull_ref_get(hdr)) {
+		return -EALREADY;
 	}
 
 	k_sem_init(&sem, 0, 1);
@@ -1768,7 +1770,7 @@ int ull_disable(void *lll)
 	 * care.
 	 */
 	if (!ull_ref_get(hdr)) {
-		return 0;
+		return -EALREADY;
 	}
 
 	mfy.param = lll;
