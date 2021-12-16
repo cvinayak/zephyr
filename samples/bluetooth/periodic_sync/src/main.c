@@ -233,7 +233,8 @@ void main(void)
 		err = bt_le_per_adv_sync_create(&sync_create_param, &sync);
 		if (err) {
 			printk("failed (err %d)\n", err);
-			return;
+
+			continue;
 		}
 		printk("success.\n");
 
@@ -246,8 +247,10 @@ void main(void)
 			err = bt_le_per_adv_sync_delete(sync);
 			if (err) {
 				printk("failed (err %d)\n", err);
-				return;
+				continue;
 			}
+			printk("success.\n");
+
 			continue;
 		}
 		printk("Periodic sync established.\n");
@@ -261,6 +264,17 @@ void main(void)
 		gpio_pin_set(led.port, led.pin, (int)led_is_on);
 #endif /* HAS_LED */
 
+#if 1
+		k_sleep(K_SECONDS(10));
+
+		printk("Deleting Periodic Advertising Sync...");
+		err = bt_le_per_adv_sync_delete(sync);
+		if (err) {
+			printk("failed (err %d)\n", err);
+			continue;
+		}
+		printk("success.\n");
+#else
 		printk("Waiting for periodic sync lost...\n");
 		err = k_sem_take(&sem_per_sync_lost, K_FOREVER);
 		if (err) {
@@ -268,5 +282,6 @@ void main(void)
 			return;
 		}
 		printk("Periodic sync lost.\n");
+#endif
 	} while (true);
 }
