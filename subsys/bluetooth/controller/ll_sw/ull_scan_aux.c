@@ -127,7 +127,10 @@ void ull_scan_aux_setup(memq_link_t *link, struct node_rx_hdr *rx)
 		sync_lll = NULL;
 		sync_iso = NULL;
 		rx_incomplete = NULL;
+
 		lll = ftr->param;
+		LL_ASSERT(!lll->lll_aux);
+
 		scan = HDR_LLL2ULL(lll);
 		sync = sync_create_get(scan);
 		phy = BT_HCI_LE_EXT_SCAN_PHY_1M;
@@ -138,7 +141,10 @@ void ull_scan_aux_setup(memq_link_t *link, struct node_rx_hdr *rx)
 		sync_lll = NULL;
 		sync_iso = NULL;
 		rx_incomplete = NULL;
+
 		lll = ftr->param;
+		LL_ASSERT(!lll->lll_aux);
+
 		scan = HDR_LLL2ULL(lll);
 		sync = sync_create_get(scan);
 		phy = BT_HCI_LE_EXT_SCAN_PHY_CODED;
@@ -184,6 +190,8 @@ void ull_scan_aux_setup(memq_link_t *link, struct node_rx_hdr *rx)
 			sync_lll = ftr->param;
 
 			lll_aux = sync_lll->lll_aux;
+			LL_ASSERT(lll_aux);
+
 			aux = HDR_LLL2ULL(lll_aux);
 			LL_ASSERT(sync_lll == aux->parent);
 		}
