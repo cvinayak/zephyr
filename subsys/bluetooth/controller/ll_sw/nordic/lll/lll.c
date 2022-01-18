@@ -800,6 +800,7 @@ static uint32_t preempt_ticker_start(struct lll_event *prev,
 		     ull->ticks_preempt_to_start;
 
 	ticks_at_preempt_new = preempt_anchor + preempt_to;
+	ticks_at_preempt_new &= HAL_TICKER_CNTR_MASK;
 
 	/* Do not request to start preempt timeout if already requested */
 	if ((preempt_start_req != preempt_start_ack) ||
@@ -813,12 +814,10 @@ static uint32_t preempt_ticker_start(struct lll_event *prev,
 			return TICKER_STATUS_SUCCESS;
 		}
 
-		preempt_ticker_stop();
-
-		ticks_at_preempt = ticks_at_preempt_new;
-
-		prev->is_aborted = 1U;
-		prev->abort_cb(&prev->prepare_param, prev->prepare_param.param);
+		/* Stop any scheduled preempt ticker */
+		ret = preempt_ticker_stop();
+		LL_ASSERT((ret == TICKER_STATUS_SUCCESS) ||
+			  (ret == TICKER_STATUS_BUSY));
 	}
 
 	preempt_start_req++;
@@ -913,14 +912,39 @@ static void preempt(void *param)
 
 	/* Preemptor not in pipeline */
 	if (next != param) {
+		struct lll_event *next_next = NULL;
+		struct lll_event *e;
 		uint32_t ret;
 
-		/* Start the preempt timeout */
-		ret = preempt_ticker_start(NULL, next);
-		LL_ASSERT((ret == TICKER_STATUS_SUCCESS) ||
-			  (ret == TICKER_STATUS_BUSY));
+		/* Find if a short prepare request in the pipeline */
+		do {
+			e = ull_prepare_dequeue_iter(&idx);
+			if (!next_next && e && (!e->is_aborted && !e->is_resume)) {
+				next_next = e;
+			}
+		} while (e && (e->is_aborted || e->is_resume) && (e != param));
 
-		return;
+		/* No short prepare request in pipeline */
+		if (!e) {
+			/* Start the preempt timeout for next event */
+			ret = preempt_ticker_start(NULL, next);
+			LL_ASSERT((ret == TICKER_STATUS_SUCCESS) ||
+				  (ret == TICKER_STATUS_BUSY));
+
+			return;
+		} else {
+			/* FIXME: Abort all events in pipeline before the short
+			 *        prepare event.
+			 */
+			LL_ASSERT(next_next == e);
+			next->is_aborted = 1;
+			next->abort_cb(&next->prepare_param, next->prepare_param.param);
+
+			/* Use the short prepare event as next event that will
+			 * try abort the current event.
+			 */
+			next = e;
+		}
 	}
 
 	/* Check if current event want to continue */
