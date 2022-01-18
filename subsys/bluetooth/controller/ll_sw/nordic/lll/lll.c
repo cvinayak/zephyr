@@ -306,6 +306,11 @@ int lll_done(void *param)
 	struct ull_hdr *ull;
 	void *evdone;
 
+#define DEBUG_MAX 10
+	static uint32_t debug_tick[DEBUG_MAX];
+	static void *debug[DEBUG_MAX];
+	static uint8_t debug_idx;
+
 	/* Assert if param supplied without a pending prepare to cancel. */
 	next = ull_prepare_dequeue_get();
 	LL_ASSERT(!param || next);
@@ -360,8 +365,25 @@ int lll_done(void *param)
 	extra->result = result;
 #endif /* CONFIG_BT_CTLR_JIT_SCHEDULING */
 
+	debug_tick[debug_idx] = ticker_ticks_now_get();
+	debug[debug_idx] = ull;
+	debug_idx++;
+	if (debug_idx == DEBUG_MAX) {
+		debug_idx = 0U;
+	}
+
 	/* Let ULL know about LLL event done */
 	evdone = ull_event_done(ull);
+	if (!evdone) {
+		printk("ASSERTED IN LLL:\n");
+		for (int i = 0; i < DEBUG_MAX; i++) {
+			if (debug_idx == 0U) {
+				debug_idx = DEBUG_MAX;
+			}
+			debug_idx--;
+			printk("ULL: %u -> %p\n", debug_tick[debug_idx], debug[debug_idx]);
+		}
+	}
 	LL_ASSERT(evdone);
 
 	return 0;
