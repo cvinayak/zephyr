@@ -1173,6 +1173,9 @@ struct bt_le_per_adv_sync_recv_info {
 
 	/** The Constant Tone Extension (CTE) of the advertisement (@ref bt_df_cte_type) */
 	uint8_t cte_type;
+
+	/** Data Status */
+	uint8_t data_status;
 };
 
 
