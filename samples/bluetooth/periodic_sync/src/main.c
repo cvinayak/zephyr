@@ -8,7 +8,12 @@
 #include <devicetree.h>
 #include <drivers/gpio.h>
 #include <bluetooth/bluetooth.h>
+#include <bluetooth/hci.h>
 
+#define BT_LE_SCAN_CUSTOM BT_LE_SCAN_PARAM(BT_LE_SCAN_TYPE_ACTIVE, \
+					   BT_LE_SCAN_OPT_NONE, \
+					   0x0020, \
+					   0x0010)
 #define TIMEOUT_SYNC_CREATE K_SECONDS(10)
 #define NAME_LEN            30
 
@@ -73,16 +78,23 @@ static void scan_recv(const struct bt_le_scan_recv_info *info,
 {
 	char le_addr[BT_ADDR_LE_STR_LEN];
 	char name[NAME_LEN];
+	uint8_t data_status;
+	uint16_t len;
 
+	len = buf->len;
 	(void)memset(name, 0, sizeof(name));
 
 	bt_data_parse(buf, data_cb, name);
 
+	data_status = BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS(info->adv_props);
+
 	bt_addr_le_to_str(info->addr, le_addr, sizeof(le_addr));
-	printk("[DEVICE]: %s, AD evt type %u, Tx Pwr: %i, RSSI %i %s "
+	printk("[DEVICE]: %s, AD evt type %u, Tx Pwr: %i, RSSI %i "
+	       "Status: %u AD len: %u [%s] "
 	       "C:%u S:%u D:%u SR:%u E:%u Prim: %s, Secn: %s, "
 	       "Interval: 0x%04x (%u ms), SID: %u\n",
-	       le_addr, info->adv_type, info->tx_power, info->rssi, name,
+	       le_addr, info->adv_type, info->tx_power, info->rssi,
+	       data_status, len, name,
 	       (info->adv_props & BT_GAP_ADV_PROP_CONNECTABLE) != 0,
 	       (info->adv_props & BT_GAP_ADV_PROP_SCANNABLE) != 0,
 	       (info->adv_props & BT_GAP_ADV_PROP_DIRECTED) != 0,
@@ -138,15 +150,17 @@ static void recv_cb(struct bt_le_per_adv_sync *sync,
 		    struct net_buf_simple *buf)
 {
 	char le_addr[BT_ADDR_LE_STR_LEN];
-	char data_str[129];
+	//char data_str[191];
 
 	bt_addr_le_to_str(info->addr, le_addr, sizeof(le_addr));
-	bin2hex(buf->data, buf->len, data_str, sizeof(data_str));
+	//bin2hex(buf->data, buf->len, data_str, sizeof(data_str));
 
 	printk("PER_ADV_SYNC[%u]: [DEVICE]: %s, tx_power %i, "
-	       "RSSI %i, CTE %u, data length %u, data: %s\n",
+	       "RSSI %i, CTE %u, status: %u, data length %u, data: %s\n",
 	       bt_le_per_adv_sync_get_index(sync), le_addr, info->tx_power,
-	       info->rssi, info->cte_type, buf->len, data_str);
+	       info->rssi, info->cte_type, info->data_status, buf->len,
+	       "");
+	       //data_str);
 }
 
 static struct bt_le_per_adv_sync_cb sync_callbacks = {
@@ -198,7 +212,7 @@ void main(void)
 	printk("Success.\n");
 
 	printk("Start scanning...");
-	err = bt_le_scan_start(BT_LE_SCAN_ACTIVE, NULL);
+	err = bt_le_scan_start(BT_LE_SCAN_CUSTOM, NULL);
 	if (err) {
 		printk("failed (err %d)\n", err);
 		return;
