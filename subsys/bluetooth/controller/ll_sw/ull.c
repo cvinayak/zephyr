@@ -1869,18 +1869,6 @@ struct lll_event *ull_prepare_enqueue(lll_is_abort_cb_t is_abort_cb,
 
 	MFIFO_ENQUEUE(prep, idx);
 
-	{
-		static uint8_t max;
-		uint8_t avail;
-
-		avail = MFIFO_AVAIL_COUNT_GET(prep);
-		if (avail > max) {
-			max = avail;
-		}
-
-		//printk("%s: max = %u, avail = %u\n", __func__, max, avail);
-	}
-
 	return e;
 }
 
@@ -1955,22 +1943,6 @@ void *ull_event_done(void *param)
 {
 	struct node_rx_event_done *evdone;
 	memq_link_t *link;
-
-	{
-		static uint8_t min;
-		uint8_t avail;
-
-		avail = MFIFO_AVAIL_COUNT_GET(done);
-		if (!min) {
-			min = avail;
-		}
-
-		if (avail < min) {
-			min = avail;
-		}
-
-		//printk("%s: min = %u, avail = %u\n", __func__, min, avail);
-	}
 
 	/* Obtain new node that signals "Done of an RX-event".
 	 * Obtain this by dequeuing from the global 'mfifo_done' queue.

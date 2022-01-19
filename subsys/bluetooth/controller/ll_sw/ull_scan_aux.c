@@ -1008,28 +1008,13 @@ static int init_reset(void)
 	return 0;
 }
 
-static uint8_t s_cnt;
-
 static inline struct ll_scan_aux_set *aux_acquire(void)
 {
-	struct ll_scan_aux_set *aux;
-
-	aux = mem_acquire(&scan_aux_free);
-	if (!aux) {
-		return NULL;
-	}
-
-	LL_ASSERT(!s_cnt);
-	s_cnt++;
-
-	return aux;
+	return mem_acquire(&scan_aux_free);
 }
 
 static inline void aux_release(struct ll_scan_aux_set *aux)
 {
-	s_cnt--;
-	LL_ASSERT(!s_cnt);
-
 	/* Clear the parent so that when scan is being disabled then this
 	 * auxiliary context shall not associate itself from being disable.
 	 */

@@ -783,7 +783,6 @@ static void ticker_start_op_cb(uint32_t status, void *param)
 static uint32_t preempt_ticker_start(struct lll_event *prev,
 				     struct lll_event *next)
 {
-	static uint8_t lock;
 	static uint32_t ticks_at_preempt;
 	uint32_t ticks_at_preempt_new;
 	struct lll_prepare_param *p;
@@ -791,9 +790,6 @@ static uint32_t preempt_ticker_start(struct lll_event *prev,
 	struct ull_hdr *ull;
 	uint32_t preempt_to;
 	uint32_t ret;
-
-	LL_ASSERT(!lock);
-	lock++;
 
 	/* Calc the preempt timeout */
 	p = &next->prepare_param;
@@ -815,8 +811,6 @@ static uint32_t preempt_ticker_start(struct lll_event *prev,
 		diff = ticks_at_preempt_new - ticks_at_preempt;
 		if (!prev || prev->is_aborted ||
 		    ((diff & BIT(HAL_TICKER_CNTR_MSBIT)) == 0U)) {
-			LL_ASSERT(lock);
-			lock--;
 			return TICKER_STATUS_SUCCESS;
 		}
 
@@ -843,8 +837,6 @@ static uint32_t preempt_ticker_start(struct lll_event *prev,
 			   preempt_ticker_cb, next,
 			   ticker_start_op_cb, next);
 
-	LL_ASSERT(lock);
-	lock--;
 	return ret;
 }
 
