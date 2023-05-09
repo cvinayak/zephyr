@@ -131,6 +131,22 @@ static uint8_t force_md_cnt_calc(struct lll_conn *lll_conn, uint32_t tx_rate);
 				(LL_LENGTH_OCTETS_TX_MAX + \
 				BT_CTLR_USER_TX_BUFFER_OVERHEAD))
 
+/**
+ * One connection may take up to 4 TX buffers for procedures
+ * simultaneously, for example 2 for encryption, 1 for termination,
+ * and 1 one that is in flight and has not been returned to the pool
+ */
+#define CONN_TX_CTRL_BUF_SIZE MROUND(offsetof(struct node_tx, pdu) + \
+				     offsetof(struct pdu_data, llctrl) + \
+				     PDU_DC_CTRL_TX_SIZE_MAX)
+
+/* Terminate procedure state values */
+#define TERM_REQ   1
+#define TERM_ACKED 3
+
+/* CIS Establishment procedure state values */
+#define CIS_REQUEST_AWAIT_HOST 2
+
 static MFIFO_DEFINE(conn_tx, sizeof(struct lll_tx), CONFIG_BT_BUF_ACL_TX_COUNT);
 static MFIFO_DEFINE(conn_ack, sizeof(struct lll_tx),
 		    (CONFIG_BT_BUF_ACL_TX_COUNT + LLCP_TX_CTRL_BUF_COUNT));
@@ -1069,6 +1085,14 @@ void ull_conn_done(struct node_rx_event_done *done)
 	}
 #endif /* CONFIG_BT_CTLR_LE_ENC */
 
+	/* Legacy LLCP:
+	 * Peripheral received terminate ind or
+	 * Central received ack for the transmitted terminate ind or
+	 * Central transmitted ack for the received terminate ind or
+	 * there has been MIC failure
+	 * Refactored LLCP:
+	 * reason_final is set exactly under the above conditions
+	 */
 	reason_final = conn->llcp_terminate.reason_final;
 	if (reason_final) {
 		conn_cleanup(conn, reason_final);
@@ -1911,6 +1935,7 @@ static void conn_cleanup_iso_cis_released_cb(struct ll_conn *conn)
 static void conn_cleanup_finalize(struct ll_conn *conn)
 {
 	struct lll_conn *lll = &conn->lll;
+	struct node_rx_pdu *rx;
 	uint32_t ticker_status;
 
 	if ((IS_ENABLED(CONFIG_BT_CTLR_PERIPHERAL_ISO) ||
@@ -2129,13 +2154,13 @@ static void tx_lll_flush(void *param)
 			    (void **)&tx);
 	while (link) {
 		uint8_t idx;
-		struct lll_tx *tx_buf;
+		struct lll_tx *lll_tx2;
 
-		idx = MFIFO_ENQUEUE_GET(conn_ack, (void **)&tx_buf);
-		LL_ASSERT_ERR(tx_buf);
+		idx = MFIFO_ENQUEUE_GET(conn_ack, (void **)&lll_tx2);
+		LL_ASSERT_ERR(lll_tx2);
 
-		tx_buf->handle = LLL_HANDLE_INVALID;
-		tx_buf->node = tx;
+		lll_tx2->handle = LLL_HANDLE_INVALID;
+		lll_tx2->node = tx;
 
 		/* TX node UPSTREAM, i.e. Tx node ack path */
 		link->next = tx->next; /* Indicates ctrl pool or data pool */
@@ -2157,7 +2182,8 @@ static void tx_lll_flush(void *param)
 	rx->hdr.link = NULL;
 
 	/* Enqueue the terminate towards ULL context */
-	ull_rx_put_sched(link, rx);
+	ull_rx_put(link, rx);
+	ull_rx_sched();
 }
 
 #if defined(CONFIG_BT_CTLR_LLID_DATA_START_EMPTY)
@@ -2792,6 +2818,11 @@ void ull_dle_local_tx_update(struct ll_conn *conn, uint16_t tx_octets, uint16_t 
 
 void ull_dle_init(struct ll_conn *conn, uint8_t phy)
 {
+	/*
+	 * TODO:
+	 * legacy code uses the maximum of the time for 1M phy and actual phy
+	 * for max_time_min, to be verified if that is required here as well
+	 */
 #if defined(CONFIG_BT_CTLR_PHY)
 	const uint16_t max_time_min = PDU_DC_MAX_US(PDU_DC_PAYLOAD_SIZE_MIN, phy);
 	const uint16_t max_time_max = PDU_DC_MAX_US(LL_LENGTH_OCTETS_RX_MAX, phy);
