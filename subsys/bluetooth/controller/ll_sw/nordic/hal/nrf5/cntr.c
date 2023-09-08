@@ -7,6 +7,10 @@
 
 #include <stdint.h>
 
+#if defined(CONFIG_SOC_SERIES_NRF53X)
+#include <hal/nrf_ipc.h>
+#endif /* CONFIG_SOC_SERIES_NRF53X */
+
 #include "hal/cntr.h"
 
 #include "hal/debug.h"
@@ -105,6 +109,10 @@ uint32_t cntr_start(void)
 	nrf_rtc_task_trigger(NRF_RTC, NRF_RTC_TASK_START);
 #endif /* !CONFIG_BT_CTLR_NRF_GRTC */
 
+#if defined(CONFIG_SOC_SERIES_NRF53X)
+	nrf_ipc_task_trigger(NRF_IPC, NRF_IPC_TASK_SEND_4);
+#endif /* CONFIG_SOC_SERIES_NRF53X */
+
 	return 0;
 }
 
@@ -121,6 +129,10 @@ uint32_t cntr_stop(void)
 #else /* !CONFIG_BT_CTLR_NRF_GRTC */
 	nrf_rtc_task_trigger(NRF_RTC, NRF_RTC_TASK_STOP);
 #endif /* !CONFIG_BT_CTLR_NRF_GRTC */
+
+#if defined(CONFIG_SOC_SERIES_NRF53X)
+	nrf_ipc_task_trigger(NRF_IPC, NRF_IPC_TASK_SEND_5);
+#endif /* CONFIG_SOC_SERIES_NRF53X */
 
 	return 0;
 }
