@@ -324,7 +324,20 @@ static int prepare_cb(struct lll_prepare_param *p)
 	overhead = lll_preempt_calc(ull, (TICKER_ID_ADV_AUX_BASE + ull_adv_aux_lll_handle_get(lll)),
 				    ticks_at_event);
 	/* check if preempt to start has changed */
-	if (overhead) {
+	if (unlikely(overhead)) {
+		extern uint32_t ticker_ticks_now_get(void);
+		extern uint32_t g_ticks_to_expire_minus;
+		extern void *g_ticker;
+		uint32_t ticks_now;
+
+		ticks_now = ticker_ticks_now_get();
+
+		printk("%s: %p ticker %p ticks_to_expire_minus %u\n", __func__, lll, g_ticker, g_ticks_to_expire_minus);
+
+		extern void prepare_print(uint32_t ticks_now);
+
+		prepare_print(ticks_now);
+
 		LL_ASSERT_OVERHEAD(overhead);
 
 		radio_isr_set(isr_done, lll);
