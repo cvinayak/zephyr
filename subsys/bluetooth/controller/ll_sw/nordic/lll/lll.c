@@ -1412,6 +1412,8 @@ static uint32_t preempt_ticker_start(struct lll_event *first,
 
 		ticks_at_preempt = ticks_at_preempt_new;
 
+		ticks_at_preempt_start = ticker_ticks_now_get();
+
 		LL_ASSERT_ERR(preempt_req == preempt_ack);
 		preempt_req++;
 
