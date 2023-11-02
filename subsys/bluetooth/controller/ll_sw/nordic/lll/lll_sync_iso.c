@@ -635,6 +635,19 @@ static int prepare_cb_common(struct lll_prepare_param *p)
 		if (p->defer == 1U) {
 			err = 0;
 		} else {
+			extern uint32_t ticker_ticks_now_get(void);
+			extern uint32_t g_ticks_to_expire_minus;
+			extern void *g_ticker;
+			uint32_t ticks_now;
+
+			ticks_now = ticker_ticks_now_get();
+
+			printk("\n%s: ticker %p ticks_to_expire_minus %u\n", __func__, g_ticker, g_ticks_to_expire_minus);
+
+			extern void prepare_print(uint32_t ticks_now);
+
+			prepare_print(ticks_now);
+
 			LL_ASSERT_OVERHEAD(overhead);
 
 			err = -ECANCELED;

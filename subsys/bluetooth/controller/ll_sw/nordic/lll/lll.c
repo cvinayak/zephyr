@@ -908,6 +908,81 @@ void lll_isr_early_abort(void *param)
 	lll_done(NULL);
 }
 
+static uint32_t ticks_at_preempt;
+static uint32_t ticks_at_preempt_start;
+static uint32_t ticks_at_preempt_start_op_cb;
+static uint32_t ticks_now_at_preempt_start_op_cb;
+static uint32_t ticks_at_expire_preempt;
+
+#define G_PREPARE_COUNT 30
+struct {
+	void *param_curr;
+	void *param_next;
+	uint32_t ticks;
+	uint32_t minus;
+	uint32_t curr;
+	uint32_t next;
+} g_prepare[G_PREPARE_COUNT];
+uint8_t g_prepare_idx;
+
+void prepare_print(uint32_t ticks_now)
+{
+	uint8_t idx;
+
+	extern uint32_t ticker_job_used_min;
+	extern uint32_t ticker_job_used_max;
+	extern uint32_t ticker_job_used;
+	extern uint32_t ticker_job_used_manage;
+	extern uint32_t ticker_job_used_bh;
+	extern uint32_t ticker_job_used_insert;
+	extern uint32_t ticker_job_used_resched;
+	extern uint32_t ticker_job_used_inquire;
+
+	printk("min %u\n", ticker_job_used_min);
+	printk("avg %u\n", ticker_job_used);
+	printk("max %u\n", ticker_job_used_max);
+	printk("mng %u\n", ticker_job_used_manage);
+	printk("bh  %u\n", ticker_job_used_bh);
+	printk("ins %u\n", ticker_job_used_insert);
+	printk("res %u\n", ticker_job_used_resched);
+	printk("inq %u\n", ticker_job_used_inquire);
+	printk("ticks_at_preempt                 %u\n", ticks_at_preempt);
+	printk("ticks_at_preempt_start           %u\n", ticks_at_preempt_start);
+	printk("ticks_at_preempt_start_op_cb     %u\n", ticks_at_preempt_start_op_cb);
+	printk("ticks_now_at_preempt_start_op_cb %u\n", ticks_now_at_preempt_start_op_cb);
+	printk("ticks_at_expire_preempt          %u\n", ticks_at_expire_preempt);
+
+	idx = g_prepare_idx;
+	for (int i = 0; i < G_PREPARE_COUNT; i++) {
+		uint32_t delay, used;
+
+		if (idx == 0U) {
+			idx = G_PREPARE_COUNT;
+		}
+
+		idx--;
+
+		delay = ticker_ticks_diff_get(g_prepare[idx].curr,
+					      g_prepare[idx].ticks);
+		used  = ticker_ticks_diff_get(g_prepare[idx].next,
+					      g_prepare[idx].curr);
+		if (!used) {
+			used = ticker_ticks_diff_get(ticks_now,
+						     g_prepare[idx].curr);
+		}
+
+		printk("param %10p->%10p ticks %u (%u) curr %u next %u delay %u used %u\n",
+		       g_prepare[idx].param_curr,
+		       g_prepare[idx].param_next,
+		       g_prepare[idx].ticks,
+		       g_prepare[idx].minus,
+		       g_prepare[idx].curr,
+		       g_prepare[idx].next,
+		       delay,
+		       used);
+	}
+}
+
 int lll_prepare_resolve(lll_is_abort_cb_t is_abort_cb, lll_abort_cb_t abort_cb,
 			lll_prepare_cb_t prepare_cb,
 			struct lll_prepare_param *prepare_param,
@@ -918,6 +993,19 @@ int lll_prepare_resolve(lll_is_abort_cb_t is_abort_cb, lll_abort_cb_t abort_cb,
 	struct lll_event *next;
 	void *idx;
 	int err;
+
+	extern uint32_t g_ticks_to_expire_minus;
+	g_prepare[g_prepare_idx].param_curr = prepare_param->param;
+	g_prepare[g_prepare_idx].param_next = NULL;
+	g_prepare[g_prepare_idx].ticks = prepare_param->ticks_at_expire;
+	g_prepare[g_prepare_idx].minus = g_ticks_to_expire_minus;
+	g_prepare[g_prepare_idx].curr = ticker_ticks_now_get();
+	g_prepare[g_prepare_idx].next = g_prepare[g_prepare_idx].curr;
+	uint8_t prev = g_prepare_idx;
+	g_prepare_idx++;
+	if (g_prepare_idx == G_PREPARE_COUNT) {
+		g_prepare_idx = 0U;
+	}
 
 	/* Find the ready prepare in the pipeline */
 	idx = NULL;
@@ -962,8 +1050,14 @@ int lll_prepare_resolve(lll_is_abort_cb_t is_abort_cb, lll_abort_cb_t abort_cb,
 					   prepare_cb, is_resume);
 		LL_ASSERT_ERR(next);
 
+		g_prepare[prev].param_curr = prepare_param->param;
+		g_prepare[prev].param_next = NULL;
+		g_prepare[prev].next += 10000U;
+
 #if !defined(CONFIG_BT_CTLR_LOW_LAT)
 		if (is_resume || prepare_param->defer) {
+			g_prepare[prev].next += 1U;
+
 			return -EINPROGRESS;
 		}
 
@@ -971,6 +1065,8 @@ int lll_prepare_resolve(lll_is_abort_cb_t is_abort_cb, lll_abort_cb_t abort_cb,
 		if (IS_ENABLED(CONFIG_BT_CTLR_LLL_PREPARE_AT_MARGIN)) {
 			event.curr.has_margin = 0U;
 		}
+
+		g_prepare[prev].next += 2U;
 
 		/* Always start preempt timeout for first prepare in pipeline */
 		struct lll_event *first = ready ? ready : next;
@@ -1045,6 +1141,8 @@ int lll_prepare_resolve(lll_is_abort_cb_t is_abort_cb, lll_abort_cb_t abort_cb,
 
 	err = prepare_cb(prepare_param);
 
+	g_prepare[prev].next = ticker_ticks_now_get();
+
 	if (!IS_ENABLED(CONFIG_BT_CTLR_ASSERT_OVERHEAD_START) &&
 	    (err == -ECANCELED)) {
 		err = 0;
@@ -1067,6 +1165,8 @@ int lll_prepare_resolve(lll_is_abort_cb_t is_abort_cb, lll_abort_cb_t abort_cb,
 	if (!next) {
 		return err;
 	}
+
+	g_prepare[prev].param_next = next->prepare_param.param;
 
 	/* Start the preempt timeout */
 	ret = preempt_ticker_start(next, NULL, next);
@@ -1186,6 +1286,10 @@ static void ticker_start_op_cb(uint32_t status, void *param)
 	 */
 	LL_ASSERT_ERR(preempt_start_req != preempt_start_ack);
 	preempt_start_ack = preempt_start_req;
+
+	ticks_at_preempt_start_op_cb = (uint32_t)param;
+
+	ticks_now_at_preempt_start_op_cb = ticker_ticks_now_get();
 }
 
 static void isr_radio_tmr_cb(void *param, uint8_t chain)
@@ -1207,12 +1311,26 @@ static uint32_t preempt_ticker_start(struct lll_event *first,
 				     struct lll_event *next)
 {
 	const struct lll_prepare_param *p;
-	static uint32_t ticks_at_preempt;
 	uint32_t ticks_at_preempt_new;
 	uint32_t preempt_anchor;
 	struct ull_hdr *ull;
 	uint32_t preempt_to;
 	uint32_t ret;
+
+	extern uint32_t g_ticks_to_expire_minus;
+	g_prepare[g_prepare_idx].param_curr = first->prepare_param.param;
+	g_prepare[g_prepare_idx].param_next = next->prepare_param.param;
+	g_prepare[g_prepare_idx].ticks = next->prepare_param.ticks_at_expire;
+	g_prepare[g_prepare_idx].minus = g_ticks_to_expire_minus;
+	g_prepare[g_prepare_idx].curr = ticker_ticks_now_get();
+	g_prepare[g_prepare_idx].next = g_prepare[g_prepare_idx].curr;
+	uint8_t prev1 = g_prepare_idx;
+	g_prepare_idx++;
+	if (g_prepare_idx == G_PREPARE_COUNT) {
+		g_prepare_idx = 0U;
+	}
+
+	g_prepare[prev1].next = g_prepare[prev1].curr + 20000U;
 
 	/* Do not request to start preempt timeout if already requested.
 	 *
@@ -1238,6 +1356,8 @@ static uint32_t preempt_ticker_start(struct lll_event *first,
 					     ticks_at_preempt);
 		if ((!IS_ENABLED(CONFIG_BT_CTLR_RADIO_TIMER_ISR) || (diff != 0U)) &&
 		    ((diff & BIT(HAL_TICKER_CNTR_MSBIT)) == 0U)) {
+			g_prepare[prev1].next += 3U;
+
 			return TICKER_STATUS_SUCCESS;
 		}
 
@@ -1253,6 +1373,8 @@ static uint32_t preempt_ticker_start(struct lll_event *first,
 
 		/* Schedule short preempt timeout */
 		first = next;
+
+		g_prepare[prev1].next += 2U;
 	} else {
 		/* Calc the preempt timeout */
 		p = &first->prepare_param;
@@ -1263,6 +1385,9 @@ static uint32_t preempt_ticker_start(struct lll_event *first,
 
 		ticks_at_preempt_new = preempt_anchor + preempt_to;
 		ticks_at_preempt_new &= HAL_TICKER_CNTR_MASK;
+
+		g_prepare[g_prepare_idx].ticks = p->ticks_at_expire;
+		g_prepare[prev1].next += 1U;
 	}
 
 	if (IS_ENABLED(CONFIG_BT_CTLR_RADIO_TIMER_ISR)) {
@@ -1296,6 +1421,8 @@ static uint32_t preempt_ticker_start(struct lll_event *first,
 
 	ticks_at_preempt = ticks_at_preempt_new;
 
+	ticks_at_preempt_start = ticker_ticks_now_get();
+
 	/* Setup pre empt timeout */
 	ret = ticker_start(TICKER_INSTANCE_ID_CTLR,
 			   TICKER_USER_ID_LLL,
@@ -1307,7 +1434,7 @@ static uint32_t preempt_ticker_start(struct lll_event *first,
 			   TICKER_NULL_LAZY,
 			   TICKER_NULL_SLOT,
 			   preempt_ticker_cb, first->prepare_param.param,
-			   ticker_start_op_cb, NULL);
+			   ticker_start_op_cb, (void *)ticks_at_preempt);
 
 	return ret;
 }
@@ -1345,6 +1472,8 @@ static void preempt_ticker_cb(uint32_t ticks_at_expire, uint32_t ticks_drift,
 	LL_ASSERT_ERR(preempt_ack != preempt_req);
 	preempt_ack = preempt_req;
 
+	ticks_at_expire_preempt = ticks_at_expire;
+
 	mfy.param = param;
 	ret = mayfly_enqueue(TICKER_USER_ID_ULL_HIGH, TICKER_USER_ID_LLL, 0U, &mfy);
 	LL_ASSERT_ERR(!ret);
@@ -1357,8 +1486,25 @@ static void preempt(void *param)
 	void *idx;
 	int err;
 
+	extern uint32_t g_ticks_to_expire_minus;
+	g_prepare[g_prepare_idx].param_curr = event.curr.param;
+	g_prepare[g_prepare_idx].param_next = NULL;
+	g_prepare[g_prepare_idx].ticks = ticks_at_expire_preempt;
+	g_prepare[g_prepare_idx].minus = g_ticks_to_expire_minus;
+	g_prepare[g_prepare_idx].curr = ticker_ticks_now_get();
+	g_prepare[g_prepare_idx].next = g_prepare[g_prepare_idx].curr;
+	uint8_t prev = g_prepare_idx;
+	g_prepare_idx++;
+	if (g_prepare_idx == G_PREPARE_COUNT) {
+		g_prepare_idx = 0U;
+	}
+
+	g_prepare[prev].next = g_prepare[prev].curr + 30000U;
+
 	/* No event to abort */
 	if (!event.curr.abort_cb || !event.curr.param) {
+		g_prepare[prev].next += 1U;
+
 		/* When a radio event is placed back in the prepare pipeline as
 		 * resume prepare and a done event is not to be generated; in
 		 * these cases, event.curr.abort_cb is not NULL, but
@@ -1385,12 +1531,16 @@ static void preempt(void *param)
 	ready = prepare_dequeue_iter_ready_get(&idx);
 	if (!ready) {
 		/* No ready prepare */
+		g_prepare[prev].next += 2U;
 		return;
 	}
 
 	/* Preemptor not in pipeline */
 	if (ready->prepare_param.param != param) {
 		uint32_t ret;
+
+		g_prepare[prev].param_next = ready->prepare_param.param;
+		g_prepare[prev].next += 3U;
 
 		/* Start the preempt timeout for ready event */
 		ret = preempt_ticker_start(ready, NULL, ready);
@@ -1448,6 +1598,7 @@ preempt_cancel_ready:
 			 */
 			ready->prepare_param.defer = 1U;
 
+			g_prepare[prev].next += 4U;
 
 			goto preempt_start_ready;
 
@@ -1475,6 +1626,7 @@ preempt_cancel_ready:
 						   &ready->prepare_param, ready_resume_cb, 0U);
 			LL_ASSERT_ERR(next);
 
+			g_prepare[prev].next += 5U;
 
 			goto preempt_start_ready;
 
@@ -1486,6 +1638,8 @@ preempt_cancel_ready:
 		/* Let preemptor LLL know about the cancelled prepare */
 		ready->is_aborted = 1;
 		ready->abort_cb(&ready->prepare_param, NULL);
+
+		g_prepare[prev].next += 6U;
 
 preempt_start_ready:
 		/* Find next prepare that is ready and not a resume */
@@ -1600,6 +1754,9 @@ preempt_cancel_curr:
 		iter = resume_enqueue(is_abort_cb, abort_cb, curr_resume_cb, curr_param,
 				      ticks_at_expire);
 		LL_ASSERT_ERR(iter);
+
+		g_prepare[prev].param_next = ready->prepare_param.param;
+		g_prepare[prev].next += 9U;
 	} else {
 		LL_ASSERT_ERR(err == -ECANCELED);
 	}

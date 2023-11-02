@@ -1563,6 +1563,9 @@ void ticker_worker(void *param)
 			   instance);
 }
 
+void *g_ticker = NULL;
+uint32_t g_ticks_to_expire_minus = 0U;
+
 /**
  * @brief Prepare ticker node expiration
  *
@@ -1624,6 +1627,17 @@ static void ticks_to_expire_prep(struct ticker_node *ticker,
 	/* Update ticker */
 	ticker->ticks_to_expire = ticks_to_expire;
 	ticker->ticks_to_expire_minus = ticks_to_expire_minus;
+
+	if (ticks_to_expire_minus && !g_ticker) {
+	       g_ticker = ticker;
+	}
+
+	if (g_ticker == ticker) {
+		g_ticks_to_expire_minus = ticks_to_expire_minus;
+		if (!ticks_to_expire_minus) {
+			g_ticker = NULL;
+		}
+	}
 }
 
 #if defined(CONFIG_BT_TICKER_REMAINDER_SUPPORT)
@@ -3332,6 +3346,15 @@ ticker_job_compare_update(struct ticker_instance *instance,
 	return 0U;
 }
 
+uint32_t ticker_job_used = 0U;
+uint32_t ticker_job_used_manage = 0U;
+uint32_t ticker_job_used_bh = 0U;
+uint32_t ticker_job_used_insert = 0U;
+uint32_t ticker_job_used_resched = 0U;
+uint32_t ticker_job_used_inquire = 0U;
+uint32_t ticker_job_used_max = 0U;
+uint32_t ticker_job_used_min = UINT32_MAX;
+
 /**
  * @brief Ticker job
  *
@@ -3373,6 +3396,11 @@ void ticker_job(void *param)
 				   instance);
 		return;
 	}
+
+	uint32_t enter = ticker_ticks_now_get();
+	uint32_t manage = 0U, bh = 0U, ins = 0U, resched = 0U, inquire = 0U;
+
+	/* Guard ticker_job against pre-emption by ticker worker */
 	instance->job_guard = 1U;
 
 	/* Back up the previous known tick */
@@ -3432,6 +3460,10 @@ void ticker_job(void *param)
 	pending = ticker_job_list_manage(instance, ticks_now, ticks_elapsed,
 					 &insert_head);
 
+	uint32_t curr = ticker_ticks_now_get();
+
+	manage = ticker_ticks_diff_get(curr, enter);
+
 	/* Detect change in head of the list */
 	if (instance->ticker_id_head != ticker_id_old_head) {
 		flag_compare_update = 1U;
@@ -3442,6 +3474,9 @@ void ticker_job(void *param)
 		ticker_job_worker_bh(instance, ticks_now, ticks_previous,
 				     ticks_elapsed, &insert_head);
 
+		curr = ticker_ticks_now_get();
+		bh = ticker_ticks_diff_get(curr, enter);
+
 		/* Detect change in head of the list */
 		if (instance->ticker_id_head != ticker_id_old_head) {
 			flag_compare_update = 1U;
@@ -3449,6 +3484,9 @@ void ticker_job(void *param)
 
 		/* Handle insertions */
 		pending |= ticker_job_list_insert(instance, insert_head);
+
+		curr = ticker_ticks_now_get();
+		ins = ticker_ticks_diff_get(curr, enter);
 
 #if defined(CONFIG_BT_TICKER_EXT) && !defined(CONFIG_BT_TICKER_SLOT_AGNOSTIC) &&\
 	!defined(CONFIG_BT_TICKER_LOW_LAT)
@@ -3458,9 +3496,15 @@ void ticker_job(void *param)
 			flag_compare_update = 1U;
 		}
 #endif /* CONFIG_BT_TICKER_EXT */
+
+		curr = ticker_ticks_now_get();
+		resched = ticker_ticks_diff_get(curr, enter);
 	} else {
 		/* Handle insertions */
 		pending |= ticker_job_list_insert(instance, insert_head);
+
+		curr = ticker_ticks_now_get();
+		ins = ticker_ticks_diff_get(curr, enter);
 	}
 
 	/* Detect change in head of the list */
@@ -3486,6 +3530,9 @@ void ticker_job(void *param)
 	* !CONFIG_BT_TICKER_PRIORITY_SET
 	*/
 
+	curr = ticker_ticks_now_get();
+	inquire = ticker_ticks_diff_get(curr, enter);
+
 #if defined(CONFIG_BT_TICKER_EXT_EXPIRE_INFO)
 	if (instance->expire_infos_outdated) {
 		ticker_job_update_expire_infos(instance);
@@ -3499,6 +3546,29 @@ void ticker_job(void *param)
 	} else {
 		compare_trigger = 0U;
 	}
+
+	uint32_t exit = ticker_ticks_now_get();
+	uint32_t diff = ticker_ticks_diff_get(exit, enter);
+
+	if (diff > ticker_job_used_max) {
+		ticker_job_used_manage = manage;
+		ticker_job_used_bh = bh;
+		ticker_job_used_insert = ins;
+		ticker_job_used_resched = resched;
+		ticker_job_used_inquire = inquire;
+		ticker_job_used_max = diff;
+	}
+
+	if (diff < ticker_job_used_min) {
+		ticker_job_used_min = diff;
+	}
+
+	if (!ticker_job_used && diff) {
+		ticker_job_used = diff;
+	}
+
+	ticker_job_used += diff;
+	ticker_job_used >>= 1U;
 
 	/* Permit worker to run */
 	instance->job_guard = 0U;
