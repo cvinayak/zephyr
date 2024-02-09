@@ -498,6 +498,8 @@ static void stream_recv_lc3_codec(struct bt_bap_stream *stream,
 		printk("Bad packet: 0x%02X\n", info->flags);
 
 		in_buf = NULL;
+
+		return;
 	} else {
 		in_buf = buf->data;
 	}
