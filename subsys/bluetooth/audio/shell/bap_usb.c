@@ -302,6 +302,7 @@ int bap_usb_init(void)
 		return err;
 	}
 
+#if 0
 	if (IS_ENABLED(CONFIG_SOC_NRF5340_CPUAPP)) {
 		/* Use this to turn on 128 MHz clock for cpu_app */
 		err = nrfx_clock_divider_set(NRF_CLOCK_DOMAIN_HFCLK, NRF_CLOCK_HFCLK_DIV_1);
@@ -311,6 +312,7 @@ int bap_usb_init(void)
 			LOG_WRN("Failed to set 128 MHz: %d");
 		}
 	}
+#endif
 
 	return 0;
 }
