@@ -958,6 +958,7 @@ static uint8_t ticker_resolve_collision(struct ticker_node *nodes,
 			uint8_t curr_has_ticks_slot_window =
 					TICKER_HAS_SLOT_WINDOW(ticker) &&
 					((ticker->ticks_slot == 0U) ||
+					 (ticker->ext_data->is_jitter_in_window == 0U) ||
 					 ((acc_ticks_to_expire < ticker_ticks_slot) &&
 					  (ticker->ext_data->ticks_slot_window >
 					   (ticker->ext_data->ticks_drift + ticker->ticks_slot)) &&
@@ -1307,6 +1308,7 @@ void ticker_worker(void *param)
 	node = &instance->nodes[0];
 
 	while (ticker_id_head != TICKER_NULL) {
+		uint32_t ticks_to_expire_minus;
 		struct ticker_node *ticker;
 		uint32_t ticks_to_expire;
 		uint8_t must_expire_skip;
@@ -1387,9 +1389,22 @@ void ticker_worker(void *param)
 			must_expire_skip = 1U;
 		}
 
+		/* Pick the ticker expiry latency, to calculate ticks_at_expire
+		 */
+		ticks_to_expire_minus = ticker->ticks_to_expire_minus;
+
 #if defined(CONFIG_BT_TICKER_EXT)
 		if (ticker->ext_data) {
+			/* Pick the drift, to give it in the ticker_cb */
 			ticks_drift = ticker->ext_data->ticks_drift;
+
+			/* Revert back drift so that next expiry maintains the
+			 * average periodic interval.
+			 */
+			if (ticker->ext_data->is_jitter_in_window) {
+				ticker->ticks_to_expire_minus += ticks_drift;
+			}
+
 			/* Mark node as not re-scheduling */
 			ticker->ext_data->reschedule_state = TICKER_RESCHEDULE_STATE_NONE;
 		} else {
@@ -1403,6 +1418,10 @@ void ticker_worker(void *param)
 #else  /* CONFIG_BT_TICKER_LOW_LAT ||
 	* CONFIG_BT_TICKER_SLOT_AGNOSTIC
 	*/
+		/* Pick the ticker expiry latency, to calculate ticks_at_expire
+		 */
+		ticks_to_expire_minus = ticker->ticks_to_expire_minus;
+
 		ticks_drift = 0U;
 #endif /* CONFIG_BT_TICKER_LOW_LAT ||
 	* CONFIG_BT_TICKER_SLOT_AGNOSTIC
@@ -1417,7 +1436,7 @@ void ticker_worker(void *param)
 
 			ticks_at_expire = (instance->ticks_current +
 					   ticks_expired -
-					   ticker->ticks_to_expire_minus) &
+					   ticks_to_expire_minus) &
 					   HAL_TICKER_CNTR_MASK;
 
 #if defined(CONFIG_BT_TICKER_REMAINDER_SUPPORT)
@@ -1738,10 +1757,14 @@ static inline uint32_t ticker_job_node_update(struct ticker_instance *instance,
 	 */
 	struct ticker_ext *ext_data = ticker->ext_data;
 
-	if (ext_data && ext_data->ticks_slot_window != 0U) {
-		ext_data->ticks_drift =
-			user_op->params.update.ticks_drift_plus -
-			user_op->params.update.ticks_drift_minus;
+	if ((ext_data != NULL) && (ext_data->ticks_slot_window != 0U)) {
+		if (ext_data->is_jitter_in_window == 0U) {
+			ext_data->ticks_drift =
+				user_op->params.update.ticks_drift_plus -
+				user_op->params.update.ticks_drift_minus;
+		} else {
+			/* Retain any ticks_drift value */
+		}
 	}
 #endif /* CONFIG_BT_TICKER_EXT && !CONFIG_BT_TICKER_SLOT_AGNOSTIC */
 
@@ -2534,7 +2557,8 @@ static uint8_t ticker_job_reschedule_in_window(struct ticker_instance *instance)
 		if (IS_ENABLED(CONFIG_BT_TICKER_EXT_SLOT_WINDOW_YIELD) &&
 		    ticker_resched->ticks_slot &&
 		    !ext_data->ticks_drift &&
-		    !ext_data->is_drift_in_window) {
+		    !ext_data->is_drift_in_window &&
+		    !ext_data->is_jitter_in_window) {
 			/* Use slot window after intersection include required
 			 * ticks_slot, and we do not take the interval of the
 			 * colliding ticker provided every expiry increments the
@@ -2606,7 +2630,8 @@ static uint8_t ticker_job_reschedule_in_window(struct ticker_instance *instance)
 					    ticks_to_expire_latest -
 					    HAL_TICKER_RESCHEDULE_MARGIN);
 			} else if ((ticker_resched->ticks_slot == 0U) ||
-				   ext_data->is_drift_in_window) {
+				   ext_data->is_drift_in_window ||
+				   ext_data->is_jitter_in_window) {
 				/* Next expiry is too close - hop over after
 				 * next node
 				 */
@@ -2629,7 +2654,8 @@ static uint8_t ticker_job_reschedule_in_window(struct ticker_instance *instance)
 				    (ext_data->is_drift_in_window &&
 				     !ext_data->dir_drift_in_window) ||
 				    (IS_ENABLED(CONFIG_BT_TICKER_EXT_SLOT_WINDOW_YIELD) &&
-				     ext_data->has_drift_in_window)) {
+				     ext_data->has_drift_in_window) ||
+				    ext_data->is_jitter_in_window) {
 					/* Place at start of window */
 					ticks_to_expire = window_start_ticks;
 					break;
@@ -2671,7 +2697,8 @@ reschedule_in_window_hop_over:
 
 			if (!ticker_resched->ticks_slot ||
 			    (ext_data->is_drift_in_window &&
-			     !ext_data->dir_drift_in_window)) {
+			     !ext_data->dir_drift_in_window) ||
+			    ext_data->is_jitter_in_window) {
 				if (!ticker_resched->ticks_slot ||
 				    (window_start_ticks <= (ticks_slot_window -
 							   ticks_slot))) {
