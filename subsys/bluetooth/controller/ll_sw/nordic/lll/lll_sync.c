@@ -524,6 +524,11 @@ static int is_abort_cb(void *next, void *curr, lll_prepare_cb_t *resume_cb)
 	 */
 	ARG_UNUSED(resume_cb);
 
+	/* Prepare being cancelled (no resume for periodic sync) */
+	if (next == NULL) {
+		return -ECANCELED;
+	}
+
 	/* Different radio event overlap */
 	if (next != curr) {
 		struct lll_scan_aux *lll_aux;
@@ -556,7 +561,7 @@ static int is_abort_cb(void *next, void *curr, lll_prepare_cb_t *resume_cb)
 
 			/* Do not abort if near supervision timeout */
 			if (lll_sync_curr->forced) {
-				return 0;
+				return -EBUSY;
 			}
 
 			/* Abort current event as next event is not a
@@ -647,7 +652,7 @@ static void abort_cb(struct lll_prepare_param *prepare_param, void *param)
 	* CONFIG_BT_CTLR_CTEINLINE_SUPPORT
 	*/
 
-	lll_done(param);
+	lll_done(prepare_param->param);
 }
 
 static void isr_aux_setup(void *param)
