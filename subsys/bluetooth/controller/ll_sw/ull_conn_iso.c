@@ -493,8 +493,10 @@ void ull_conn_iso_done(struct node_rx_event_done *done)
 							conn->supervision_timeout * 10U * 1000U,
 							cig->iso_interval * CONN_INT_UNIT_US);
 
-				} else if (cis->event_expire > cig->lll.latency_event) {
-					cis->event_expire -= cig->lll.latency_event;
+				} else if (cis->event_expire > (cig->lll.latency_event +
+								cig->lll.lazy_prepare + 1U)) {
+					cis->event_expire -= cig->lll.latency_event +
+							     cig->lll.lazy_prepare + 1U;
 
 				} else {
 					cis->event_expire = 0U;
