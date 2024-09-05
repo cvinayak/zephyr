@@ -97,19 +97,29 @@ static void iso_recv(struct bt_iso_chan *chan, const struct bt_iso_recv_info *in
 		struct net_buf *buf)
 {
 	if (info->flags & BT_ISO_FLAGS_VALID) {
-		printk("Incoming data channel %p len %u\n", chan, buf->len);
+		printk("Incoming data channel %p len %u ts %u\n", chan, buf->len, info->ts);
 		iso_print_data(buf->data, buf->len);
 	}
 }
 
+static struct k_work_delayable iso_send_work;
+static uint16_t seq_num;
+
 static void iso_connected(struct bt_iso_chan *chan)
 {
 	printk("ISO Channel %p connected\n", chan);
+
+	seq_num = 0U;
+
+	/* Start send timer */
+	k_work_schedule(&iso_send_work, K_MSEC(0));
 }
 
 static void iso_disconnected(struct bt_iso_chan *chan, uint8_t reason)
 {
 	printk("ISO Channel %p disconnected (reason 0x%02x)\n", chan, reason);
+
+	k_work_cancel_delayable(&iso_send_work);
 }
 
 static struct bt_iso_chan_ops iso_ops = {
@@ -118,14 +128,21 @@ static struct bt_iso_chan_ops iso_ops = {
 	.disconnected	= iso_disconnected,
 };
 
+static struct bt_iso_chan_io_qos iso_tx = {
+	.sdu = CONFIG_BT_ISO_TX_MTU,
+	.phy = BT_GAP_LE_PHY_2M,
+	.rtn = 0,
+	.path = NULL,
+};
+
 static struct bt_iso_chan_io_qos iso_rx = {
 	.sdu = CONFIG_BT_ISO_TX_MTU,
 	.path = NULL,
 };
 
 static struct bt_iso_chan_qos iso_qos = {
+	.tx = &iso_tx,
 	.rx = &iso_rx,
-	.tx = NULL,
 };
 
 static struct bt_iso_chan iso_chan = {
@@ -154,6 +171,67 @@ static struct bt_iso_server iso_server = {
 #endif /* CONFIG_BT_SMP */
 	.accept = iso_accept,
 };
+
+static uint32_t interval_us = 10U * USEC_PER_MSEC; /* 10 ms */
+NET_BUF_POOL_FIXED_DEFINE(tx_pool, 5, BT_ISO_SDU_BUF_SIZE(CONFIG_BT_ISO_TX_MTU),
+			  CONFIG_BT_CONN_TX_USER_DATA_SIZE, NULL);
+/**
+ * @brief Send ISO data on timeout
+ *
+ * This will send an increasing amount of ISO data, starting from 1 octet.
+ *
+ * First iteration : 0x00
+ *
+ * Second iteration: 0x00 0x01
+ * Third iteration : 0x00 0x01 0x02
+ *
+ * And so on, until it wraps around the configured ISO TX MTU (CONFIG_BT_ISO_TX_MTU)
+ *
+ * @param work Pointer to the work structure
+ */
+static void iso_timer_timeout(struct k_work *work)
+{
+	int ret;
+	static uint8_t buf_data[CONFIG_BT_ISO_TX_MTU];
+	static bool data_initialized;
+	struct net_buf *buf;
+	static size_t len_to_send = 1;
+
+	if (!data_initialized) {
+		for (int i = 0; i < ARRAY_SIZE(buf_data); i++) {
+			buf_data[i] = (uint8_t)i;
+		}
+
+		data_initialized = true;
+	}
+
+	buf = net_buf_alloc(&tx_pool, K_NO_WAIT);
+	if (buf != NULL) {
+		net_buf_reserve(buf, BT_ISO_CHAN_SEND_RESERVE);
+
+		net_buf_add_mem(buf, buf_data, len_to_send);
+
+		ret = bt_iso_chan_send(&iso_chan, buf, seq_num);
+
+		if (ret < 0) {
+			printk("Failed to send ISO data (%d)\n", ret);
+			net_buf_unref(buf);
+		}
+
+		len_to_send++;
+		if (len_to_send > ARRAY_SIZE(buf_data)) {
+			len_to_send = 1;
+		}
+	} else {
+		printk("Failed to allocate buffer, retrying in next interval (%u us)\n",
+		       interval_us);
+	}
+
+	/* Sequence number shall be incremented for each SDU interval */
+	seq_num++;
+
+	k_work_schedule(&iso_send_work, K_USEC(interval_us));
+}
 
 int main(void)
 {
@@ -184,5 +262,8 @@ int main(void)
 	}
 
 	printk("Advertising successfully started\n");
+
+	k_work_init_delayable(&iso_send_work, iso_timer_timeout);
+
 	return 0;
 }

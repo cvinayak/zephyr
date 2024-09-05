@@ -231,7 +231,7 @@ uint8_t ll_cig_parameters_commit(uint8_t cig_id, uint16_t *handles)
 		 * handle the throughput. For unframed these must be divisible, if they're not,
 		 * framed mode must be forced.
 		 */
-		iso_interval_us = cig->c_sdu_interval;
+		iso_interval_us = cig->c_sdu_interval * 2U;
 
 		if (iso_interval_us < ISO_INTERVAL_TO_US(BT_HCI_ISO_INTERVAL_MIN)) {
 			/* ISO_Interval is below minimum (5 ms) */
@@ -474,10 +474,16 @@ ll_cig_parameters_commit_retry:
 			cis->lll.tx.ft = ll_cis_calculate_ft(cig_sync_delay_us_max, iso_interval_us,
 							     cig->c_sdu_interval, cig->c_latency,
 							     cis->framed);
+			if (!cis->lll.tx.bn) {
+				cis->lll.tx.ft = 1U;
+			}
 
 			cis->lll.rx.ft = ll_cis_calculate_ft(cig_sync_delay_us_max, iso_interval_us,
 							     cig->p_sdu_interval, cig->p_latency,
 							     cis->framed);
+			if (!cis->lll.rx.bn) {
+				cis->lll.rx.ft = 1U;
+			}
 
 			if ((cis->lll.tx.ft == 0U) || (cis->lll.rx.ft == 0U)) {
 				/* Invalid FT caused by invalid combination of parameters */
@@ -489,6 +495,7 @@ ll_cig_parameters_commit_retry:
 			LL_ASSERT(0);
 #endif
 			cis->lll.nse = DIV_ROUND_UP(se[i].total_count, cis->lll.tx.ft);
+			cis->lll.nse = 2U;
 		}
 
 		if (cig->central.packing == BT_ISO_PACKING_SEQUENTIAL) {
@@ -1036,6 +1043,7 @@ static void mfy_cig_offset_get(void *param)
 
 	offset_min_us = HAL_TICKER_TICKS_TO_US(ticks_to_expire) +
 			(EVENT_TICKER_RES_MARGIN_US << 2U);
+	offset_min_us = PDU_CIS_OFFSET_MIN_US;
 	offset_min_us += cig->sync_delay - cis->sync_delay;
 
 	conn = ll_conn_get(cis->lll.acl_handle);
@@ -1043,6 +1051,8 @@ static void mfy_cig_offset_get(void *param)
 	while (offset_min_us >= (conn_interval_us + PDU_CIS_OFFSET_MIN_US)) {
 		offset_min_us -= conn_interval_us;
 	}
+
+	offset_min_us += cig->iso_interval * ISO_INT_UNIT_US;
 
 	offset_max_us = conn_interval_us - cig->sync_delay;
 
@@ -1359,6 +1369,8 @@ static uint8_t ll_cis_calculate_ft(uint32_t cig_sync_delay, uint32_t iso_interva
 		} else {
 			tl = cig_sync_delay + ft * iso_interval_us - sdu_interval;
 		}
+
+		printk("%s: ft %u tl %u latency %u\n", __func__, ft, tl, latency);
 
 		if (tl > latency) {
 			/* Latency exceeded - use one less */

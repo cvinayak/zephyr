@@ -25,9 +25,9 @@ static struct bt_conn *default_conn;
 static struct k_work_delayable iso_send_work;
 static struct bt_iso_chan iso_chan;
 static uint16_t seq_num;
-static uint16_t latency_ms = 10U; /* 10ms */
+static uint16_t latency_ms = 70U; /* 70ms */
 static uint32_t interval_us = 10U * USEC_PER_MSEC; /* 10 ms */
-NET_BUF_POOL_FIXED_DEFINE(tx_pool, 1, BT_ISO_SDU_BUF_SIZE(CONFIG_BT_ISO_TX_MTU),
+NET_BUF_POOL_FIXED_DEFINE(tx_pool, 4, BT_ISO_SDU_BUF_SIZE(CONFIG_BT_ISO_TX_MTU),
 			  CONFIG_BT_CONN_TX_USER_DATA_SIZE, NULL);
 
 /**
@@ -87,6 +87,95 @@ static void iso_timer_timeout(struct k_work *work)
 	k_work_schedule(&iso_send_work, K_USEC(interval_us));
 }
 
+/** Print data as d_0 d_1 d_2 ... d_(n-2) d_(n-1) d_(n) to show the 3 first and 3 last octets
+ *
+ * Examples:
+ * 01
+ * 0102
+ * 010203
+ * 01020304
+ * 0102030405
+ * 010203040506
+ * 010203...050607
+ * 010203...060708
+ * etc.
+ */
+static void iso_print_data(uint8_t *data, size_t data_len)
+{
+	/* Maximum number of octets from each end of the data */
+	const uint8_t max_octets = 3;
+	char data_str[35];
+	size_t str_len;
+
+	str_len = bin2hex(data, MIN(max_octets, data_len), data_str, sizeof(data_str));
+	if (data_len > max_octets) {
+		if (data_len > (max_octets * 2)) {
+			static const char dots[] = "...";
+
+			strcat(&data_str[str_len], dots);
+			str_len += strlen(dots);
+		}
+
+		str_len += bin2hex(data + (data_len - MIN(max_octets, data_len - max_octets)),
+				   MIN(max_octets, data_len - max_octets),
+				   data_str + str_len,
+				   sizeof(data_str) - str_len);
+	}
+
+	printk("\t %s\n", data_str);
+}
+
+static void iso_connected(struct bt_iso_chan *chan)
+{
+	printk("ISO Channel %p connected\n", chan);
+
+	seq_num = 0U;
+
+	/* Start send timer */
+	k_work_schedule(&iso_send_work, K_MSEC(0));
+}
+
+static void iso_disconnected(struct bt_iso_chan *chan, uint8_t reason)
+{
+	printk("ISO Channel %p disconnected (reason 0x%02x)\n", chan, reason);
+
+	k_work_cancel_delayable(&iso_send_work);
+}
+
+static void iso_recv(struct bt_iso_chan *chan, const struct bt_iso_recv_info *info,
+		struct net_buf *buf)
+{
+	if (info->flags & BT_ISO_FLAGS_VALID) {
+		printk("Incoming data channel %p len %u ts %u\n", chan, buf->len, info->ts);
+		iso_print_data(buf->data, buf->len);
+	}
+}
+
+static struct bt_iso_chan_ops iso_ops = {
+	.recv		= iso_recv,
+	.connected	= iso_connected,
+	.disconnected	= iso_disconnected,
+};
+
+static struct bt_iso_chan_io_qos iso_tx = {
+	.sdu = CONFIG_BT_ISO_TX_MTU,
+	.phy = BT_GAP_LE_PHY_2M,
+	.rtn = 0,
+	.path = NULL,
+};
+
+static struct bt_iso_chan_io_qos iso_rx = {
+	.sdu = CONFIG_BT_ISO_RX_MTU,
+	.phy = BT_GAP_LE_PHY_2M,
+	.rtn = 0,
+	.path = NULL,
+};
+
+static struct bt_iso_chan_qos iso_qos = {
+	.tx = &iso_tx,
+	.rx = &iso_rx,
+};
+
 static void device_found(const bt_addr_le_t *addr, int8_t rssi, uint8_t type,
 			 struct net_buf_simple *ad)
 {
@@ -107,7 +196,7 @@ static void device_found(const bt_addr_le_t *addr, int8_t rssi, uint8_t type,
 	printk("Device found: %s (RSSI %d)\n", addr_str, rssi);
 
 	/* connect only to devices in close proximity */
-	if (rssi < -50) {
+	if (rssi < -70) {
 		return;
 	}
 
@@ -136,39 +225,6 @@ static void start_scan(void)
 
 	printk("Scanning successfully started\n");
 }
-
-static void iso_connected(struct bt_iso_chan *chan)
-{
-	printk("ISO Channel %p connected\n", chan);
-
-	seq_num = 0U;
-
-	/* Start send timer */
-	k_work_schedule(&iso_send_work, K_MSEC(0));
-}
-
-static void iso_disconnected(struct bt_iso_chan *chan, uint8_t reason)
-{
-	printk("ISO Channel %p disconnected (reason 0x%02x)\n", chan, reason);
-	k_work_cancel_delayable(&iso_send_work);
-}
-
-static struct bt_iso_chan_ops iso_ops = {
-	.connected	= iso_connected,
-	.disconnected	= iso_disconnected,
-};
-
-static struct bt_iso_chan_io_qos iso_tx = {
-	.sdu = CONFIG_BT_ISO_TX_MTU,
-	.phy = BT_GAP_LE_PHY_2M,
-	.rtn = 1,
-	.path = NULL,
-};
-
-static struct bt_iso_chan_qos iso_qos = {
-	.tx = &iso_tx,
-	.rx = NULL,
-};
 
 static void connected(struct bt_conn *conn, uint8_t err)
 {
@@ -251,7 +307,7 @@ int main(void)
 	iso_chan.ops = &iso_ops;
 	iso_chan.qos = &iso_qos;
 #if defined(CONFIG_BT_SMP)
-	iso_chan.required_sec_level = BT_SECURITY_L2,
+	iso_chan.required_sec_level = BT_SECURITY_L2;
 #endif /* CONFIG_BT_SMP */
 
 	channels[0] = &iso_chan;
@@ -275,5 +331,6 @@ int main(void)
 	start_scan();
 
 	k_work_init_delayable(&iso_send_work, iso_timer_timeout);
+
 	return 0;
 }

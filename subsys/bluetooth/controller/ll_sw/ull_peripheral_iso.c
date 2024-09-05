@@ -285,6 +285,11 @@ uint8_t ull_peripheral_iso_acquire(struct ll_conn *acl,
 	*cis_handle = ll_conn_iso_stream_handle_get(cis);
 	cig->lll.num_cis++;
 
+	printk("%s: C_to_P sdu %u pdu %u interval %u %u nse %u bn %u ft %u\n", __func__,
+	       cis->c_max_sdu, cis->lll.rx.max_pdu, cig->c_sdu_interval, cig->iso_interval, cis->lll.nse, cis->lll.rx.bn, cis->lll.rx.ft);
+	printk("%s: P_to_C sdu %u pdu %u interval %u %u nse %u bn %u ft %u\n", __func__,
+	       cis->p_max_sdu, cis->lll.tx.max_pdu, cig->p_sdu_interval, cig->iso_interval, cis->lll.nse, cis->lll.tx.bn, cis->lll.tx.ft);
+
 	return 0;
 }
 
