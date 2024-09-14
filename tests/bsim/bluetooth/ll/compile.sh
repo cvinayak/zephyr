@@ -40,6 +40,7 @@ app=tests/bsim/bluetooth/ll/edtt/gatt_test_app \
   conf_file=prj_llcp.conf compile
 
 app=tests/bsim/bluetooth/ll/multiple_id compile
+app=tests/bsim/bluetooth/ll/multiple_id conf_overlay=overlay-rng_fake.conf compile
 app=tests/bsim/bluetooth/ll/throughput compile
 app=tests/bsim/bluetooth/ll/throughput conf_overlay=overlay-no_phy_update.conf compile
 

@@ -131,6 +131,10 @@ void radio_bc_configure(uint32_t n);
 void radio_bc_status_reset(void);
 uint32_t radio_bc_has_match(void);
 
+void radio_rng_fake_seed_set(uint32_t seed);
+int radio_rng_fake_get(void *buf, uint16_t len);
+int radio_rng_fake_isr_get(void *buf, uint16_t len);
+
 void isr_radio_tmr(void);
 uint32_t radio_tmr_isr_set(uint32_t start_us, radio_isr_cb_t cb, void *param);
 

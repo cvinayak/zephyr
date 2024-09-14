@@ -259,7 +259,11 @@ int lll_init(void)
 	if (!device_is_ready(dev_entropy)) {
 		return -ENODEV;
 	}
-#endif /* CONFIG_ENTROPY_HAS_DRIVER */
+#else /* !CONFIG_ENTROPY_HAS_DRIVER */
+	if (IS_ENABLED(CONFIG_BT_CTLR_RNG_FAKE)) {
+		radio_rng_fake_seed_set(0U);
+	}
+#endif /* !CONFIG_ENTROPY_HAS_DRIVER */
 
 	/* Initialise LLL internals */
 	event.curr.abort_cb = NULL;
@@ -426,6 +430,11 @@ int lll_csrand_get(void *buf, size_t len)
 #if defined(CONFIG_ENTROPY_HAS_DRIVER)
 	return entropy_get_entropy(dev_entropy, buf, len);
 #else /* !CONFIG_ENTROPY_HAS_DRIVER */
+	if (IS_ENABLED(CONFIG_BT_CTLR_RNG_FAKE)) {
+		/* Fake random number generated in radio HAL */
+		return radio_rng_fake_get(buf, len);
+	}
+
 	/* FIXME: No suitable entropy device available yet.
 	 *        It is required by Controller to use random numbers.
 	 *        Hence, return uninitialized buf contents, for now.
@@ -439,6 +448,11 @@ int lll_csrand_isr_get(void *buf, size_t len)
 #if defined(CONFIG_ENTROPY_HAS_DRIVER)
 	return entropy_get_entropy_isr(dev_entropy, buf, len, 0);
 #else /* !CONFIG_ENTROPY_HAS_DRIVER */
+	if (IS_ENABLED(CONFIG_BT_CTLR_RNG_FAKE)) {
+		/* Fake random number generated in radio HAL */
+		return radio_rng_fake_get(buf, len);
+	}
+
 	/* FIXME: No suitable entropy device available yet.
 	 *        It is required by Controller to use random numbers.
 	 *        Hence, return uninitialized buf contents, for now.
@@ -452,6 +466,11 @@ int lll_rand_get(void *buf, size_t len)
 #if defined(CONFIG_ENTROPY_HAS_DRIVER)
 	return entropy_get_entropy(dev_entropy, buf, len);
 #else /* !CONFIG_ENTROPY_HAS_DRIVER */
+	if (IS_ENABLED(CONFIG_BT_CTLR_RNG_FAKE)) {
+		/* Fake random number generated in radio HAL */
+		return radio_rng_fake_get(buf, len);
+	}
+
 	/* FIXME: No suitable entropy device available yet.
 	 *        It is required by Controller to use random numbers.
 	 *        Hence, return uninitialized buf contents, for now.
@@ -465,6 +484,11 @@ int lll_rand_isr_get(void *buf, size_t len)
 #if defined(CONFIG_ENTROPY_HAS_DRIVER)
 	return entropy_get_entropy_isr(dev_entropy, buf, len, 0);
 #else /* !CONFIG_ENTROPY_HAS_DRIVER */
+	if (IS_ENABLED(CONFIG_BT_CTLR_RNG_FAKE)) {
+		/* Fake random number generated in radio HAL */
+		return radio_rng_fake_get(buf, len);
+	}
+
 	/* FIXME: No suitable entropy device available yet.
 	 *        It is required by Controller to use random numbers.
 	 *        Hence, return uninitialized buf contents, for now.
