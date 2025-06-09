@@ -21,7 +21,8 @@ Execute ./bs_${BOARD_TS}_tests_bsim_bluetooth_audio_prj_conf \
 
 Execute ./bs_${BOARD_TS}_tests_bsim_bluetooth_audio_prj_conf \
   -v=${VERBOSITY_LEVEL} -s=${SIMULATION_ID} -d=1 -testid=cap_initiator_broadcast \
-  -RealEncryption=1 -rs=23 -D=${NR_OF_DEVICES}
+  -RealEncryption=1 -rs=23 -D=${NR_OF_DEVICES} \
+  -xo_drift=-100e-6
 
 Execute ./bs_${BOARD_TS}_tests_bsim_bluetooth_audio_prj_conf \
   -v=${VERBOSITY_LEVEL} -s=${SIMULATION_ID} -d=2 -testid=cap_acceptor_broadcast_reception \
