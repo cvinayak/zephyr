@@ -457,7 +457,9 @@ static void started_cb(struct bt_bap_stream *stream)
 	test_stream->valid_rx_cnt = 0U;
 	test_stream->seq_num = 0U;
 	test_stream->tx_cnt = 0U;
+	test_stream->err_rx_cnt = 0U;
 	UNSET_FLAG(test_stream->flag_audio_received);
+	test_stream->last_rx_failed = false;
 
 	printk("Stream %p started\n", stream);
 }
@@ -507,7 +509,9 @@ static void unicast_stream_started(struct bt_bap_stream *stream)
 	test_stream->valid_rx_cnt = 0U;
 	test_stream->seq_num = 0U;
 	test_stream->tx_cnt = 0U;
+	test_stream->err_rx_cnt = 0U;
 	UNSET_FLAG(test_stream->flag_audio_received);
+	test_stream->last_rx_failed = false;
 
 	printk("Started stream %p\n", stream);
 
@@ -1215,7 +1219,7 @@ static void pa_sync_to_broadcaster(void)
 	int err;
 
 	printk("Scanning for broadcast sources\n");
-	err = bt_le_scan_start(BT_LE_SCAN_ACTIVE, NULL);
+	err = bt_le_scan_start(BT_LE_SCAN_ACTIVE_CONTINUOUS, NULL);
 	if (err != 0) {
 		FAIL("Unable to start scan for broadcast sources: %d", err);
 		return;
