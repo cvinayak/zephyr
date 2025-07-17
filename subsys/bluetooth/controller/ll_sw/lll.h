@@ -19,7 +19,7 @@
 #define CONN_INT_UNIT_US         1250U
 #define ISO_INT_UNIT_US          CONN_INT_UNIT_US
 #define PERIODIC_INT_UNIT_US     CONN_INT_UNIT_US
-#define CONN_LOW_LAT_INT_UNIT_US 500U
+#define CONN_LOW_LAT_INT_UNIT_US 375U
 
 #define ISO_INTERVAL_TO_US(interval) ((interval) * ISO_INT_UNIT_US)
 

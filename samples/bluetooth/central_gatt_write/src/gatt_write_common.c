@@ -240,6 +240,39 @@ static void write_cmd_cb(struct bt_conn *conn, void *user_data)
 		 *       scan window.
 		 */
 		const struct bt_le_conn_param update_params[] = {{
+#if defined(CONFIG_BT_CTLR_CONN_INTERVAL_LOW_LATENCY)
+				.interval_min = 0x0002,
+				.interval_max = 0x0002,
+				.latency = 0,
+				.timeout = 84,
+			}, {
+				.interval_min = 0x0001,
+				.interval_max = 0x0001,
+				.latency = 0,
+				.timeout = 84,
+			}, {
+				.interval_min = 0x0029,
+				.interval_max = 0x0029,
+				.latency = 0,
+				.timeout = 31,
+			}, {
+				.interval_min = 0x0028,
+				.interval_max = 0x0028,
+				.latency = 0,
+				.timeout = 30,
+			}, {
+				.interval_min = 0x0001,
+				.interval_max = 0x0001,
+				.latency = 0,
+				.timeout = 84,
+			}, {
+				.interval_min = 0x0002,
+				.interval_max = 0x0002,
+				.latency = 0,
+				.timeout = 84,
+			}, {
+#endif /* CONFIG_BT_CTLR_CONN_INTERVAL_LOW_LATENCY */
+
 				.interval_min = BT_GAP_US_TO_CONN_INTERVAL(51250U),
 				.interval_max = BT_GAP_US_TO_CONN_INTERVAL(51250U),
 				.latency = 0,
