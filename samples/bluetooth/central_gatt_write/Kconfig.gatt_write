@@ -1,8 +1,21 @@
 # Copyright (c) 2025 Nordic Semiconductor ASA
 # SPDX-License-Identifier: Apache-2.0
 
+config USE_FIXED_LENGTH_DATA
+	bool "Use fixed length data in GATT Write without Response"
+	help
+	  Use fixed length data in GATT Write without Response otherwise
+	  determine the maximum GATT MTU size to use.
+
+config USE_FIXED_LENGTH_DATA_LEN
+	int "Fixed length data length"
+	default 0
+	help
+	  Fixed length data length to use in GATT Write without Response.
+
 config USE_VARIABLE_LENGTH_DATA
 	bool "Use variable length data in GATT Write without Response"
+	depends on !USE_FIXED_LENGTH_DATA
 	help
 	  Use increasing and decreasing length data in GATT Write without
 	  Response.
