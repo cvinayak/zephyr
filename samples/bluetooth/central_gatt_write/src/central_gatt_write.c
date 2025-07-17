@@ -19,6 +19,73 @@ extern uint32_t last_write_rate;
 extern uint32_t *write_countdown;
 extern void (*start_scan_func)(void);
 
+#if defined(CONFIG_BT_EXT_ADV)
+#define NAME_LEN 30
+
+static bool data_cb(struct bt_data *data, void *user_data)
+{
+	char *name = user_data;
+	uint8_t len;
+
+	switch (data->type) {
+	case BT_DATA_NAME_SHORTENED:
+	case BT_DATA_NAME_COMPLETE:
+		len = MIN(data->data_len, NAME_LEN - 1);
+		(void)memcpy(name, data->data, len);
+		name[len] = '\0';
+		return false;
+	default:
+		return true;
+	}
+}
+
+static const char *phy2str(uint8_t phy)
+{
+	switch (phy) {
+	case BT_GAP_LE_PHY_NONE: return "No packets";
+	case BT_GAP_LE_PHY_1M: return "LE 1M";
+	case BT_GAP_LE_PHY_2M: return "LE 2M";
+	case BT_GAP_LE_PHY_CODED: return "LE Coded";
+	default: return "Unknown";
+	}
+}
+
+static void scan_recv(const struct bt_le_scan_recv_info *info,
+		      struct net_buf_simple *buf)
+{
+	char le_addr[BT_ADDR_LE_STR_LEN];
+	char name[NAME_LEN];
+	uint8_t data_status;
+	uint16_t data_len;
+
+	(void)memset(name, 0, sizeof(name));
+
+	data_len = buf->len;
+	bt_data_parse(buf, data_cb, name);
+
+	data_status = BT_HCI_LE_ADV_EVT_TYPE_DATA_STATUS(info->adv_props);
+
+	bt_addr_le_to_str(info->addr, le_addr, sizeof(le_addr));
+	printk("[DEVICE]: %s, AD evt type %u, Tx Pwr: %i, RSSI %i "
+	       "Data status: %u, AD data len: %u Name: %s "
+	       "C:%u S:%u D:%u SR:%u E:%u Pri PHY: %s, Sec PHY: %s, "
+	       "Interval: 0x%04x (%u ms), SID: %u\n",
+	       le_addr, info->adv_type, info->tx_power, info->rssi,
+	       data_status, data_len, name,
+	       (info->adv_props & BT_GAP_ADV_PROP_CONNECTABLE) != 0,
+	       (info->adv_props & BT_GAP_ADV_PROP_SCANNABLE) != 0,
+	       (info->adv_props & BT_GAP_ADV_PROP_DIRECTED) != 0,
+	       (info->adv_props & BT_GAP_ADV_PROP_SCAN_RESPONSE) != 0,
+	       (info->adv_props & BT_GAP_ADV_PROP_EXT_ADV) != 0,
+	       phy2str(info->primary_phy), phy2str(info->secondary_phy),
+	       info->interval, info->interval * 5 / 4, info->sid);
+}
+
+static struct bt_le_scan_cb scan_callbacks = {
+	.recv = scan_recv,
+};
+#endif /* CONFIG_BT_EXT_ADV */
+
 static void device_found(const bt_addr_le_t *addr, int8_t rssi, uint8_t type,
 			 struct net_buf_simple *ad)
 {
@@ -27,6 +94,11 @@ static void device_found(const bt_addr_le_t *addr, int8_t rssi, uint8_t type,
 
 	printk("[DEVICE]: %s, AD evt type %u, AD data len %u, RSSI %i\n",
 	       bt_addr_le_str(addr), type, ad->len, rssi);
+
+	/* If already connected, do nothing */
+	if (conn_connected) {
+		return;
+	}
 
 	/* We're only interested in connectable events */
 	if (type != BT_GAP_ADV_TYPE_ADV_IND &&
@@ -57,16 +129,33 @@ static void device_found(const bt_addr_le_t *addr, int8_t rssi, uint8_t type,
 
 static void start_scan(void)
 {
+	struct bt_le_scan_param scan_param = {
+		.type       = BT_LE_SCAN_TYPE_ACTIVE,
+		.options    = BT_LE_SCAN_OPT_CODED,
+		.interval   = 0x0010,
+		.window     = 0x0010,
+	};
 	int err;
 
-	err = bt_le_scan_start(BT_LE_SCAN_ACTIVE, device_found);
+scan_start_retry:
+	printk("Starting scanning...\n");
+	err = bt_le_scan_start(&scan_param, device_found);
 	if (err) {
-		printk("%s: Scanning failed to start (err %d)\n", __func__,
-		       err);
+		if ((scan_param.options & BT_LE_SCAN_OPT_CODED) != 0U) {
+			printk("Failed to start scanning with Coded PHY (err %d), retrying "
+			       "without...\n", err);
+
+			scan_param.options &= ~BT_LE_SCAN_OPT_CODED;
+
+			goto scan_start_retry;
+		}
+
+		printk("Start scanning failed (err %d)\n", err);
+
 		return;
 	}
 
-	printk("%s: Scanning successfully started\n", __func__);
+	printk("success.\n");
 }
 
 void mtu_updated(struct bt_conn *conn, uint16_t tx, uint16_t rx)
@@ -108,6 +197,11 @@ uint32_t central_gatt_write(uint32_t count)
 		return 0U;
 	}
 #endif /* CONFIG_BT_USER_PHY_UPDATE */
+
+#if defined(CONFIG_BT_EXT_ADV)
+	bt_le_scan_cb_register(&scan_callbacks);
+	printk("Registered scan callbacks\n");
+#endif /* CONFIG_BT_EXT_ADV */
 
 	start_scan_func = start_scan;
 	start_scan_func();
