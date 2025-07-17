@@ -234,12 +234,46 @@ static void write_cmd_cb(struct bt_conn *conn, void *user_data)
 			phy_update_iterate(conn);
 		}
 
+#if defined(CONFIG_BT_PERIPHERAL)
 		/* NOTE: Though minimum connection timeout permitted is 100 ms, to avoid supervision
 		 *       timeout when observer role is enabled in the sample, keep the timeout for
 		 *       smaller connection interval be large enough due to repeated overlaps by the
 		 *       scan window.
 		 */
 		const struct bt_le_conn_param update_params[] = {{
+#if defined(CONFIG_BT_CTLR_CONN_INTERVAL_LOW_LATENCY)
+				.interval_min = 0x0002,
+				.interval_max = 0x0002,
+				.latency = 0,
+				.timeout = 84,
+			}, {
+				.interval_min = 0x0001,
+				.interval_max = 0x0001,
+				.latency = 0,
+				.timeout = 84,
+			}, {
+				.interval_min = 0x0029,
+				.interval_max = 0x0029,
+				.latency = 0,
+				.timeout = 31,
+			}, {
+				.interval_min = 0x0028,
+				.interval_max = 0x0028,
+				.latency = 0,
+				.timeout = 30,
+			}, {
+				.interval_min = 0x0001,
+				.interval_max = 0x0001,
+				.latency = 0,
+				.timeout = 84,
+			}, {
+				.interval_min = 0x0002,
+				.interval_max = 0x0002,
+				.latency = 0,
+				.timeout = 84,
+			}, {
+#endif /* CONFIG_BT_CTLR_CONN_INTERVAL_LOW_LATENCY */
+
 				.interval_min = BT_GAP_US_TO_CONN_INTERVAL(51250U),
 				.interval_max = BT_GAP_US_TO_CONN_INTERVAL(51250U),
 				.latency = 0,
@@ -349,6 +383,7 @@ static void write_cmd_cb(struct bt_conn *conn, void *user_data)
 		}
 
 		param_update_idx++;
+#endif /* CONFIG_BT_PERIPHERAL */
 
 	} else {
 		uint16_t len;
@@ -530,9 +565,13 @@ int write_cmd(struct bt_conn *conn)
 	uint16_t data_len_max;
 	int err;
 
-	data_len_max = bt_gatt_get_mtu(conn) - 3;
-	if (data_len_max > BT_ATT_MAX_ATTRIBUTE_LEN) {
-		data_len_max = BT_ATT_MAX_ATTRIBUTE_LEN;
+	if (IS_ENABLED(CONFIG_USE_FIXED_LENGTH_DATA)) {
+		data_len_max = CONFIG_USE_FIXED_LENGTH_DATA_LEN;
+	} else {
+		data_len_max = bt_gatt_get_mtu(conn) - 3;
+		if (data_len_max > BT_ATT_MAX_ATTRIBUTE_LEN) {
+			data_len_max = BT_ATT_MAX_ATTRIBUTE_LEN;
+		}
 	}
 
 	if (IS_ENABLED(CONFIG_USE_VARIABLE_LENGTH_DATA)) {
