@@ -1955,17 +1955,20 @@ static uint32_t ticker_update_rand(struct ll_adv_set *adv, uint32_t ticks_delay_
 	uint32_t random_delay;
 	uint32_t ret;
 
+	uint8_t handle = ull_adv_handle_get(adv);
+
 	/* Get pseudo-random number in the range [0..ticks_delay_window].
 	 * Please note that using modulo of 2^32 sample space has an uneven
 	 * distribution, slightly favoring smaller values.
 	 */
 	lll_rand_isr_get(&random_delay, sizeof(random_delay));
+	random_delay = handle;
 	random_delay %= ticks_delay_window;
 	random_delay += (ticks_delay_window_offset + 1);
 
 	ret = ticker_update(TICKER_INSTANCE_ID_CTLR,
 			    TICKER_USER_ID_ULL_HIGH,
-			    TICKER_ID_ADV_BASE + ull_adv_handle_get(adv),
+			    TICKER_ID_ADV_BASE + handle,
 			    random_delay,
 			    ticks_adjust_minus, 0, 0, 0, 0,
 			    fp_op_func, adv);
