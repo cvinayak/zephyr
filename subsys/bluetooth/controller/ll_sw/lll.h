@@ -446,7 +446,7 @@ struct node_rx_pdu {
 	struct node_rx_hdr hdr;
 	union {
 		struct node_rx_ftr rx_ftr;
-#if defined(CONFIG_BT_CTLR_SYNC_ISO) || defined(CONFIG_BT_CTLR_CONN_ISO)
+#if defined(CONFIG_BT_CTLR_SYNC_ISO) || defined(CONFIG_BT_CTLR_CONN_ISO) || defined(CONFIG_BT_CTLR_ADV_ISO)
 		struct node_rx_iso_meta rx_iso_meta;
 #endif
 #if defined(CONFIG_BT_CTLR_RX_PDU_META)

@@ -575,7 +575,11 @@ void ull_scan_aux_setup(memq_link_t *link, struct node_rx_pdu *rx)
 
 		/* Broadcast ISO synchronize */
 		if (sync_iso) {
+#ifdef CONFIG_GRPTLK
+			ull_sync_grptlk_setup(sync_iso, rx, ptr, acad_len);
+#else
 			ull_sync_iso_setup(sync_iso, rx, ptr, acad_len);
+#endif /* CONFIG_GRPTLK */
 		}
 #endif /* CONFIG_BT_CTLR_SYNC_ISO */
 	}
@@ -1999,7 +2003,11 @@ void ull_scan_aux_setup(memq_link_t *link, struct node_rx_pdu *rx)
 
 		/* Broadcast ISO synchronize */
 		if (sync_iso) {
+#ifdef CONFIG_GRPTLK
+			ull_sync_grptlk_setup(sync_iso, rx, ptr, acad_len);
+#else
 			ull_sync_iso_setup(sync_iso, rx, ptr, acad_len);
+#endif /* CONFIG_GRPTLK */
 		}
 #endif /* CONFIG_BT_CTLR_SYNC_ISO */
 	}

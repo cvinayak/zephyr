@@ -1740,10 +1740,17 @@ static void le_create_big(struct net_buf *buf, struct net_buf **evt)
 	max_sdu = sys_le16_to_cpu(cmd->max_sdu);
 	max_latency = sys_le16_to_cpu(cmd->max_latency);
 
+#ifdef CONFIG_GRPTLK
+	status = ll_grptlk_create(big_handle, adv_handle, cmd->num_bis,
+			       sdu_interval, max_sdu, max_latency, cmd->rtn,
+			       cmd->phy, cmd->packing, cmd->framing,
+			       cmd->encryption, cmd->bcode);
+#else
 	status = ll_big_create(big_handle, adv_handle, cmd->num_bis,
 			       sdu_interval, max_sdu, max_latency, cmd->rtn,
 			       cmd->phy, cmd->packing, cmd->framing,
 			       cmd->encryption, cmd->bcode);
+#endif /* CONFIG_GRPTLK */
 
 	*evt = cmd_status(status);
 }
@@ -1875,9 +1882,15 @@ static void le_big_create_sync(struct net_buf *buf, struct net_buf **evt)
 	sync_handle = sys_le16_to_cpu(cmd->sync_handle);
 	sync_timeout = sys_le16_to_cpu(cmd->sync_timeout);
 
+#ifdef CONFIG_GRPTLK
+	status = ll_grptlk_sync_create(cmd->big_handle, sync_handle,
+					  cmd->encryption, cmd->bcode, cmd->mse,
+					  sync_timeout, cmd->num_bis, cmd->bis);
+#else
 	status = ll_big_sync_create(cmd->big_handle, sync_handle,
 				    cmd->encryption, cmd->bcode, cmd->mse,
 				    sync_timeout, cmd->num_bis, cmd->bis);
+#endif /* CONFIG_GRPTLK */
 
 	*evt = cmd_status(status);
 }
@@ -6195,13 +6208,21 @@ int hci_iso_handle(struct net_buf *buf, struct net_buf **evt)
 
 		/* Get BIS stream handle and stream context */
 		stream_handle = LL_BIS_ADV_IDX_FROM_HANDLE(handle);
+#ifdef CONFIG_GRPTLK
+		stream = ull_adv_grptlk_stream_get(stream_handle);
+#else
 		stream = ull_adv_iso_stream_get(stream_handle);
+#endif  /* CONFIG_GRPTLK */
 		if (!stream || !stream->dp) {
 			LOG_ERR("Invalid BIS stream");
 			return -EINVAL;
 		}
 
+#ifdef CONFIG_GRPTLK
+		adv_iso = ull_adv_grptlk_by_stream_get(stream_handle);
+#else
 		adv_iso = ull_adv_iso_by_stream_get(stream_handle);
+#endif  /* CONFIG_GRPTLK */
 		if (!adv_iso) {
 			LOG_ERR("No BIG associated with stream handle");
 			return -EINVAL;
@@ -6322,6 +6343,51 @@ int hci_iso_handle(struct net_buf *buf, struct net_buf **evt)
 		}
 
 		return 0;
+
+	#ifdef CONFIG_GRPTLK
+	} else if (IS_SYNC_ISO_HANDLE(handle)) {
+		struct lll_sync_iso_stream *sync_stream;
+		struct ll_sync_iso_set *sync_iso;
+		struct lll_sync_iso *lll_iso;
+		uint16_t stream_handle;
+
+		/* Get BIS stream handle (-1 since we only have n-1 RX streams) */
+		stream_handle = handle - LL_BIS_SYNC_HANDLE_BASE;
+
+		sync_stream = ull_sync_grptlk_stream_get(stream_handle);
+		if (!sync_stream || !sync_stream->dp) {
+			LOG_ERR("Invalid BIS stream");
+			return -EINVAL;
+		}
+
+		sync_iso = ull_sync_grptlk_by_stream_get(stream_handle);
+		if (!sync_iso) {
+			LOG_ERR("No BIG associated with stream handle");
+			return -EINVAL;
+		}
+
+		lll_iso = &sync_iso->lll;
+
+		// printk("SDU %x%x%x%x\n", ((uint8_t *)sdu_frag_tx.dbuf)[3],
+	    //    ((uint8_t *)sdu_frag_tx.dbuf)[2],
+	    //    ((uint8_t *)sdu_frag_tx.dbuf)[1],
+	    //    ((uint8_t *)sdu_frag_tx.dbuf)[0]);
+
+		isoal_status_t isoal_status =
+			isoal_tx_sdu_fragment(sync_stream->dp->source_hdl, &sdu_frag_tx);
+		
+		if (isoal_status) {
+			if (isoal_status & ISOAL_STATUS_ERR_PDU_ALLOC) {
+				data_buf_overflow(evt, BT_OVERFLOW_LINK_ISO);
+				return -ENOBUFS;
+			}
+
+			return -EINVAL;
+		}
+
+		return 0;
+
+#endif  /* CONFIG_GRPTLK */
 #endif /* CONFIG_BT_CTLR_ADV_ISO */
 
 	}

@@ -672,11 +672,19 @@ static struct ull_hdr *ull_hdr_get_cb(uint8_t ticker_id, uint32_t *ticks_slot)
 			    TICKER_ID_ADV_ISO_LAST)) {
 		struct ll_adv_iso_set *adv_iso;
 
+#ifdef CONFIG_GRPTLK
+		adv_iso = ull_adv_grptlk_get(ticker_id - TICKER_ID_ADV_ISO_BASE);
+#else
 		adv_iso = ull_adv_iso_get(ticker_id - TICKER_ID_ADV_ISO_BASE);
+#endif  /* CONFIG_GRPTLK */
 		if (adv_iso) {
 			uint32_t time_us;
 
+#ifdef CONFIG_GRPTLK
+			time_us = ull_adv_grptlk_max_time_get(adv_iso);
+#else
 			time_us = ull_adv_iso_max_time_get(adv_iso);
+#endif  /* CONFIG_GRPTLK */
 			*ticks_slot = HAL_TICKER_US_TO_TICKS_CEIL(time_us);
 
 			return &adv_iso->ull;

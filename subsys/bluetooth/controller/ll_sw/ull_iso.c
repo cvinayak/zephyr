@@ -41,6 +41,7 @@
 #include "lll_conn_iso.h"
 #include "lll_iso_tx.h"
 #include "lll/lll_vendor.h"
+#include "lll_sync_grptlk.h"
 
 #include "ll_sw/ull_tx_queue.h"
 
@@ -200,7 +201,11 @@ uint8_t ll_read_iso_tx_sync(uint16_t handle, uint16_t *seq,
 		uint16_t stream_handle;
 
 		stream_handle = LL_BIS_ADV_IDX_FROM_HANDLE(handle);
+#ifdef CONFIG_GRPTLK
+		adv_stream = ull_adv_grptlk_stream_get(stream_handle);
+#else
 		adv_stream = ull_adv_iso_stream_get(stream_handle);
+#endif /* CONFIG_GRPTLK */
 		if (!adv_stream || !adv_stream->dp ||
 		    isoal_tx_get_sync_info(adv_stream->dp->source_hdl, seq,
 					   timestamp, offset) != ISOAL_STATUS_OK) {
@@ -322,12 +327,21 @@ uint8_t ll_setup_iso_path(uint16_t handle, uint8_t path_dir, uint8_t path_id,
 		uint16_t stream_handle;
 
 		stream_handle = LL_BIS_ADV_IDX_FROM_HANDLE(handle);
+#ifdef CONFIG_GRPTLK
+		adv_stream = ull_adv_grptlk_stream_get(stream_handle);
+#else
 		adv_stream = ull_adv_iso_stream_get(stream_handle);
+#endif /* CONFIG_GRPTLK */
 		if (!adv_stream || adv_stream->dp) {
+			printk("ERROR\n");
 			return BT_HCI_ERR_CMD_DISALLOWED;
 		}
 
+#ifdef CONFIG_GRPTLK
+		adv_iso = ull_adv_grptlk_by_stream_get(stream_handle);
+#else
 		adv_iso = ull_adv_iso_by_stream_get(stream_handle);
+#endif /* CONFIG_GRPTLK */
 		lll_iso = &adv_iso->lll;
 
 		role = ISOAL_ROLE_BROADCAST_SOURCE;
@@ -351,12 +365,20 @@ uint8_t ll_setup_iso_path(uint16_t handle, uint8_t path_dir, uint8_t path_id,
 		uint16_t stream_handle;
 
 		stream_handle = LL_BIS_SYNC_IDX_FROM_HANDLE(handle);
+#ifdef CONFIG_GRPTLK
+		sync_stream = ull_sync_grptlk_stream_get(stream_handle);
+#else
 		sync_stream = ull_sync_iso_stream_get(stream_handle);
+#endif /* CONFIG_GRPTLK */
 		if (!sync_stream || sync_stream->dp) {
 			return BT_HCI_ERR_CMD_DISALLOWED;
 		}
 
+#ifdef CONFIG_GRPTLK
+		sync_iso = ull_sync_grptlk_by_stream_get(stream_handle);
+#else
 		sync_iso = ull_sync_iso_by_stream_get(stream_handle);
+#endif /* CONFIG_GRPTLK */
 		lll_iso = &sync_iso->lll;
 
 		role = ISOAL_ROLE_BROADCAST_SINK;
@@ -409,9 +431,13 @@ uint8_t ll_setup_iso_path(uint16_t handle, uint8_t path_dir, uint8_t path_id,
 
 	if (false) {
 
-#if defined(CONFIG_BT_CTLR_SYNC_ISO) || defined(CONFIG_BT_CTLR_CONN_ISO)
-	} else if ((path_dir == BT_HCI_DATAPATH_DIR_CTLR_TO_HOST) &&
-		   (cis || sync_stream)) {
+#if defined(CONFIG_BT_CTLR_SYNC_ISO) || defined(CONFIG_BT_CTLR_CONN_ISO) || defined(CONFIG_BT_CTLR_ADV_ISO)
+#ifdef CONFIG_GRPTLK
+	} else if (path_dir == BT_HCI_DATAPATH_DIR_CTLR_TO_HOST) {
+		role = ISOAL_ROLE_BROADCAST_SINK;
+#else
+	} else if ((path_dir == BT_HCI_DATAPATH_DIR_CTLR_TO_HOST) && (cis || sync_stream)) {
+#endif
 		isoal_sink_handle_t sink_handle;
 		isoal_status_t err;
 
@@ -464,6 +490,10 @@ uint8_t ll_setup_iso_path(uint16_t handle, uint8_t path_dir, uint8_t path_id,
 				sync_stream->dp = dp;
 			}
 
+			if (adv_stream) {
+				adv_stream->dp = dp;
+			}
+
 			dp->sink_hdl = sink_handle;
 			isoal_sink_enable(sink_handle);
 		} else {
@@ -471,13 +501,52 @@ uint8_t ll_setup_iso_path(uint16_t handle, uint8_t path_dir, uint8_t path_id,
 
 			return BT_HCI_ERR_CMD_DISALLOWED;
 		}
-#else /* !CONFIG_BT_CTLR_SYNC_ISO && !CONFIG_BT_CTLR_CONN_ISO */
+#else /* !CONFIG_BT_CTLR_SYNC_ISO && !CONFIG_BT_CTLR_CONN_ISO && !CONFIG_BT_CTLR_ADV_ISO */
 		ARG_UNUSED(sync_stream);
-#endif /* !CONFIG_BT_CTLR_SYNC_ISO && !CONFIG_BT_CTLR_CONN_ISO */
+#endif /* !CONFIG_BT_CTLR_SYNC_ISO && !CONFIG_BT_CTLR_CONN_ISO && !CONFIG_BT_CTLR_ADV_ISO */
 
 #if defined(CONFIG_BT_CTLR_ADV_ISO) || defined(CONFIG_BT_CTLR_CONN_ISO)
-	} else if ((path_dir == BT_HCI_DATAPATH_DIR_HOST_TO_CTLR) &&
-		   (cis || adv_stream)) {
+#ifdef CONFIG_GRPTLK
+	} else if (path_dir == BT_HCI_DATAPATH_DIR_HOST_TO_CTLR) {
+		role = ISOAL_ROLE_BROADCAST_SOURCE;
+
+		/* For grptlk receivers transmitting back */
+		if (IS_SYNC_ISO_HANDLE(handle)) {
+			struct ll_sync_iso_set *sync_iso;
+			struct lll_sync_iso *lll_iso;
+			uint16_t stream_handle;
+
+			stream_handle = LL_BIS_SYNC_IDX_FROM_HANDLE(handle);
+			sync_stream = ull_sync_grptlk_stream_get(stream_handle);
+
+			if (!sync_stream || sync_stream->dp) {
+				return BT_HCI_ERR_CMD_DISALLOWED;
+			}
+
+			sync_iso = ull_sync_grptlk_by_stream_get(stream_handle);
+			lll_iso = &sync_iso->lll;
+
+			/* Get ISO parameters from sync context */
+			iso_interval = lll_iso->iso_interval;
+			sdu_interval = lll_iso->sdu_interval;
+			burst_number = lll_iso->bn;
+			max_octets = lll_iso->max_pdu;
+			framed = lll_iso->framing;
+			flush_timeout = 0U;
+
+			group_sync_delay = ull_iso_big_sync_delay(lll_iso->num_bis,
+								   lll_iso->bis_spacing,
+								   lll_iso->nse,
+								   lll_iso->sub_interval,
+								   lll_iso->phy,
+								   lll_iso->max_pdu,
+								   lll_iso->enc);
+			stream_sync_delay = group_sync_delay - stream_handle * lll_iso->bis_spacing;
+		}
+#else
+	} else if ((path_dir == BT_HCI_DATAPATH_DIR_HOST_TO_CTLR) && (cis || adv_stream)) {
+#endif
+	
 		isoal_source_handle_t source_handle;
 		isoal_status_t err;
 
@@ -521,6 +590,11 @@ uint8_t ll_setup_iso_path(uint16_t handle, uint8_t path_dir, uint8_t path_id,
 
 			if (IS_ENABLED(CONFIG_BT_CTLR_ADV_ISO) && adv_stream != NULL) {
 				adv_stream->dp = dp;
+			}
+
+			// TODO: do we need to set the dp here?
+			if (IS_ENABLED(CONFIG_BT_CTLR_SYNC_ISO) && sync_stream != NULL) {
+				sync_stream->dp = dp;
 			}
 
 			dp->source_hdl = source_handle;
@@ -597,7 +671,11 @@ uint8_t ll_remove_iso_path(uint16_t handle, uint8_t path_dir)
 		}
 
 		stream_handle = LL_BIS_ADV_IDX_FROM_HANDLE(handle);
+#ifdef CONFIG_GRPTLK
+		adv_stream = ull_adv_grptlk_stream_get(stream_handle);
+#else
 		adv_stream = ull_adv_iso_stream_get(stream_handle);
+#endif /* CONFIG_GRPTLK */
 		if (!adv_stream) {
 			return BT_HCI_ERR_CMD_DISALLOWED;
 		}
@@ -624,7 +702,11 @@ uint8_t ll_remove_iso_path(uint16_t handle, uint8_t path_dir)
 		}
 
 		stream_handle = LL_BIS_SYNC_IDX_FROM_HANDLE(handle);
+#ifdef CONFIG_GRPTLK
+		sync_stream = ull_sync_grptlk_stream_get(stream_handle);
+#else
 		sync_stream = ull_sync_iso_stream_get(stream_handle);
+#endif /* CONFIG_GRPTLK */
 		if (!sync_stream) {
 			return BT_HCI_ERR_CMD_DISALLOWED;
 		}
@@ -676,7 +758,11 @@ static isoal_status_t ll_iso_test_sdu_alloc(const struct isoal_sink *sink_ctx,
 			uint16_t stream_handle;
 
 			stream_handle = LL_BIS_SYNC_IDX_FROM_HANDLE(handle);
+#ifdef CONFIG_GRPTLK
+			sync_stream = ull_sync_grptlk_stream_get(stream_handle);
+#else
 			sync_stream = ull_sync_iso_stream_get(stream_handle);
+#endif /* CONFIG_GRPTLK */
 			LL_ASSERT_DBG(sync_stream);
 
 			sync_stream->test_mode->sdu_counter =
@@ -722,10 +808,18 @@ static isoal_status_t ll_iso_test_sdu_emit(const struct isoal_sink             *
 		uint16_t stream_handle;
 
 		stream_handle = LL_BIS_SYNC_IDX_FROM_HANDLE(handle);
+#ifdef CONFIG_GRPTLK
+		sync_stream = ull_sync_grptlk_stream_get(stream_handle);
+#else
 		sync_stream = ull_sync_iso_stream_get(stream_handle);
+#endif /* CONFIG_GRPTLK */
 		LL_ASSERT_DBG(sync_stream);
 
+#ifdef CONFIG_GRPTLK
+		sync_iso = ull_sync_grptlk_by_stream_get(stream_handle);
+#else
 		sync_iso = ull_sync_iso_by_stream_get(stream_handle);
+#endif /* CONFIG_GRPTLK */
 
 		test_mode_rx = sync_stream->test_mode;
 		max_sdu = sync_iso->lll.max_sdu;
@@ -881,7 +975,11 @@ uint8_t ll_iso_receive_test(uint16_t handle, uint8_t payload_type)
 		struct lll_sync_iso *lll_iso;
 
 		stream_handle = LL_BIS_SYNC_IDX_FROM_HANDLE(handle);
+#ifdef CONFIG_GRPTLK
+		sync_stream = ull_sync_grptlk_stream_get(stream_handle);
+#else
 		sync_stream = ull_sync_iso_stream_get(stream_handle);
+#endif /* CONFIG_GRPTLK */
 		if (!sync_stream) {
 			return BT_HCI_ERR_UNKNOWN_CONN_ID;
 		}
@@ -891,7 +989,11 @@ uint8_t ll_iso_receive_test(uint16_t handle, uint8_t payload_type)
 			return BT_HCI_ERR_CMD_DISALLOWED;
 		}
 
+#ifdef CONFIG_GRPTLK
+		sync_iso = ull_sync_grptlk_by_stream_get(stream_handle);
+#else
 		sync_iso = ull_sync_iso_by_stream_get(stream_handle);
+#endif /* CONFIG_GRPTLK */
 		lll_iso = &sync_iso->lll;
 
 		test_mode_rx = sync_stream->test_mode;
@@ -994,7 +1096,11 @@ uint8_t ll_iso_read_test_counters(uint16_t handle, uint32_t *received_cnt,
 		uint16_t stream_handle;
 
 		stream_handle = LL_BIS_SYNC_IDX_FROM_HANDLE(handle);
+#ifdef CONFIG_GRPTLK
+		sync_stream = ull_sync_grptlk_stream_get(stream_handle);
+#else
 		sync_stream = ull_sync_iso_stream_get(stream_handle);
+#endif /* CONFIG_GRPTLK */
 		if (!sync_stream) {
 			return BT_HCI_ERR_UNKNOWN_CONN_ID;
 		}
@@ -1308,7 +1414,11 @@ uint8_t ll_iso_transmit_test(uint16_t handle, uint8_t payload_type)
 		uint16_t stream_handle;
 
 		stream_handle = LL_BIS_ADV_IDX_FROM_HANDLE(handle);
+#ifdef CONFIG_GRPTLK
+		stream = ull_adv_grptlk_stream_get(stream_handle);
+#else
 		stream = ull_adv_iso_stream_get(stream_handle);
+#endif /* CONFIG_GRPTLK */
 		if (!stream) {
 			return BT_HCI_ERR_UNKNOWN_CONN_ID;
 		}
@@ -1377,7 +1487,11 @@ uint8_t ll_iso_test_end(uint16_t handle, uint32_t *received_cnt,
 		uint16_t stream_handle;
 
 		stream_handle = LL_BIS_SYNC_IDX_FROM_HANDLE(handle);
+#ifdef CONFIG_GRPTLK
+		sync_stream = ull_sync_grptlk_stream_get(stream_handle);
+#else
 		sync_stream = ull_sync_iso_stream_get(stream_handle);
+#endif /* CONFIG_GRPTLK */
 		if (!sync_stream) {
 			return BT_HCI_ERR_UNKNOWN_CONN_ID;
 		}
@@ -1426,15 +1540,29 @@ int ll_iso_tx_mem_enqueue(uint16_t handle, void *node_tx, void *link)
 		cis = ll_conn_iso_stream_get(handle);
 		memq_enqueue(link, node_tx, &cis->lll.memq_tx.tail);
 
-	} else if (IS_ENABLED(CONFIG_BT_CTLR_ADV_ISO) &&
-		   IS_ADV_ISO_HANDLE(handle)) {
+	} else if (IS_ENABLED(CONFIG_BT_CTLR_ADV_ISO) && IS_ADV_ISO_HANDLE(handle)) {
 		struct lll_adv_iso_stream *stream;
 		uint16_t stream_handle;
 
 		stream_handle = LL_BIS_ADV_IDX_FROM_HANDLE(handle);
+#ifdef CONFIG_GRPTLK
+		stream = ull_adv_grptlk_stream_get(stream_handle);
+#else
 		stream = ull_adv_iso_stream_get(stream_handle);
+#endif /* CONFIG_GRPTLK */
 		memq_enqueue(link, node_tx, &stream->memq_tx.tail);
 
+#ifdef CONFIG_GRPTLK
+	} else if (IS_ENABLED(CONFIG_BT_CTLR_ADV_ISO) && IS_SYNC_ISO_HANDLE(handle)) {
+		struct lll_sync_iso_stream *sync_stream;
+		uint16_t stream_handle;
+
+		/* Get BIS stream handle (-1 since we only have n-1 RX streams) */
+		stream_handle = handle - LL_BIS_SYNC_HANDLE_BASE - 1U;
+
+		sync_stream = ull_sync_grptlk_stream_get(stream_handle);
+		memq_enqueue(link, node_tx, &sync_stream->memq_tx.tail);
+#endif /* CONFIG_GRPTLK */
 	} else {
 		return -EINVAL;
 	}
@@ -1516,6 +1644,11 @@ void ull_iso_lll_ack_enqueue(uint16_t handle, struct node_tx_iso *node_tx)
 		}
 
 		/* No datapath and no vendor datapath - fall through to MFIFO */
+#ifdef CONFIG_GRPTLK
+	} else if (IS_ENABLED(CONFIG_BT_CTLR_ADV_ISO) && IS_SYNC_ISO_HANDLE(handle)) {
+		ll_tx_ack_put(handle - CONFIG_BT_CTLR_ADV_ISO_STREAM_COUNT, (void *)node_tx);
+		ll_rx_sched();
+#endif /* CONFIG_GRPTLK */
 	} else {
 		LL_ASSERT_DBG(0);
 		return;
@@ -1564,7 +1697,11 @@ void ull_iso_lll_event_prepare(uint16_t handle, uint64_t event_count)
 		uint16_t stream_handle;
 
 		stream_handle = LL_BIS_ADV_IDX_FROM_HANDLE(handle);
+#ifdef CONFIG_GRPTLK
+		stream = ull_adv_grptlk_stream_get(stream_handle);
+#else
 		stream = ull_adv_iso_stream_get(stream_handle);
+#endif
 
 		if (stream) {
 			dp = stream->dp;
@@ -1708,12 +1845,30 @@ static void iso_rx_demux(void *param)
 					uint16_t stream_handle;
 
 					stream_handle = LL_BIS_SYNC_IDX_FROM_HANDLE(handle);
+#ifdef CONFIG_GRPTLK
+					sync_stream = ull_sync_grptlk_stream_get(stream_handle);
+#else
 					sync_stream = ull_sync_iso_stream_get(stream_handle);
+#endif /* CONFIG_GRPTLK */
 					dp = sync_stream ? sync_stream->dp : NULL;
 #endif /* CONFIG_BT_CTLR_SYNC_ISO */
+#if defined(CONFIG_BT_CTLR_ADV_ISO)
+				} else if (IS_ADV_ISO_HANDLE(handle)) {
+					struct lll_adv_iso_stream *adv_stream;
+					uint16_t stream_handle;
+
+					stream_handle = LL_BIS_ADV_IDX_FROM_HANDLE(handle);
+#ifdef CONFIG_GRPTLK
+					adv_stream = ull_adv_grptlk_lll_stream_get(stream_handle);
+#else
+					adv_stream = ull_adv_iso_stream_get(stream_handle);
+#endif /* CONFIG_GRPTLK */
+					dp = adv_stream ? adv_stream->dp : NULL;
+#endif /* CONFIG_BT_CTLR_ADV_ISO */
 				}
 
-#if defined(CONFIG_BT_CTLR_CONN_ISO) || defined(CONFIG_BT_CTLR_SYNC_ISO)
+#if defined(CONFIG_BT_CTLR_CONN_ISO) || defined(CONFIG_BT_CTLR_SYNC_ISO) || \
+	defined(CONFIG_BT_CTLR_ADV_ISO)
 				if (dp && dp->path_id != BT_HCI_DATAPATH_ID_HCI) {
 					/* If vendor specific datapath pass to ISO AL here,
 					 * in case of HCI destination it will be passed in
@@ -1730,7 +1885,8 @@ static void iso_rx_demux(void *param)
 
 					LL_ASSERT_ERR(err == ISOAL_STATUS_OK); /* TODO handle err */
 				}
-#endif /* CONFIG_BT_CTLR_CONN_ISO || CONFIG_BT_CTLR_SYNC_ISO */
+#endif /* CONFIG_BT_CTLR_CONN_ISO || CONFIG_BT_CTLR_SYNC_ISO || \
+	  CONFIG_BT_CTLR_ADV_ISO */
 
 				/* Let ISO PDU start its long journey upwards */
 				ll_iso_rx_put(link, rx);
@@ -1875,7 +2031,12 @@ static isoal_status_t ll_iso_pdu_alloc(struct isoal_pdu_buffer *pdu_buffer)
 	 * the ISOAL based on the minimum of the buffer size and the respective
 	 * Max_PDU_C_To_P or Max_PDU_P_To_C.
 	 */
+#ifdef CONFIG_GRPTLK
+	/* HACK: guarantee 40-byte LC3 frame on BIS - do not fragment */
+	pdu_buffer->size = MAX(MAX(LL_BIS_OCTETS_TX_MAX, LL_CIS_OCTETS_TX_MAX), CONFIG_BT_ISO_TX_MTU);
+#else
 	pdu_buffer->size = MAX(LL_BIS_OCTETS_TX_MAX, LL_CIS_OCTETS_TX_MAX);
+#endif /* CONFIG_GRPTLK */
 
 	return ISOAL_STATUS_OK;
 }
@@ -2121,7 +2282,11 @@ void ull_iso_resume_ticker_start(struct lll_event *resume_event,
 				uint16_t stream_idx;
 
 				stream_idx = LL_BIS_SYNC_IDX_FROM_HANDLE(stream_handle);
-				sync_iso = ull_sync_iso_by_stream_get(stream_idx);
+#ifdef CONFIG_GRPTLK
+				sync_iso = ull_sync_grptlk_by_stream_get(stream_handle);
+#else
+				sync_iso = ull_sync_iso_by_stream_get(stream_handle);
+#endif /* CONFIG_GRPTLK */
 				phy = sync_iso->lll.phy;
 #endif /* CONFIG_BT_CTLR_SYNC_ISO */
 			} else {

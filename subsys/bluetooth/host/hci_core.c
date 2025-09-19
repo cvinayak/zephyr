@@ -652,7 +652,16 @@ static void hci_num_completed_packets(struct net_buf *buf)
 
 		LOG_DBG("handle %u count %u", handle, count);
 
+#if defined(CONFIG_GRPTLK)
+		if (IS_ENABLED(CONFIG_GRPTLK_RECV)) {
+			conn = bt_conn_lookup_handle(
+				handle + CONFIG_BT_CTLR_ADV_ISO_STREAM_COUNT + 1, BT_CONN_TYPE_ALL);
+		} else {
+			conn = bt_conn_lookup_handle(handle, BT_CONN_TYPE_ALL);
+		}
+#else
 		conn = bt_conn_lookup_handle(handle, BT_CONN_TYPE_ALL);
+#endif /* CONFIG_GRPTLK */
 		if (!conn) {
 			LOG_ERR("No connection for handle %u", handle);
 			continue;

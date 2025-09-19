@@ -8,6 +8,7 @@ struct lll_adv_iso_stream {
 	/* Associated BIG Handle */
 	uint8_t big_handle;
 	struct ll_iso_datapath *dp;
+	uint64_t rx_payload_number;
 
 	/* Transmission queue */
 	MEMQ_DECLARE(tx);
@@ -109,6 +110,11 @@ struct lll_adv_iso {
 #if defined(HAL_RADIO_GPIO_HAVE_PA_PIN)
 	uint16_t pa_iss_us;
 #endif /* HAL_RADIO_GPIO_HAVE_PA_PIN */
+
+#ifdef CONFIG_GRPTLK
+	/* Temporary storage for RX node when receiving on BIS > 1 */
+	struct node_rx_pdu *node_rx_pending;
+#endif /* CONFIG_GRPTLK */
 };
 
 struct lll_adv_sync {

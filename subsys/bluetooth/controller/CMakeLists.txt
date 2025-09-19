@@ -50,6 +50,10 @@ if(CONFIG_BT_BROADCASTER)
     CONFIG_BT_CTLR_ADV_ISO
     ll_sw/ull_adv_iso.c
     )
+  zephyr_library_sources_ifdef(
+    CONFIG_GRPTLK
+    ll_sw/ull_adv_grptlk.c
+    )
 endif()
 
 if(CONFIG_BT_OBSERVER)
@@ -67,6 +71,10 @@ if(CONFIG_BT_OBSERVER)
   zephyr_library_sources_ifdef(
     CONFIG_BT_CTLR_SYNC_ISO
     ll_sw/ull_sync_iso.c
+    )
+  zephyr_library_sources_ifdef(
+    CONFIG_GRPTLK
+    ll_sw/ull_sync_grptlk.c
     )
 endif()
 

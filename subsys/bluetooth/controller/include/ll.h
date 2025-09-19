@@ -94,6 +94,11 @@ uint8_t ll_big_create(uint8_t big_handle, uint8_t adv_handle, uint8_t num_bis,
 		      uint16_t max_latency, uint8_t rtn, uint8_t phy,
 		      uint8_t packing, uint8_t framing, uint8_t encryption,
 		      uint8_t *bcode);
+uint8_t ll_grptlk_create(uint8_t big_handle, uint8_t adv_handle, uint8_t num_bis,
+		      uint32_t sdu_interval, uint16_t max_sdu,
+		      uint16_t max_latency, uint8_t rtn, uint8_t phy,
+		      uint8_t packing, uint8_t framing, uint8_t encryption,
+		      uint8_t *bcode);
 uint8_t ll_big_test_create(uint8_t big_handle, uint8_t adv_handle,
 			   uint8_t num_bis, uint32_t sdu_interval,
 			   uint16_t iso_interval, uint8_t nse, uint16_t max_sdu,
@@ -129,6 +134,10 @@ uint8_t ll_default_past_param(uint8_t mode, uint16_t skip, uint16_t timeout, uin
 
 /* Broadcast ISO Sync Receiver State Interfaces */
 uint8_t ll_big_sync_create(uint8_t big_handle, uint16_t sync_handle,
+			   uint8_t encryption, uint8_t *bcode, uint8_t mse,
+			   uint16_t sync_timeout, uint8_t num_bis,
+			   uint8_t *bis);
+uint8_t ll_grptlk_sync_create(uint8_t big_handle, uint16_t sync_handle,
 			   uint8_t encryption, uint8_t *bcode, uint8_t mse,
 			   uint16_t sync_timeout, uint8_t num_bis,
 			   uint8_t *bis);

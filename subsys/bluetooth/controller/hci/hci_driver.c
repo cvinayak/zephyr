@@ -45,7 +45,12 @@
 
 #include "ll_sw/lll.h"
 #include "lll/lll_df_types.h"
+#include "lll/lll_adv_types.h"
+#include "ll_sw/lll_adv.h"
+#include "lll/lll_adv_pdu.h"
 #include "ll_sw/lll_sync_iso.h"
+#include "ll_sw/lll_adv_iso.h"
+#include "ll_sw/lll_adv_grptlk.h"
 #include "ll_sw/lll_conn.h"
 #include "ll_sw/lll_conn_iso.h"
 #include "ll_sw/isoal.h"
@@ -222,6 +227,120 @@ isoal_status_t sink_sdu_write_hci(void *dbuf,
 
 	return ISOAL_STATUS_OK;
 }
+
+#ifdef CONFIG_GRPTLK
+/* Bypass ISOAL and deliver PDU directly for grptlk */
+static void grptlk_pdu_to_hci(uint16_t handle, struct node_rx_pdu *node_rx)
+{
+	const struct device *dev = DEVICE_DT_GET(DT_DRV_INST(0));
+	const struct hci_driver_data *data = dev->data;
+	struct bt_hci_iso_sdu_ts_hdr *sdu_hdr;
+	struct pdu_bis *pdu;
+	struct bt_hci_iso_hdr *hdr;
+	uint16_t handle_packed;
+	uint16_t slen_packed;
+	struct net_buf *buf;
+	uint16_t packet_status_flag;
+	uint8_t payload_len;
+
+	/* Get PDU */
+	pdu = (struct pdu_bis *)node_rx->pdu;
+
+	/* Check PDU type - only process data PDUs, not control PDUs */
+	if (pdu->ll_id == PDU_BIS_LLID_CTRL) {
+		/* Control PDU - should not be processed as data */
+		LOG_ERR("GRPTLK: Skipping control PDU");
+		return;
+	}
+
+	/* Validate PDU length before processing */
+	if (pdu->len == 0) {
+		/* Empty BIS padding PDU; nothing to forward */
+		return;
+	}
+
+	if (pdu->len > 251) {
+		/* Invalid length - discard packet */
+		LOG_ERR("GRPTLK: PDU length too large: %d", pdu->len);
+		return;
+	}
+
+	/* Calculate actual payload length */
+	payload_len = pdu->len;
+
+	/* Debug: Log actual PDU values */
+	// LOG_ERR("GRPTLK PDU: ll_id=%d, pdu->len=%d, payload_len=%d, OCTET3_LEN=%d",
+	// 	pdu->ll_id, pdu->len, payload_len, OCTET3_LEN);
+
+	/* Allocate HCI ISO buffer */
+	buf = bt_buf_get_rx(BT_BUF_ISO_IN, K_FOREVER);
+	if (!buf) {
+		return;
+	}
+
+	net_buf_reset(buf);
+
+	/* Reserve space for headers */
+	net_buf_reserve(buf, BT_BUF_RESERVE + BT_HCI_ISO_HDR_SIZE +
+				      BT_HCI_ISO_SDU_TS_HDR_SIZE);
+
+	/* Copy payload data starting from pdu->payload */
+	// LOG_ERR("GRPTLK: pdu=%p, pdu->payload=%p, copying exactly %u bytes",
+	// 	(void *)pdu, (void *)pdu->payload, payload_len);
+
+	/* Debug: Show what we're about to copy */
+	// uint8_t *src = (uint8_t *)pdu->payload;
+	// LOG_ERR("GRPTLK: Source data: %02x %02x %02x %02x %02x %02x %02x",
+	// 	(payload_len > 0) ? src[0] : 0,
+	// 	(payload_len > 1) ? src[1] : 0,
+	// 	(payload_len > 2) ? src[2] : 0,
+	// 	(payload_len > 3) ? src[3] : 0,
+	// 	(payload_len > 4) ? src[4] : 0,
+	// 	(payload_len > 5) ? src[5] : 0,
+	// 	(payload_len > 6) ? src[6] : 0);
+
+	net_buf_add_mem(buf, pdu->payload, payload_len);
+
+	/* Add ISO SDU timestamp header */
+	sdu_hdr = net_buf_push(buf, BT_HCI_ISO_SDU_TS_HDR_SIZE);
+	packet_status_flag = node_rx->rx_iso_meta.status;
+	slen_packed = bt_iso_pkt_len_pack(payload_len, packet_status_flag);
+	sdu_hdr->ts = sys_cpu_to_le32(node_rx->rx_iso_meta.timestamp);
+	sdu_hdr->sdu.sn = sys_cpu_to_le16((uint16_t)node_rx->rx_iso_meta.payload_number);
+	sdu_hdr->sdu.slen = sys_cpu_to_le16(slen_packed);
+
+	/* Add HCI ISO header (PB=BT_ISO_SINGLE: unframed complete SDU, TS=1) */
+	hdr = net_buf_push(buf, BT_HCI_ISO_HDR_SIZE);
+	handle_packed = bt_iso_handle_pack(handle, BT_ISO_SINGLE, 1);
+	hdr->handle = sys_cpu_to_le16(handle_packed);
+
+	/* Calculate the actual data length that will be present after HCI ISO header */
+	uint16_t actual_data_len = buf->len - BT_HCI_ISO_HDR_SIZE;
+	hdr->len = sys_cpu_to_le16(actual_data_len);
+
+	// LOG_ERR("GRPTLK: HCI ISO hdr len=%d (payload=%u)", actual_data_len, payload_len);
+
+	// /* Debug: Log buffer construction */
+	// LOG_ERR("GRPTLK Buffer: %u bytes payload, total_buf_len=%d",
+	// 	payload_len, buf->len);
+
+	/* Add H4 header */
+	net_buf_push_u8(buf, BT_HCI_H4_ISO);
+
+	/* Debug: Log final buffer after all headers */
+	// LOG_ERR("GRPTLK Final: payload_len=%d, total_with_h4=%d, expected_at_host=%d",
+	// 	payload_len, buf->len, buf->len - 1 - BT_HCI_ISO_HDR_SIZE);
+
+	// /* Debug: Show final buffer structure */
+	// uint8_t *final_data = buf->data;
+	// LOG_ERR("GRPTLK Final buffer: H4=%02x, HCI1=%02x, HCI2=%02x, HCI3=%02x, HCI4=%02x, Payload1=%02x, Payload2=%02x, Payload3=%02x",
+	// 	final_data[0], final_data[1], final_data[2], final_data[3], final_data[4], final_data[5], final_data[6], final_data[7]);
+
+	/* Send to host - after this, we don't return the buffer */
+	data->recv(dev, buf);
+}
+#endif /* CONFIG_GRPTLK */
+
 #endif /* CONFIG_BT_CTLR_ISO */
 
 #if defined(CONFIG_BT_CTLR_RX_PRIO_STACK_SIZE)
@@ -563,7 +682,8 @@ static inline struct net_buf *encode_node(struct node_rx_pdu *node_rx,
 		break;
 #endif /* CONFIG_BT_CONN */
 
-#if defined(CONFIG_BT_CTLR_SYNC_ISO) || defined(CONFIG_BT_CTLR_CONN_ISO)
+#if defined(CONFIG_BT_CTLR_SYNC_ISO) || defined(CONFIG_BT_CTLR_CONN_ISO) || \
+	defined(CONFIG_BT_CTLR_ADV_ISO)
 	case HCI_CLASS_ISO_DATA: {
 		if (false) {
 
@@ -598,11 +718,19 @@ static inline struct net_buf *encode_node(struct node_rx_pdu *node_rx,
 #if defined(CONFIG_BT_CTLR_SYNC_ISO)
 		} else if (IS_SYNC_ISO_HANDLE(node_rx->hdr.handle)) {
 			const struct lll_sync_iso_stream *stream;
-			struct isoal_pdu_rx isoal_rx;
 			uint16_t stream_handle;
-			isoal_status_t err;
 
 			stream_handle = LL_BIS_SYNC_IDX_FROM_HANDLE(node_rx->hdr.handle);
+#ifdef CONFIG_GRPTLK
+			stream = ull_sync_grptlk_stream_get(stream_handle);
+
+			/* GRPTLK: Bypass ISOAL and deliver PDU directly */
+			if (stream && stream->dp &&
+			    (stream->dp->path_id == BT_HCI_DATAPATH_ID_HCI) &&
+			    (stream->dp->path_dir == BT_HCI_DATAPATH_DIR_CTLR_TO_HOST)) {
+				grptlk_pdu_to_hci(node_rx->hdr.handle, node_rx);
+			}
+#else
 			stream = ull_sync_iso_stream_get(stream_handle);
 
 			/* Check validity of the data path sink. FIXME: A channel disconnect race
@@ -610,6 +738,9 @@ static inline struct net_buf *encode_node(struct node_rx_pdu *node_rx,
 			 */
 			if (stream && stream->dp &&
 			    (stream->dp->path_id == BT_HCI_DATAPATH_ID_HCI)) {
+				struct isoal_pdu_rx isoal_rx;
+				isoal_status_t err;
+
 				isoal_rx.meta = &node_rx->rx_iso_meta;
 				isoal_rx.pdu = (void *)node_rx->pdu;
 				err = isoal_rx_pdu_recombine(stream->dp->sink_hdl, &isoal_rx);
@@ -617,7 +748,44 @@ static inline struct net_buf *encode_node(struct node_rx_pdu *node_rx,
 				LL_ASSERT_ERR(err == ISOAL_STATUS_OK ||
 					      err == ISOAL_STATUS_ERR_SDU_ALLOC);
 			}
+#endif /* CONFIG_GRPTLK */
 #endif /* CONFIG_BT_CTLR_SYNC_ISO */
+
+#if defined(CONFIG_BT_CTLR_ADV_ISO)
+		} else if (IS_ADV_ISO_HANDLE(node_rx->hdr.handle)) {
+			const struct lll_adv_iso_stream *stream;
+			uint16_t stream_handle;
+
+			stream_handle = LL_BIS_ADV_IDX_FROM_HANDLE(node_rx->hdr.handle);
+#ifdef CONFIG_GRPTLK
+			stream = ull_adv_grptlk_lll_stream_get(stream_handle);
+
+			/* GRPTLK: Bypass ISOAL and deliver PDU directly */
+			if (stream && stream->dp &&
+			    (stream->dp->path_id == BT_HCI_DATAPATH_ID_HCI) &&
+			    (stream->dp->path_dir == BT_HCI_DATAPATH_DIR_CTLR_TO_HOST)) {
+				grptlk_pdu_to_hci(node_rx->hdr.handle, node_rx);
+			}
+#else
+			stream = ull_adv_iso_stream_get(stream_handle);
+
+			/* Check validity of the data path sink. FIXME: A channel disconnect race
+			 * may cause ISO data pending without valid data path.
+			 */
+			if (stream && stream->dp &&
+			    (stream->dp->path_id == BT_HCI_DATAPATH_ID_HCI)) {
+				struct isoal_pdu_rx isoal_rx;
+				isoal_status_t err;
+
+				isoal_rx.meta = &node_rx->rx_iso_meta;
+				isoal_rx.pdu = (void *)node_rx->pdu;
+				err = isoal_rx_pdu_recombine(stream->dp->sink_hdl, &isoal_rx);
+
+				LL_ASSERT(err == ISOAL_STATUS_OK ||
+					  err == ISOAL_STATUS_ERR_SDU_ALLOC);
+			}
+#endif /* CONFIG_GRPTLK */
+#endif /* CONFIG_BT_CTLR_ADV_ISO */
 
 		} else {
 			LL_ASSERT_DBG(0);
@@ -628,7 +796,7 @@ static inline struct net_buf *encode_node(struct node_rx_pdu *node_rx,
 
 		return buf;
 	}
-#endif /* CONFIG_BT_CTLR_SYNC_ISO || CONFIG_BT_CTLR_CONN_ISO */
+#endif /* CONFIG_BT_CTLR_SYNC_ISO || CONFIG_BT_CTLR_CONN_ISO || CONFIG_BT_CTLR_ADV_ISO */
 
 	default:
 		LL_ASSERT_DBG(0);
