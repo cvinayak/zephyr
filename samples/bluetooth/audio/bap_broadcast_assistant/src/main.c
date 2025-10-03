@@ -431,7 +431,7 @@ static void scan_for_broadcast_source(void)
 
 	scanning_for_broadcast_source = true;
 
-	err = bt_le_scan_start(BT_LE_SCAN_PASSIVE, NULL);
+	err = bt_le_scan_start(BT_LE_SCAN_PASSIVE_CONTINUOUS, NULL);
 	if (err != 0) {
 		printk("Scanning failed to start (err %d)\n", err);
 		return;
@@ -449,7 +449,7 @@ static void scan_for_broadcast_sink(void)
 
 	scanning_for_broadcast_source = false;
 
-	err = bt_le_scan_start(BT_LE_SCAN_PASSIVE, NULL);
+	err = bt_le_scan_start(BT_LE_SCAN_PASSIVE_CONTINUOUS, NULL);
 	if (err != 0) {
 		printk("Scanning failed to start (err %d)\n", err);
 		return;
