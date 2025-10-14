@@ -80,6 +80,14 @@ static struct bt_bap_lc3_preset preset_active = BT_BAP_LC3_BROADCAST_PRESET_24_2
 
 #define BROADCAST_SAMPLE_RATE 24000U
 
+#elif defined(CONFIG_BAP_BROADCAST_44_1_1)
+
+static struct bt_bap_lc3_preset preset_active = BT_BAP_LC3_BROADCAST_PRESET_441_1_1(
+	BT_AUDIO_LOCATION_FRONT_LEFT | BT_AUDIO_LOCATION_FRONT_RIGHT,
+	BT_AUDIO_CONTEXT_TYPE_UNSPECIFIED);
+
+#define BROADCAST_SAMPLE_RATE 44100U
+
 #elif defined(CONFIG_BAP_BROADCAST_48_2_1)
 
 static struct bt_bap_lc3_preset preset_active = BT_BAP_LC3_BROADCAST_PRESET_48_2_1(
@@ -104,6 +112,8 @@ static struct bt_bap_lc3_preset preset_active = BT_BAP_LC3_BROADCAST_PRESET_48_6
 #define MAX_SAMPLE_RATE 16000U
 #elif defined(CONFIG_BAP_BROADCAST_24_2_1)
 #define MAX_SAMPLE_RATE 24000U
+#elif defined(CONFIG_BAP_BROADCAST_44_1_1)
+#define MAX_SAMPLE_RATE 44100U
 #elif defined(CONFIG_BAP_BROADCAST_48_2_1) || defined(CONFIG_BAP_BROADCAST_48_6_1)
 #define MAX_SAMPLE_RATE 48000U
 #endif
@@ -180,6 +190,8 @@ static struct broadcast_source_stream {
 #elif defined(CONFIG_BAP_BROADCAST_16_2_1)
 	lc3_encoder_mem_16k_t lc3_encoder_mem;
 #elif defined(CONFIG_BAP_BROADCAST_24_2_1)
+	lc3_encoder_mem_48k_t lc3_encoder_mem;
+#elif defined(CONFIG_BAP_BROADCAST_44_1_1)
 	lc3_encoder_mem_48k_t lc3_encoder_mem;
 #elif defined(CONFIG_BAP_BROADCAST_48_2_1) || defined(CONFIG_BAP_BROADCAST_48_6_1)
 	lc3_encoder_mem_48k_t lc3_encoder_mem;
