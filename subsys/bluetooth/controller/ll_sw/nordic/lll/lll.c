@@ -96,6 +96,8 @@ static void preempt(void *param);
 #if (CONFIG_BT_CTLR_LLL_PRIO == CONFIG_BT_CTLR_ULL_LOW_PRIO)
 static void mfy_ticker_job_idle_get(void *param);
 static void ticker_op_job_disable(uint32_t status, void *op_context);
+static volatile  uint8_t job_disable_req;
+static uint8_t job_disable_ack;
 #endif
 #endif /* CONFIG_BT_CTLR_LOW_LAT */
 
@@ -555,6 +557,23 @@ int lll_prepare_done(void *param)
 	static struct mayfly mfy = {0, 0, &link, NULL, mfy_ticker_job_idle_get};
 	uint32_t ret;
 
+	/* A resume prepare can be followed immediately by a normal prepare; a single pending mayfly
+	 * enqueued is sufficient.
+	 */
+	if (job_disable_req != job_disable_ack) {
+		return -EALREADY;
+	}
+
+	uint8_t req = job_disable_req + 1U;
+
+	/* Check to ensure we do not overrun mayfly enqueue */
+	if (req == job_disable_ack) {
+		LL_ASSERT_ERR(false);
+	}
+
+	job_disable_req = req;
+
+	/* Enqueue mayfly that will call ticker_job_idle_get */
 	ret = mayfly_enqueue(TICKER_USER_ID_LLL, TICKER_USER_ID_ULL_LOW,
 			     1, &mfy);
 	if (ret) {
@@ -1697,6 +1716,18 @@ preempt_abort_resume:
 static void mfy_ticker_job_idle_get(void *param)
 {
 	uint32_t ret;
+
+	/* Check to ensure we were indeed enqueued */
+	LL_ASSERT_ERR(job_disable_req != job_disable_ack);
+
+	uint8_t ack = job_disable_ack + 1U;
+
+	/* Check to verify we do not overrun, or get into infinite calls. */
+	if (ack != job_disable_req) {
+		LL_ASSERT_ERR(false);
+	}
+
+	job_disable_ack = ack;
 
 	/* Ticker Job Silence */
 	ret = ticker_job_idle_get(TICKER_INSTANCE_ID_CTLR,

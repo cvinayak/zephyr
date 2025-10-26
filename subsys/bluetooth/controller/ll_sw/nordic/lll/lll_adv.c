@@ -1075,7 +1075,7 @@ static int prepare_cb(struct lll_prepare_param *p)
 #endif
 
 	ret = lll_prepare_done(lll);
-	LL_ASSERT_ERR(!ret);
+	LL_ASSERT_ERR((ret == 0) || (ret == -EALREADY));
 
 	DEBUG_RADIO_START_A(1);
 

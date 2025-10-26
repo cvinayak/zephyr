@@ -706,7 +706,7 @@ sync_aux_prepare_done:
 #endif /* CONFIG_BT_CENTRAL && CONFIG_BT_CTLR_SCHED_ADVANCED */
 
 	ret = lll_prepare_done(lll_aux);
-	LL_ASSERT_ERR(!ret);
+	LL_ASSERT_ERR((ret == 0) || (ret == -EALREADY));
 
 	DEBUG_RADIO_START_O(1);
 
