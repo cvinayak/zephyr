@@ -276,6 +276,15 @@ static int prepare_cb_common(struct lll_prepare_param *p)
 
 	lll = p->param;
 
+	/* Check if stopped (on disconnection between prepare and preempt)
+	 */
+	if (unlikely(lll->is_lll_stop != 0U)) {
+		radio_isr_set(lll_isr_early_abort, lll);
+		radio_disable();
+
+		return 0;
+	}
+
 	/* Calculate the current event counter value */
 	event_counter = (lll->payload_count / lll->bn) - 1U;
 
@@ -1954,6 +1963,11 @@ static void isr_rx_lll_done(void *param)
 
 	lll = param;
 
+	/* Gracefully flush pipelined event on terminate received */
+	if (unlikely(lll->is_lll_stop != 0U)) {
+		goto isr_done_cleanup;
+	}
+
 	/* Catchup with ISO event latencies */
 	latency_event = lll->latency_event;
 
@@ -2044,6 +2058,9 @@ static void isr_rx_lll_done(void *param)
 
 	/* Check if BIG terminate procedure received */
 	if (lll->term_reason) {
+		LL_ASSERT_DBG(lll->is_lll_stop == 0U);
+		lll->is_lll_stop = 1U;
+
 		e->type = EVENT_DONE_EXTRA_TYPE_SYNC_ISO_TERMINATE;
 
 		goto isr_done_cleanup;
