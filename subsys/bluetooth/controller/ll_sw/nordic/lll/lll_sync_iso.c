@@ -7,9 +7,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#include <soc.h>
 #include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/util.h>
 #include <zephyr/bluetooth/hci_types.h>
 
 #include "hal/cpu.h"
@@ -20,6 +18,7 @@
 #include "util/util.h"
 #include "util/mem.h"
 #include "util/memq.h"
+#include "util/mayfly.h"
 
 #include "ticker/ticker.h"
 
@@ -37,8 +36,6 @@
 #include "lll_tim_internal.h"
 #include "lll_prof_internal.h"
 
-#include "ll_feat.h"
-
 #include "hal/debug.h"
 
 static int init_reset(void);
@@ -53,6 +50,11 @@ static void isr_rx_done(void *param);
 static void isr_done(void *param);
 static uint16_t payload_index_get(const struct lll_sync_iso *lll);
 #if defined(CONFIG_BT_CTLR_SYNC_ISO_SEQUENTIAL)
+#if defined(CONFIG_BT_CTLR_SYNC_ISO_SLOT_WINDOW_JITTER)
+static void ticker_resume_cb(uint32_t ticks_at_expire, uint32_t ticks_drift, uint32_t remainder,
+			     uint16_t lazy, uint8_t force, void *param);
+static void ticker_op_start_cb(uint32_t status, void *param);
+#endif /* CONFIG_BT_CTLR_SYNC_ISO_SLOT_WINDOW_JITTER */
 static void next_chan_calc_seq(struct lll_sync_iso *lll, uint16_t event_counter,
 			       uint16_t data_chan_id);
 #endif /* CONFIG_BT_CTLR_SYNC_ISO_SEQUENTIAL */
@@ -317,10 +319,10 @@ static int prepare_cb_common(struct lll_prepare_param *p)
 	const bool is_sequential_packing = (lll->bis_spacing >= (lll->sub_interval * lll->nse));
 
 #if defined(CONFIG_BT_CTLR_SYNC_ISO_SLOT_WINDOW_JITTER)
+	uint8_t skipped_bis = 0U;
 	uint8_t skipped = 0U;
 
 	if (p->ticks_drift != 0U) {
-		uint8_t skipped_bis;
 		uint32_t drift_us;
 
 		/* FIXME: Add implementation to support interleaved packing BIG event drift and
@@ -449,8 +451,10 @@ static int prepare_cb_common(struct lll_prepare_param *p)
 		}
 
 		/* Calculate the radio channel to use for subevent */
-		while (skipped != 0U) {
-			skipped--;
+		uint8_t skip = skipped;
+
+		while (skip != 0U) {
+			skip--;
 
 			data_chan_use = lll_chan_iso_subevent(data_chan_id,
 						lll->data_chan_map,
@@ -596,6 +600,24 @@ static int prepare_cb_common(struct lll_prepare_param *p)
 #if defined(CONFIG_BT_CTLR_SYNC_ISO_SEQUENTIAL)
 	} else if (is_sequential_packing) {
 		next_chan_calc_seq(lll, event_counter, data_chan_id);
+
+#if defined(CONFIG_BT_CTLR_SYNC_ISO_SLOT_WINDOW_JITTER)
+		if ((p->ticks_drift != 0U) && (skipped_bis < (lll->num_bis - 1U))) {
+			uint32_t bis_offset = lll->bis_spacing -
+					      (lll->sub_interval * (skipped - 1U));
+
+			ret = ticker_start(TICKER_INSTANCE_ID_CTLR, TICKER_USER_ID_LLL,
+					   (TICKER_ID_SCAN_SYNC_ISO_RESUME_BASE +
+					    ull_sync_iso_lll_index_get(lll)),
+					   p->ticks_at_expire, HAL_TICKER_US_TO_TICKS(bis_offset),
+					   TICKER_NULL_PERIOD, TICKER_NULL_REMAINDER,
+					   TICKER_NULL_LAZY, ull_sync_iso_lll_ticks_slot_get(lll),
+					   ticker_resume_cb, lll, ticker_op_start_cb,
+					   (void *)__LINE__);
+			LL_ASSERT_ERR((ret == TICKER_STATUS_SUCCESS) ||
+				      (ret == TICKER_STATUS_BUSY));
+		}
+#endif /* CONFIG_BT_CTLR_SYNC_ISO_SLOT_WINDOW_JITTER */
 #endif /* CONFIG_BT_CTLR_SYNC_ISO_SEQUENTIAL */
 
 #if defined(CONFIG_BT_CTLR_SYNC_ISO_INTERLEAVED)
@@ -1901,6 +1923,28 @@ static uint16_t payload_index_get(const struct lll_sync_iso *lll)
 }
 
 #if defined(CONFIG_BT_CTLR_SYNC_ISO_SEQUENTIAL)
+#if defined(CONFIG_BT_CTLR_SYNC_ISO_SLOT_WINDOW_JITTER)
+static void ticker_resume_cb(uint32_t ticks_at_expire, uint32_t ticks_drift, uint32_t remainder,
+			     uint16_t lazy, uint8_t force, void *param)
+{
+	/* TODO: Add implementation to place ULL time reservation for subsequent BIS spacing */
+}
+
+static void ticker_op_start_cb(uint32_t status, void *param)
+{
+	ARG_UNUSED(status);
+	ARG_UNUSED(param);
+
+	/* FIXME: Handle the skipped ULL scheduling of the subevent used to reserve time.
+	 *
+	 *  This assertion check will fail, i.e. ULL scheduled reception of AUX_ADV_IND PDU can
+	 *  cause the ULL time reservation for subevent to be skipped.
+	 *
+	 *  LL_ASSERT_ERR(status == TICKER_STATUS_SUCCESS);
+	 */
+}
+#endif /* CONFIG_BT_CTLR_SYNC_ISO_SLOT_WINDOW_JITTER */
+
 static void next_chan_calc_seq(struct lll_sync_iso *lll, uint16_t event_counter,
 			       uint16_t data_chan_id)
 {
