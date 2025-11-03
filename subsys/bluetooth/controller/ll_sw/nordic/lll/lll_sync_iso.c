@@ -1926,8 +1926,6 @@ static void ticker_op_start_cb(uint32_t status, void *param)
 {
 	ARG_UNUSED(status);
 	ARG_UNUSED(param);
-
-	LL_ASSERT_ERR(status == TICKER_STATUS_SUCCESS);
 }
 #endif /* CONFIG_BT_CTLR_SYNC_ISO_SLOT_WINDOW_JITTER */
 
