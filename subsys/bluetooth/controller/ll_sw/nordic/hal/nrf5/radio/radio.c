@@ -190,24 +190,20 @@ static void mram_no_latency_callback(struct onoff_manager *mgr,
 	LL_ASSERT_ERR(mram_no_latency_start_ack != mram_no_latency_start_req);
 	mram_no_latency_start_ack++;
 
-	/* There could be cancel or release */
-	if (mram_no_latency_stop_req != mram_no_latency_stop_ack) {
-		mram_no_latency_stop_ack++;
+	/* Count the requests and releases */
+	uint8_t req = mram_no_latency_start_req - mram_no_latency_start_ack;
+	uint8_t rel = mram_no_latency_stop_req - mram_no_latency_stop_ack;
 
-		/* There shall be no more than one cancel or release */
-		LL_ASSERT_ERR(mram_no_latency_stop_ack == mram_no_latency_stop_req);
+	/* Reset requests and releases */
+	mram_no_latency_start_ack = mram_no_latency_start_req;
+	mram_no_latency_stop_ack = mram_no_latency_stop_req;
 
-		/* Handle cancel or release if was no request placed again */
-		if (mram_no_latency_start_ack == mram_no_latency_start_req) {
-			int ret;
+	/* Handle cancel or release */
+	if (rel > req) {
+		int ret;
 
-			ret = mram_no_latency_cancel_or_release(&mram_cli);
-			LL_ASSERT_ERR(ret == ONOFF_STATE_ON);
-		} else {
-			/* Request placed after cancel or release */
-			mram_no_latency_start_ack++;
-			LL_ASSERT_ERR(mram_no_latency_start_ack == mram_no_latency_start_req);
-		}
+		ret = mram_no_latency_cancel_or_release(&mram_cli);
+		LL_ASSERT_ERR(ret == ONOFF_STATE_ON);
 	} else {
 		/* No cancel or release before this callback */
 	}
