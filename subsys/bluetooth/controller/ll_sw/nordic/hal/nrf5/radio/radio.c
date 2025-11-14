@@ -8,11 +8,14 @@
 #include <zephyr/toolchain.h>
 #include <zephyr/dt-bindings/gpio/gpio.h>
 #include <zephyr/sys/byteorder.h>
+
 #include <soc.h>
 
 #include <nrf_sys_event.h>
 #include <nrfx_gpiote.h>
 #include <gpiote_nrfx.h>
+
+#include <mram_latency.h>
 
 #include "util/mem.h"
 
@@ -192,6 +195,8 @@ void radio_setup(void)
 	hal_radio_ram_prio_setup();
 }
 
+static struct onoff_client mram_cli;
+
 void radio_reset(void)
 {
 
@@ -231,6 +236,14 @@ void radio_reset(void)
 	NRF_POWER->TASKS_CONSTLAT = 1U;
 #endif /* !CONFIG_NRF_SYS_EVENT */
 #endif /* CONFIG_SOC_COMPATIBLE_NRF54LX */
+
+
+#define MRAM_ZLL 1
+#if MRAM_ZLL
+	sys_notify_init_spinwait(&mram_cli.notify);
+
+	(void)mram_no_latency_request(&mram_cli);
+#endif
 
 #if defined(HAL_RADIO_GPIO_HAVE_PA_PIN) || defined(HAL_RADIO_GPIO_HAVE_LNA_PIN)
 	hal_palna_ppi_setup();
@@ -286,6 +299,10 @@ void radio_stop(void)
 	 *       - PSEL.DFEGPIO[n]
 	 *       - DFEPACKET.PTR
 	 */
+
+#if MRAM_ZLL
+	(void)mram_no_latency_cancel_or_release(&mram_cli);
+#endif
 }
 
 void radio_phy_set(uint8_t phy, uint8_t flags)
