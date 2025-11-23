@@ -2620,9 +2620,11 @@ static uint8_t ticker_job_reschedule_in_window(struct ticker_instance *instance)
 			 */
 			if ((window_start_ticks + ticker_resched->ticks_slot) <=
 			    window_end_ticks_max) {
-				if (!ticker_resched->ticks_slot ||
+				if ((ticker_resched->ticks_slot == 0U) ||
 				    ((ext_data->is_drift_in_window != 0U) &&
-				     (ext_data->dir_drift_in_window == 0U))) {
+				     (ext_data->dir_drift_in_window == 0U)) ||
+				    (IS_ENABLED(CONFIG_BT_TICKER_EXT_SLOT_WINDOW_YIELD) &&
+				     (ext_data->has_drift_in_window != 0U))) {
 					/* Place at start of window */
 					ticks_to_expire = window_start_ticks;
 					break;
