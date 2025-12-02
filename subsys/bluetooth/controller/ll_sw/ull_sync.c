@@ -1339,6 +1339,8 @@ void ull_sync_done(struct node_rx_event_done *done)
 			sync->sync_expire = 0U;
 		}
 
+		force = 0U;
+		force_lll = 0U;
 		elapsed_event = lll->lazy_prepare + 1U;
 
 		/* Reset supervision countdown */
@@ -1350,6 +1352,9 @@ void ull_sync_done(struct node_rx_event_done *done)
 		else if (sync->sync_expire) {
 			if (sync->sync_expire > elapsed_event) {
 				sync->sync_expire -= elapsed_event;
+
+				force = 1U;
+				force_lll = 1U;
 			} else {
 				sync_ticker_cleanup(sync, ticker_stop_sync_expire_op_cb);
 
@@ -1363,8 +1368,6 @@ void ull_sync_done(struct node_rx_event_done *done)
 		}
 
 		/* check timeout */
-		force = 0U;
-		force_lll = 0U;
 		if (sync->timeout_expire) {
 			if (sync->timeout_expire > elapsed_event) {
 				sync->timeout_expire -= elapsed_event;
@@ -1372,12 +1375,12 @@ void ull_sync_done(struct node_rx_event_done *done)
 				/* break skip */
 				lll->skip_event = 0U;
 
-				if (sync->timeout_expire <= 6U) {
-					force_lll = 1U;
-
+				if (sync->timeout_expire <= CONN_ESTAB_COUNTDOWN) {
 					force = 1U;
+					force_lll = 1U;
 				} else if (skip_event) {
 					force = 1U;
+					force_lll = 1U;
 				}
 			} else {
 				sync_ticker_cleanup(sync, ticker_stop_sync_lost_op_cb);
