@@ -43,7 +43,6 @@
 
 #include "lc3.h"
 
-#include "nrf54l15.h"
 #if defined(NRF54L15_XXAA)
 #include <hal/nrf_clock.h>
 #endif /* defined(NRF54L15_XXAA) */
@@ -54,7 +53,7 @@ static const struct gpio_dt_spec rst = GPIO_DT_SPEC_GET(DT_ALIAS(led3), gpios);
 
 #define I2S_NL DT_NODELABEL(i2s20)
 PINCTRL_DT_DEFINE(I2S_NL);
-static nrfx_i2s_t i2s_inst = NRFX_I2S_INSTANCE(20);
+static nrfx_i2s_t i2s_inst = NRFX_I2S_INSTANCE(NRF_I2S20);
 static nrfx_i2s_config_t cfg = {
 	/* Pins are configured by pinctrl. */
 	.skip_gpio_cfg = true,
@@ -63,10 +62,12 @@ static nrfx_i2s_config_t cfg = {
 	.mode = NRF_I2S_MODE_SLAVE,
 	.format = NRF_I2S_FORMAT_I2S,
 	.alignment = NRF_I2S_ALIGN_LEFT,
-	.ratio = NRF_I2S_RATIO_64X,
+	.prescalers = {
+		.ratio = NRF_I2S_RATIO_64X,
+		.mck_setup = NRF_I2S_MCK_32MDIV2,
+	},
 	.sample_width = NRF_I2S_SWIDTH_16BIT,
 	.channels = NRF_I2S_CHANNELS_STEREO,
-	.mck_setup = NRF_I2S_MCK_32MDIV2,
 };
 
 #define I2S_SAMPLES_NUM 48 // samples per 1ms block
@@ -140,11 +141,10 @@ void audio_i2s_set_next_buf(const uint8_t *tx_buf, uint32_t *rx_buf)
 	const nrfx_i2s_buffers_t i2s_buf = {.p_rx_buffer = rx_buf,
 					    .p_tx_buffer = (uint32_t *)tx_buf,
 					    .buffer_size = I2S_SAMPLES_NUM};
-
-	nrfx_err_t ret;
+	int ret;
 
 	ret = nrfx_i2s_next_buffers_set(&i2s_inst, &i2s_buf);
-	if (ret != NRFX_SUCCESS) {
+	if (ret != 0) {
 		printf("Failed to set next buffers: %x\n", ret);
 	}
 }
@@ -184,7 +184,7 @@ void audio_i2s_start(const uint8_t *tx_buf, uint32_t *rx_buf)
 
 	/* Buffer size in 32-bit words */
 	ret = nrfx_i2s_start(&i2s_inst, &i2s_buf, 0);
-	if (ret != NRFX_SUCCESS) {
+	if (ret != 0) {
 		printf("Failed to start I2S: %d\n", ret);
 	}
 }
@@ -199,12 +199,12 @@ void audio_i2s_init(void)
 		return;
 	}
 
-	IRQ_CONNECT(DT_IRQN(I2S_NL), DT_IRQ(I2S_NL, priority), nrfx_isr, nrfx_i2s_20_irq_handler,
-		    0);
+	IRQ_CONNECT(DT_IRQN(I2S_NL), DT_IRQ(I2S_NL, priority), nrfx_i2s_irq_handler, &i2s_inst, 0);
+
 	irq_enable(DT_IRQN(I2S_NL));
 
 	ret = nrfx_i2s_init(&i2s_inst, &cfg, i2s_comp_handler);
-	if (ret != NRFX_SUCCESS) {
+	if (ret != 0) {
 		printf("Failed to initialize I2S: %x\n", ret);
 		return;
 	}
