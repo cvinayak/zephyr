@@ -842,7 +842,7 @@ static uint8_t ticker_resolve_collision(struct ticker_node *nodes,
 		uint32_t ticker_ticks_slot;
 
 		if (TICKER_HAS_SLOT_WINDOW(ticker) && (ticker->ticks_slot == 0U)) {
-			ticker_ticks_slot = HAL_TICKER_RESCHEDULE_MARGIN;
+			ticker_ticks_slot = HAL_TICKER_TICKS_SLOT_MARGIN;
 		} else {
 			ticker_ticks_slot = ticker->ticks_slot;
 		}
@@ -1339,7 +1339,7 @@ void ticker_worker(void *param)
 
 		if (TICKER_HAS_SLOT_WINDOW(ticker) &&
 		    (ticker->ticks_slot == 0U)) {
-			ticker_ticks_slot = HAL_TICKER_RESCHEDULE_MARGIN;
+			ticker_ticks_slot = HAL_TICKER_TICKS_SLOT_MARGIN;
 		} else {
 			ticker_ticks_slot = ticker->ticks_slot;
 		}
@@ -2119,21 +2119,13 @@ static inline void ticker_job_worker_bh(struct ticker_instance *instance,
 			instance->ticks_slot_previous = 0U;
 		}
 
-		uint32_t ticker_ticks_slot;
-
-		if (TICKER_HAS_SLOT_WINDOW(ticker) && !ticker->ticks_slot) {
-			ticker_ticks_slot = HAL_TICKER_RESCHEDULE_MARGIN;
-		} else {
-			ticker_ticks_slot = ticker->ticks_slot;
-		}
-
 		/* If a reschedule is set pending, we will need to keep
 		 * the slot_previous information
 		 */
 		if ((ticker->ticks_slot != 0U) && (state == 2U) &&
 		    (skip_collision == 0U) && !TICKER_RESCHEDULE_PENDING(ticker)) {
 			instance->ticker_id_slot_previous = id_expired;
-			instance->ticks_slot_previous = ticker_ticks_slot;
+			instance->ticks_slot_previous = ticker->ticks_slot;
 		}
 #endif /* CONFIG_BT_TICKER_SLOT_AGNOSTIC */
 
@@ -2515,19 +2507,19 @@ static uint8_t ticker_job_reschedule_in_window(struct ticker_instance *instance)
 		LL_ASSERT_DBG(ticker_resched->ticks_to_expire == 0U);
 
 		/* Use ticker's reserved time ticks_slot, else for unreserved
-		 * tickers use the reschedule margin as ticks_slot.
+		 * tickers use the margin as ticks_slot.
 		 */
 		if (ticker_resched->ticks_slot) {
 			ticks_slot = ticker_resched->ticks_slot;
 		} else {
 			LL_ASSERT_DBG(TICKER_HAS_SLOT_WINDOW(ticker_resched));
 
-			ticks_slot = HAL_TICKER_RESCHEDULE_MARGIN;
+			ticks_slot = HAL_TICKER_TICKS_SLOT_MARGIN;
 		}
 
 		/* Window start after intersection with already active node */
-		window_start_ticks = instance->ticks_slot_previous +
-				     HAL_TICKER_RESCHEDULE_MARGIN;
+		window_start_ticks = instance->ticks_slot_previous;
+		window_start_ticks += HAL_TICKER_RESCHEDULE_MARGIN;
 
 		/* If drift was applied to this node, this must be
 		 * taken into consideration. Reduce the window with
