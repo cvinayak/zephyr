@@ -842,7 +842,7 @@ static uint8_t ticker_resolve_collision(struct ticker_node *nodes,
 		uint32_t ticker_ticks_slot;
 
 		if (TICKER_HAS_SLOT_WINDOW(ticker) && (ticker->ticks_slot == 0U)) {
-			ticker_ticks_slot = HAL_TICKER_RESCHEDULE_MARGIN;
+			ticker_ticks_slot = HAL_TICKER_TICKS_SLOT_MARGIN;
 		} else {
 			ticker_ticks_slot = ticker->ticks_slot;
 		}
@@ -1339,9 +1339,8 @@ void ticker_worker(void *param)
 	!defined(CONFIG_BT_TICKER_SLOT_AGNOSTIC)
 		uint32_t ticker_ticks_slot;
 
-		if (TICKER_HAS_SLOT_WINDOW(ticker) &&
-		    (ticker->ticks_slot == 0U)) {
-			ticker_ticks_slot = HAL_TICKER_RESCHEDULE_MARGIN;
+		if (TICKER_HAS_SLOT_WINDOW(ticker) && (ticker->ticks_slot == 0U)) {
+			ticker_ticks_slot = HAL_TICKER_TICKS_SLOT_MARGIN;
 		} else {
 			ticker_ticks_slot = ticker->ticks_slot;
 		}
@@ -2123,8 +2122,8 @@ static inline void ticker_job_worker_bh(struct ticker_instance *instance,
 
 		uint32_t ticker_ticks_slot;
 
-		if (TICKER_HAS_SLOT_WINDOW(ticker) && !ticker->ticks_slot) {
-			ticker_ticks_slot = HAL_TICKER_RESCHEDULE_MARGIN;
+		if (TICKER_HAS_SLOT_WINDOW(ticker) && (ticker->ticks_slot == 0U)) {
+			ticker_ticks_slot = HAL_TICKER_TICKS_SLOT_MARGIN;
 		} else {
 			ticker_ticks_slot = ticker->ticks_slot;
 		}
