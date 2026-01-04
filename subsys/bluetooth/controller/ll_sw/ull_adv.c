@@ -1386,7 +1386,7 @@ uint8_t ll_adv_enable(uint8_t enable)
 
 #if !defined(CONFIG_BT_HCI_MESH_EXT)
 	ticks_anchor = ticker_ticks_now_get();
-	ticks_anchor += HAL_TICKER_US_TO_TICKS(EVENT_OVERHEAD_START_US);
+	// ticks_anchor += HAL_TICKER_US_TO_TICKS(EVENT_OVERHEAD_START_US);
 
 #else /* CONFIG_BT_HCI_MESH_EXT */
 	if (!at_anchor) {
@@ -1593,7 +1593,7 @@ uint8_t ll_adv_enable(uint8_t enable)
 			interval_us = (uint64_t)adv->interval * ADV_INT_UNIT_US;
 
 			if (adv->max_skip == 0U) {
-#if defined(CONFIG_BT_CTLR_ADV_AUX_OFFSET_CONSTANT)
+#if defined(CONFIG_BT_CTLR_ADV_AUX_OFFSET_CONSTANT) || 1
 				aux->interval = DIV_ROUND_UP(interval_us,
 						     PERIODIC_INT_UNIT_US);
 #else /* !CONFIG_BT_CTLR_ADV_AUX_OFFSET_CONSTANT */
