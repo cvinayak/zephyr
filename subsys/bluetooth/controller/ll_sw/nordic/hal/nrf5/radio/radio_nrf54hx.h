@@ -414,6 +414,22 @@ static inline void hal_radio_stop(void)
 static inline void hal_radio_ram_prio_setup(void)
 {
 	/* TODO */
+	/* HMPAN-103 */
+	if ((*(volatile uint32_t *) 0x5302C8A0UL == 0x80000000UL) ||
+	    (*(volatile uint32_t *) 0x5302C8A0UL == 0x0058120EUL)) {
+		*(volatile uint32_t *) 0x5302C8A0UL = 0x0058090EUL;
+	}
+
+	*(volatile uint32_t *) 0x5302C8A4UL = 0x00F8AA5FUL;
+	*(volatile uint32_t *) 0x5302C8A8UL = 0x00C00030UL;
+	*(volatile uint32_t *) 0x5302C8ACUL = 0x00A80030UL;
+	*(volatile uint32_t *) 0x5302C7ACUL = 0x8672827AUL;
+	*(volatile uint32_t *) 0x5302C7B0UL = 0x7E768672UL;
+	*(volatile uint32_t *) 0x5302C7B4UL = 0x0406007EUL;
+	*(volatile uint32_t *) 0x5302C7E4UL = 0x0412C384UL;
+
+	/* HMPAN-102 */
+	*(volatile uint32_t *) 0x5302C7E4UL = 0x0412C384UL;
 }
 
 static inline uint32_t hal_radio_phy_mode_get(uint8_t phy, uint8_t flags)
