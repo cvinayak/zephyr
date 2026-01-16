@@ -354,7 +354,7 @@ void llcp_lr_rx(struct ll_conn *conn, struct proc_ctx *ctx, memq_link_t *link,
 #endif /* CONFIG_BT_CTLR_SCA_UPDATE */
 #if defined(CONFIG_BT_CTLR_SUBRATING)
 	case PROC_SUBRATE_UPDATE:
-		llcp_lp_sr_rx(conn, ctx, rx);
+		llcp_lp_subrate_rx(conn, ctx, rx);
 		break;
 #endif /* CONFIG_BT_CTLR_SUBRATING */
 	default:
@@ -508,7 +508,7 @@ static void lr_act_run(struct ll_conn *conn)
 #endif /* CONFIG_BT_CTLR_SYNC_TRANSFER_SENDER */
 #if defined(CONFIG_BT_CTLR_SUBRATING)
 	case PROC_SUBRATE_UPDATE:
-		llcp_lp_sr_run(conn, ctx, NULL);
+		llcp_lp_subrate_run(conn, ctx, NULL);
 		break;
 #endif /* CONFIG_BT_CTLR_SUBRATING */
 	default:

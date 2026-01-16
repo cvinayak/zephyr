@@ -357,15 +357,15 @@ uint8_t ll_subrate_req(uint16_t handle, uint16_t subrate_min, uint16_t subrate_m
 	}
 
 	/* Initialize procedure data */
-	ctx->data.sr.subrate_factor_min = subrate_min;
-	ctx->data.sr.subrate_factor_max = subrate_max;
-	ctx->data.sr.max_latency = max_latency;
-	ctx->data.sr.continuation_number = continuation_number;
-	ctx->data.sr.supervision_timeout = supervision_timeout;
-	ctx->data.sr.error = BT_HCI_ERR_SUCCESS;
+	ctx->data.subrate.subrate_factor_min = subrate_min;
+	ctx->data.subrate.subrate_factor_max = subrate_max;
+	ctx->data.subrate.max_latency = max_latency;
+	ctx->data.subrate.continuation_number = continuation_number;
+	ctx->data.subrate.supervision_timeout = supervision_timeout;
+	ctx->data.subrate.error = BT_HCI_ERR_SUCCESS;
 
 	/* Initialize procedure state */
-	llcp_lp_sr_init_proc(ctx);
+	llcp_lp_subrate_init_proc(ctx);
 
 	/* Enqueue procedure */
 	llcp_lr_enqueue(conn, ctx);
