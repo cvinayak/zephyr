@@ -48,8 +48,6 @@
 #define BT_DBG_ENABLED IS_ENABLED(CONFIG_BT_DEBUG_HCI_DRIVER)
 #define LOG_MODULE_NAME bt_ctlr_ull_llcp_subrate
 #include "common/log.h"
-#include <soc.h>
-#include "hal/debug.h"
 
 /* Subrate parameter limits according to BT Core Spec v6.2 */
 #define SUBRATE_FACTOR_MIN 0x0001
@@ -58,6 +56,11 @@
 #define CONTINUATION_NUMBER_MAX 0x01F3
 #define SUPERVISION_TIMEOUT_MIN 0x000A
 #define SUPERVISION_TIMEOUT_MAX 0x0C80
+
+/* Maximum product of subrate_factor and max_latency as per BT Core Spec v6.2
+ * Section 6.B.4.5.16: subrate_factor * (max_latency + 1) shall not exceed 500
+ */
+#define MAX_SUBRATE_LATENCY_PRODUCT 500
 
 /* LLCP Local Procedure Subrate Update FSM states */
 enum {
@@ -195,10 +198,10 @@ static void lp_sr_st_wait_ntf(struct ll_conn *conn, struct proc_ctx *ctx, uint8_
 			sr->peripheral_latency = conn->lll.latency;
 			sr->continuation_number = conn->continuation_number;
 			sr->supervision_timeout = conn->supervision_timeout;
-			
+
 			/* Notification will be picked up by HCI */
 			llcp_ntf_set_pending(conn);
-			
+
 			lp_sr_complete(conn, ctx);
 		}
 		break;
@@ -305,7 +308,7 @@ static void rp_sr_send_subrate_ind(struct ll_conn *conn, struct proc_ctx *ctx, u
 		ctx->data.sr.subrate_factor = subrate_factor;
 		ctx->data.sr.subrate_base_event = conn->lll.event_counter + 6;
 		ctx->data.sr.latency = MIN(ctx->data.sr.max_latency,
-					  (500 / subrate_factor) - 1);
+					  (MAX_SUBRATE_LATENCY_PRODUCT / subrate_factor) - 1);
 
 		/* Use requested values for continuation and timeout */
 		/* continuation_number and supervision_timeout already in ctx */
@@ -371,10 +374,10 @@ static void rp_sr_st_wait_ntf(struct ll_conn *conn, struct proc_ctx *ctx, uint8_
 			sr->peripheral_latency = conn->lll.latency;
 			sr->continuation_number = conn->continuation_number;
 			sr->supervision_timeout = conn->supervision_timeout;
-			
+
 			/* Notification will be picked up by HCI */
 			llcp_ntf_set_pending(conn);
-			
+
 			rp_sr_complete(conn, ctx);
 		}
 		break;
