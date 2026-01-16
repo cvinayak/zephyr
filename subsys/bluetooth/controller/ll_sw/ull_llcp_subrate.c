@@ -183,13 +183,18 @@ static void lp_sr_st_wait_ntf(struct ll_conn *conn, struct proc_ctx *ctx, uint8_
 		ctx->node_ref.rx = llcp_ntf_alloc();
 		if (ctx->node_ref.rx) {
 			struct node_rx_pdu *ntf = ctx->node_ref.rx;
-			struct pdu_data *pdu = (struct pdu_data *)ntf->pdu;
+			struct node_rx_subrate_change *sr;
 
 			ntf->hdr.type = NODE_RX_TYPE_SUBRATE_CHANGE;
 			ntf->hdr.handle = conn->lll.handle;
 
-			/* Encode subrate change complete */
-			pdu->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_SUBRATE_IND;
+			/* Populate subrate change data */
+			sr = (struct node_rx_subrate_change *)ntf->pdu;
+			sr->status = ctx->data.sr.error;
+			sr->subrate_factor = conn->subrate_factor;
+			sr->peripheral_latency = conn->lll.latency;
+			sr->continuation_number = conn->continuation_number;
+			sr->supervision_timeout = conn->supervision_timeout;
 			
 			/* Notification will be picked up by HCI */
 			llcp_ntf_set_pending(conn);
@@ -354,13 +359,18 @@ static void rp_sr_st_wait_ntf(struct ll_conn *conn, struct proc_ctx *ctx, uint8_
 		ctx->node_ref.rx = llcp_ntf_alloc();
 		if (ctx->node_ref.rx) {
 			struct node_rx_pdu *ntf = ctx->node_ref.rx;
-			struct pdu_data *pdu = (struct pdu_data *)ntf->pdu;
+			struct node_rx_subrate_change *sr;
 
 			ntf->hdr.type = NODE_RX_TYPE_SUBRATE_CHANGE;
 			ntf->hdr.handle = conn->lll.handle;
 
-			/* Encode subrate change complete */
-			pdu->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_SUBRATE_IND;
+			/* Populate subrate change data */
+			sr = (struct node_rx_subrate_change *)ntf->pdu;
+			sr->status = BT_HCI_ERR_SUCCESS;
+			sr->subrate_factor = conn->subrate_factor;
+			sr->peripheral_latency = conn->lll.latency;
+			sr->continuation_number = conn->continuation_number;
+			sr->supervision_timeout = conn->supervision_timeout;
 			
 			/* Notification will be picked up by HCI */
 			llcp_ntf_set_pending(conn);
