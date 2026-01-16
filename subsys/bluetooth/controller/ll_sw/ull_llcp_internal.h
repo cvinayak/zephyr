@@ -842,6 +842,14 @@ void llcp_pdu_encode_subrate_req(struct proc_ctx *ctx, struct pdu_data *pdu);
 void llcp_pdu_decode_subrate_req(struct proc_ctx *ctx, struct pdu_data *pdu);
 void llcp_pdu_encode_subrate_ind(struct proc_ctx *ctx, struct pdu_data *pdu);
 void llcp_pdu_decode_subrate_ind(struct proc_ctx *ctx, struct pdu_data *pdu);
+
+void llcp_lp_sr_init_proc(struct proc_ctx *ctx);
+void llcp_lp_sr_run(struct ll_conn *conn, struct proc_ctx *ctx, void *param);
+void llcp_lp_sr_rx(struct ll_conn *conn, struct proc_ctx *ctx, struct node_rx_pdu *rx);
+
+void llcp_rp_sr_init_proc(struct proc_ctx *ctx);
+void llcp_rp_sr_run(struct ll_conn *conn, struct proc_ctx *ctx, void *param);
+void llcp_rp_sr_rx(struct ll_conn *conn, struct proc_ctx *ctx, struct node_rx_pdu *rx);
 #endif /* CONFIG_BT_CTLR_SUBRATING */
 
 #ifdef ZTEST_UNITTEST
