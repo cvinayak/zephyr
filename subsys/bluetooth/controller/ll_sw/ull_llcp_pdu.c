@@ -1072,3 +1072,59 @@ void llcp_pdu_decode_periodic_sync_ind(struct proc_ctx *ctx, struct pdu_data *pd
 	ctx->data.periodic_sync.sync_conn_event_count = sys_le16_to_cpu(p->sync_conn_event_count);
 }
 #endif /* CONFIG_BT_CTLR_SYNC_TRANSFER_RECEIVER */
+
+#if defined(CONFIG_BT_CTLR_SUBRATING)
+void llcp_pdu_encode_subrate_req(struct proc_ctx *ctx, struct pdu_data *pdu)
+{
+	struct pdu_data_llctrl_subrate_req *p;
+
+	pdu->ll_id = PDU_DATA_LLID_CTRL;
+	pdu->len = PDU_DATA_LLCTRL_LEN(subrate_req);
+	pdu->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_SUBRATE_REQ;
+
+	p = &pdu->llctrl.subrate_req;
+	p->subrate_factor_min = sys_cpu_to_le16(ctx->data.sr.subrate_factor_min);
+	p->subrate_factor_max = sys_cpu_to_le16(ctx->data.sr.subrate_factor_max);
+	p->max_latency = sys_cpu_to_le16(ctx->data.sr.max_latency);
+	p->continuation_number = sys_cpu_to_le16(ctx->data.sr.continuation_number);
+	p->supervision_timeout = sys_cpu_to_le16(ctx->data.sr.supervision_timeout);
+}
+
+void llcp_pdu_decode_subrate_req(struct proc_ctx *ctx, struct pdu_data *pdu)
+{
+	struct pdu_data_llctrl_subrate_req *p = &pdu->llctrl.subrate_req;
+
+	ctx->data.sr.subrate_factor_min = sys_le16_to_cpu(p->subrate_factor_min);
+	ctx->data.sr.subrate_factor_max = sys_le16_to_cpu(p->subrate_factor_max);
+	ctx->data.sr.max_latency = sys_le16_to_cpu(p->max_latency);
+	ctx->data.sr.continuation_number = sys_le16_to_cpu(p->continuation_number);
+	ctx->data.sr.supervision_timeout = sys_le16_to_cpu(p->supervision_timeout);
+}
+
+void llcp_pdu_encode_subrate_ind(struct proc_ctx *ctx, struct pdu_data *pdu)
+{
+	struct pdu_data_llctrl_subrate_ind *p;
+
+	pdu->ll_id = PDU_DATA_LLID_CTRL;
+	pdu->len = PDU_DATA_LLCTRL_LEN(subrate_ind);
+	pdu->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_SUBRATE_IND;
+
+	p = &pdu->llctrl.subrate_ind;
+	p->subrate_factor = sys_cpu_to_le16(ctx->data.sr.subrate_factor);
+	p->subrate_base_event = sys_cpu_to_le16(ctx->data.sr.subrate_base_event);
+	p->latency = sys_cpu_to_le16(ctx->data.sr.latency);
+	p->continuation_number = sys_cpu_to_le16(ctx->data.sr.continuation_number);
+	p->supervision_timeout = sys_cpu_to_le16(ctx->data.sr.supervision_timeout);
+}
+
+void llcp_pdu_decode_subrate_ind(struct proc_ctx *ctx, struct pdu_data *pdu)
+{
+	struct pdu_data_llctrl_subrate_ind *p = &pdu->llctrl.subrate_ind;
+
+	ctx->data.sr.subrate_factor = sys_le16_to_cpu(p->subrate_factor);
+	ctx->data.sr.subrate_base_event = sys_le16_to_cpu(p->subrate_base_event);
+	ctx->data.sr.latency = sys_le16_to_cpu(p->latency);
+	ctx->data.sr.continuation_number = sys_le16_to_cpu(p->continuation_number);
+	ctx->data.sr.supervision_timeout = sys_le16_to_cpu(p->supervision_timeout);
+}
+#endif /* CONFIG_BT_CTLR_SUBRATING */
