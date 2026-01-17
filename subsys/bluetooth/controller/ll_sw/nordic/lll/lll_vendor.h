@@ -54,6 +54,12 @@
  */
 #define EVENT_OVERHEAD_END_US         40
 
+/* Minimum possible value for EVENT_OVERHEAD_START_US across all configurations.
+ * This is the base value used when no extended advertising or minimal features
+ * are enabled (9 RTC ticks equivalent).
+ */
+#define EVENT_OVERHEAD_START_MIN_US   275
+
 /* Sleep Clock Accuracy */
 #define EVENT_JITTER_US               16
 
@@ -103,7 +109,7 @@
  *
  * The calculation is:
  *   EVENT_OVERHEAD_END_US (40 us) - Time after radio event ends
- *   + EVENT_OVERHEAD_START_US (minimum 275 us) - Time before next radio event starts
+ *   + EVENT_OVERHEAD_START_MIN_US (275 us) - Minimum time before next radio event starts
  *   = 315 us (minimum total overhead)
  *
  * Note: EVENT_OVERHEAD_START_US varies by configuration:
@@ -111,6 +117,6 @@
  *   - 428 us: Extended advertising with scanning on 1M PHY
  *   - 641 us: Extended advertising with scanning on 1M and Coded PHY
  *
- * The minimum value (315 us) occurs with the smallest EVENT_OVERHEAD_START_US (275 us).
+ * The minimum value (315 us) occurs with the smallest EVENT_OVERHEAD_START_US.
  */
-#define EVENT_OVERHEAD_RESUME_MIN_US        (EVENT_OVERHEAD_END_US + 275U)
+#define EVENT_OVERHEAD_RESUME_MIN_US        (EVENT_OVERHEAD_END_US + EVENT_OVERHEAD_START_MIN_US)
