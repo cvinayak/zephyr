@@ -27,3 +27,14 @@
 
 /* TODO - fix up numbers re. HW */
 #define EVENT_RX_TX_TURNAROUND(phy)  ((phy) == 1?100:((phy) == 2 ? 80:900))
+
+/* Minimum overhead time from radio end to radio start when roles use lll_resume.
+ * This represents the shortest possible time between the end of one radio event
+ * and the start of the next radio event when using the lll_resume functionality.
+ *
+ * The calculation is:
+ *   EVENT_OVERHEAD_END_US (40 us) - Time after radio event ends
+ *   + EVENT_OVERHEAD_START_US (300 us) - Time before next radio event starts
+ *   = 340 us (total overhead for OpenISA platform)
+ */
+#define EVENT_OVERHEAD_RESUME_MIN_US        (EVENT_OVERHEAD_END_US + EVENT_OVERHEAD_START_US)

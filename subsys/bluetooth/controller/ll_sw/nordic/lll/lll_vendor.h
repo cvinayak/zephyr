@@ -96,3 +96,21 @@
  * for CIS_Offset_Min.
  */
 #define EVENT_OVERHEAD_CIS_SETUP_US         MAX(EVENT_OVERHEAD_START_US, 500U)
+
+/* Minimum overhead time from radio end to radio start when roles use lll_resume.
+ * This represents the shortest possible time between the end of one radio event
+ * and the start of the next radio event when using the lll_resume functionality.
+ *
+ * The calculation is:
+ *   EVENT_OVERHEAD_END_US (40 us) - Time after radio event ends
+ *   + EVENT_OVERHEAD_START_US (minimum 275 us) - Time before next radio event starts
+ *   = 315 us (minimum total overhead)
+ *
+ * Note: EVENT_OVERHEAD_START_US varies by configuration:
+ *   - 275 us: Basic configuration (no extended advertising or with only advertising)
+ *   - 428 us: Extended advertising with scanning on 1M PHY
+ *   - 641 us: Extended advertising with scanning on 1M and Coded PHY
+ *
+ * The minimum value (315 us) occurs with the smallest EVENT_OVERHEAD_START_US (275 us).
+ */
+#define EVENT_OVERHEAD_RESUME_MIN_US        (EVENT_OVERHEAD_END_US + 275U)
