@@ -17,15 +17,15 @@ The overhead time from radio end to radio start when using lll_resume is the sum
 
 #### Nordic Platforms
 The `EVENT_OVERHEAD_START_US` varies based on configuration:
-- **275 μs**: Basic configuration (no extended advertising or with only advertising)
-- **428 μs**: Extended advertising with scanning on 1M PHY
-- **641 μs**: Extended advertising with scanning on 1M and Coded PHY
+- **275 us**: Basic configuration (no extended advertising or with only advertising)
+- **428 us**: Extended advertising with scanning on 1M PHY
+- **641 us**: Extended advertising with scanning on 1M and Coded PHY
 
-**Minimum overhead for Nordic**: 40 μs + 275 μs = **315 μs**
+**Minimum overhead for Nordic**: 40 us + 275 us = **315 us**
 
 #### OpenISA Platforms
-- **EVENT_OVERHEAD_START_US**: 300 μs (fixed)
-- **Total overhead**: 40 μs + 300 μs = **340 μs**
+- **EVENT_OVERHEAD_START_US**: 300 us (fixed)
+- **Total overhead**: 40 us + 300 us = **340 us**
 
 ### Overall Minimum
 The **shortest overhead time across all platforms is 315 microseconds**, occurring on Nordic platforms with the minimal configuration (no extended advertising features or with only basic advertising).
@@ -40,6 +40,7 @@ This macro can be used throughout the codebase when calculating or validating ti
 
 ## Related Constants
 
-- `EVENT_OVERHEAD_END_US = 40 μs` - Worst-case time margin after event end
-- `EVENT_OVERHEAD_START_US = 275-641 μs` (Nordic) or 300 μs (OpenISA) - Time for event setup
-- `EVENT_OVERHEAD_RESUME_MIN_US = 315 μs` (Nordic) or 340 μs (OpenISA) - Total minimum overhead
+- `EVENT_OVERHEAD_END_US = 40 us` - Worst-case time margin after event end
+- `EVENT_OVERHEAD_START_US = 275-641 us` (Nordic) or 300 us (OpenISA) - Time for event setup
+- `EVENT_OVERHEAD_START_MIN_US = 275 us` (Nordic) - Minimum start overhead constant
+- `EVENT_OVERHEAD_RESUME_MIN_US = 315 us` (Nordic) or 340 us (OpenISA) - Total minimum overhead
