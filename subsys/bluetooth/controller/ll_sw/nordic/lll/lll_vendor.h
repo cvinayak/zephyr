@@ -56,7 +56,8 @@
 
 /* Minimum possible value for EVENT_OVERHEAD_START_US across all configurations.
  * This is the base value used when no extended advertising or minimal features
- * are enabled (9 RTC ticks equivalent).
+ * are enabled. Equivalent to 9 RTC ticks with 32.768 kHz crystal
+ * (275 us = 9 * 30.517578125 us/tick).
  */
 #define EVENT_OVERHEAD_START_MIN_US   275
 

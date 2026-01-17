@@ -17,7 +17,7 @@ The overhead time from radio end to radio start when using lll_resume is the sum
 
 #### Nordic Platforms
 The `EVENT_OVERHEAD_START_US` varies based on configuration:
-- **275 us**: Basic configuration (no extended advertising or with only advertising)
+- **275 us**: Basic configuration (without extended advertising features or with basic advertising only)
 - **428 us**: Extended advertising with scanning on 1M PHY
 - **641 us**: Extended advertising with scanning on 1M and Coded PHY
 
