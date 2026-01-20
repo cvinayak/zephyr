@@ -358,7 +358,7 @@ struct proc_ctx {
 			uint16_t subrate_factor;
 			uint16_t subrate_base_event;
 			uint16_t latency;
-		} sr;
+		} subrate;
 #endif /* CONFIG_BT_CTLR_SUBRATING */
 	} data;
 
