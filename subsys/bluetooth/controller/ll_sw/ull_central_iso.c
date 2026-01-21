@@ -440,12 +440,14 @@ ll_cig_parameters_commit_retry:
 	/* 1) Prepare calculation of the flush timeout by adding up the total time needed to
 	 *    transfer all payloads, including retransmissions.
 	 */
+#if defined(CONFIG_BT_CTLR_CONN_ISO_SEQUENTIAL)
 	if (cig->central.packing == BT_ISO_PACKING_SEQUENTIAL) {
 		/* Sequential CISes - add up the total duration */
 		for (uint8_t i = 0U; i < num_cis; i++) {
 			total_time += se[i].total_count * se[i].length;
 		}
 	}
+#endif /* CONFIG_BT_CTLR_CONN_ISO_SEQUENTIAL */
 
 	handle_iter = UINT16_MAX;
 	cig_sync_delay = 0U;
@@ -465,12 +467,35 @@ ll_cig_parameters_commit_retry:
 
 		if (!cig->central.test) {
 #if defined(CONFIG_BT_CTLR_CONN_ISO_LOW_LATENCY_POLICY)
-			/* TODO: Only implemented for sequential packing */
-			LL_ASSERT_ERR(cig->central.packing == BT_ISO_PACKING_SEQUENTIAL);
+#if defined(CONFIG_BT_CTLR_CONN_ISO_SEQUENTIAL)
+			if (cig->central.packing == BT_ISO_PACKING_SEQUENTIAL) {
+				/* Use symmetric flush timeout */
+				cis->lll.tx.ft = DIV_ROUND_UP(total_time, iso_interval_us);
+				cis->lll.rx.ft = cis->lll.tx.ft;
+			}
+#endif /* CONFIG_BT_CTLR_CONN_ISO_SEQUENTIAL */
+#if defined(CONFIG_BT_CTLR_CONN_ISO_INTERLEAVED)
+			if (cig->central.packing == BT_ISO_PACKING_INTERLEAVED) {
+				/* For interleaved packing with low latency policy, use reliability
+				 * policy approach to calculate flush timeout
+				 */
+				uint32_t cig_sync_delay_us_max = iso_interval_us;
 
-			/* Use symmetric flush timeout */
-			cis->lll.tx.ft = DIV_ROUND_UP(total_time, iso_interval_us);
-			cis->lll.rx.ft = cis->lll.tx.ft;
+				cis->lll.tx.ft = ll_cis_calculate_ft(cig_sync_delay_us_max, iso_interval_us,
+								     cig->c_sdu_interval, cig->c_latency,
+								     cis->framed);
+
+				cis->lll.rx.ft = ll_cis_calculate_ft(cig_sync_delay_us_max, iso_interval_us,
+								     cig->p_sdu_interval, cig->p_latency,
+								     cis->framed);
+
+				if ((cis->lll.tx.ft == 0U) || (cis->lll.rx.ft == 0U)) {
+					/* Invalid FT caused by invalid combination of parameters */
+					err = BT_HCI_ERR_INVALID_PARAM;
+					goto ll_cig_parameters_commit_cleanup;
+				}
+			}
+#endif /* CONFIG_BT_CTLR_CONN_ISO_INTERLEAVED */
 
 #elif defined(CONFIG_BT_CTLR_CONN_ISO_RELIABILITY_POLICY)
 			/* Utilize Max_Transport_latency */
@@ -502,11 +527,16 @@ ll_cig_parameters_commit_retry:
 			cis->lll.nse = DIV_ROUND_UP(se[i].total_count, cis->lll.tx.ft);
 		}
 
+#if defined(CONFIG_BT_CTLR_CONN_ISO_SEQUENTIAL)
 		if (cig->central.packing == BT_ISO_PACKING_SEQUENTIAL) {
 			/* Accumulate CIG sync delay for sequential CISes */
 			cis->lll.sub_interval = MAX(SUB_INTERVAL_MIN, se[i].length);
 			cig_sync_delay += cis->lll.nse * cis->lll.sub_interval;
-		} else {
+		}
+#endif /* CONFIG_BT_CTLR_CONN_ISO_SEQUENTIAL */
+
+#if defined(CONFIG_BT_CTLR_CONN_ISO_INTERLEAVED)
+		if (cig->central.packing == BT_ISO_PACKING_INTERLEAVED) {
 			/* For interleaved CISes, offset each CIS by a fraction of a subinterval,
 			 * positioning them evenly within the subinterval.
 			 */
@@ -515,6 +545,7 @@ ll_cig_parameters_commit_retry:
 					     (cis->lll.nse * cis->lll.sub_interval) +
 					     (i * cis->lll.sub_interval / num_cis));
 		}
+#endif /* CONFIG_BT_CTLR_CONN_ISO_INTERLEAVED */
 	}
 
 	cig->sync_delay = cig_sync_delay;
@@ -581,15 +612,21 @@ ll_cig_parameters_commit_retry:
 		c_max_latency = MAX(c_max_latency, c_latency);
 		p_max_latency = MAX(p_max_latency, p_latency);
 
+#if defined(CONFIG_BT_CTLR_CONN_ISO_SEQUENTIAL)
 		if (cig->central.packing == BT_ISO_PACKING_SEQUENTIAL) {
 			/* Distribute CISes sequentially */
 			cis->sync_delay = cig_sync_delay;
 			cig_sync_delay -= cis->lll.nse * cis->lll.sub_interval;
-		} else {
+		}
+#endif /* CONFIG_BT_CTLR_CONN_ISO_SEQUENTIAL */
+
+#if defined(CONFIG_BT_CTLR_CONN_ISO_INTERLEAVED)
+		if (cig->central.packing == BT_ISO_PACKING_INTERLEAVED) {
 			/* Distribute CISes interleaved */
 			cis->sync_delay = cig_sync_delay;
 			cig_sync_delay -= (cis->lll.sub_interval / num_cis);
 		}
+#endif /* CONFIG_BT_CTLR_CONN_ISO_INTERLEAVED */
 
 		if (cis->lll.nse <= 1) {
 			cis->lll.sub_interval = 0U;

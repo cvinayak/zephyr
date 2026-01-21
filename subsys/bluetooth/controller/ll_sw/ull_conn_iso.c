@@ -1066,13 +1066,15 @@ void ull_conn_iso_start(struct ll_conn *conn, uint16_t cis_handle,
 	uint32_t ticks_slot_offset;
 
 	/* Calculate time reservations for sequential and interleaved packing as
-	 * configured.
+	 * configured. The sub_interval and nse values are already calculated correctly
+	 * by ULL for both packing modes, so the same formula works for both.
 	 */
 	if (IS_PERIPHERAL(cig)) {
 		uint32_t slot_us;
 
-		/* FIXME: Time reservation for interleaved packing */
-		/* Below is time reservation for sequential packing */
+		/* Time reservation works for both sequential and interleaved packing because
+		 * sub_interval is calculated differently for each mode in ULL
+		 */
 		if (IS_ENABLED(CONFIG_BT_CTLR_PERIPHERAL_ISO_RESERVE_MAX)) {
 			slot_us = cis->lll.sub_interval * cis->lll.nse;
 		} else {
