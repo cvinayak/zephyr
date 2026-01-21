@@ -473,12 +473,21 @@ ll_cig_parameters_commit_retry:
 				cis->lll.tx.ft = DIV_ROUND_UP(total_time, iso_interval_us);
 				cis->lll.rx.ft = cis->lll.tx.ft;
 			}
+#else /* !CONFIG_BT_CTLR_CONN_ISO_SEQUENTIAL */
+			/* Sequential packing support is not compiled in */
+			if (cig->central.packing == BT_ISO_PACKING_SEQUENTIAL) {
+				err = BT_HCI_ERR_UNSUPP_FEATURE_PARAM_VAL;
+				goto ll_cig_parameters_commit_cleanup;
+			}
 #endif /* CONFIG_BT_CTLR_CONN_ISO_SEQUENTIAL */
+
 #if defined(CONFIG_BT_CTLR_CONN_ISO_INTERLEAVED)
+#if defined(CONFIG_BT_CTLR_CONN_ISO_RELIABILITY_POLICY)
+			/* For interleaved packing with low latency policy, use reliability
+			 * policy approach to calculate flush timeout. This requires the
+			 * reliability policy to be enabled.
+			 */
 			if (cig->central.packing == BT_ISO_PACKING_INTERLEAVED) {
-				/* For interleaved packing with low latency policy, use reliability
-				 * policy approach to calculate flush timeout
-				 */
 				uint32_t cig_sync_delay_us_max = iso_interval_us;
 
 				cis->lll.tx.ft = ll_cis_calculate_ft(cig_sync_delay_us_max, iso_interval_us,
@@ -494,6 +503,21 @@ ll_cig_parameters_commit_retry:
 					err = BT_HCI_ERR_INVALID_PARAM;
 					goto ll_cig_parameters_commit_cleanup;
 				}
+			}
+#else /* !CONFIG_BT_CTLR_CONN_ISO_RELIABILITY_POLICY */
+			/* Interleaved packing with low latency policy requires reliability
+			 * policy to be enabled for flush timeout calculation
+			 */
+			if (cig->central.packing == BT_ISO_PACKING_INTERLEAVED) {
+				err = BT_HCI_ERR_UNSUPP_FEATURE_PARAM_VAL;
+				goto ll_cig_parameters_commit_cleanup;
+			}
+#endif /* CONFIG_BT_CTLR_CONN_ISO_RELIABILITY_POLICY */
+#else /* !CONFIG_BT_CTLR_CONN_ISO_INTERLEAVED */
+			/* Interleaved packing support is not compiled in */
+			if (cig->central.packing == BT_ISO_PACKING_INTERLEAVED) {
+				err = BT_HCI_ERR_UNSUPP_FEATURE_PARAM_VAL;
+				goto ll_cig_parameters_commit_cleanup;
 			}
 #endif /* CONFIG_BT_CTLR_CONN_ISO_INTERLEAVED */
 
@@ -533,6 +557,12 @@ ll_cig_parameters_commit_retry:
 			cis->lll.sub_interval = MAX(SUB_INTERVAL_MIN, se[i].length);
 			cig_sync_delay += cis->lll.nse * cis->lll.sub_interval;
 		}
+#else /* !CONFIG_BT_CTLR_CONN_ISO_SEQUENTIAL */
+		/* Sequential packing support is not compiled in */
+		if (cig->central.packing == BT_ISO_PACKING_SEQUENTIAL) {
+			err = BT_HCI_ERR_UNSUPP_FEATURE_PARAM_VAL;
+			goto ll_cig_parameters_commit_cleanup;
+		}
 #endif /* CONFIG_BT_CTLR_CONN_ISO_SEQUENTIAL */
 
 #if defined(CONFIG_BT_CTLR_CONN_ISO_INTERLEAVED)
@@ -544,6 +574,12 @@ ll_cig_parameters_commit_retry:
 			cig_sync_delay = MAX(cig_sync_delay,
 					     (cis->lll.nse * cis->lll.sub_interval) +
 					     (i * cis->lll.sub_interval / num_cis));
+		}
+#else /* !CONFIG_BT_CTLR_CONN_ISO_INTERLEAVED */
+		/* Interleaved packing support is not compiled in */
+		if (cig->central.packing == BT_ISO_PACKING_INTERLEAVED) {
+			err = BT_HCI_ERR_UNSUPP_FEATURE_PARAM_VAL;
+			goto ll_cig_parameters_commit_cleanup;
 		}
 #endif /* CONFIG_BT_CTLR_CONN_ISO_INTERLEAVED */
 	}
@@ -618,6 +654,12 @@ ll_cig_parameters_commit_retry:
 			cis->sync_delay = cig_sync_delay;
 			cig_sync_delay -= cis->lll.nse * cis->lll.sub_interval;
 		}
+#else /* !CONFIG_BT_CTLR_CONN_ISO_SEQUENTIAL */
+		/* Sequential packing support is not compiled in */
+		if (cig->central.packing == BT_ISO_PACKING_SEQUENTIAL) {
+			err = BT_HCI_ERR_UNSUPP_FEATURE_PARAM_VAL;
+			goto ll_cig_parameters_commit_cleanup;
+		}
 #endif /* CONFIG_BT_CTLR_CONN_ISO_SEQUENTIAL */
 
 #if defined(CONFIG_BT_CTLR_CONN_ISO_INTERLEAVED)
@@ -625,6 +667,12 @@ ll_cig_parameters_commit_retry:
 			/* Distribute CISes interleaved */
 			cis->sync_delay = cig_sync_delay;
 			cig_sync_delay -= (cis->lll.sub_interval / num_cis);
+		}
+#else /* !CONFIG_BT_CTLR_CONN_ISO_INTERLEAVED */
+		/* Interleaved packing support is not compiled in */
+		if (cig->central.packing == BT_ISO_PACKING_INTERLEAVED) {
+			err = BT_HCI_ERR_UNSUPP_FEATURE_PARAM_VAL;
+			goto ll_cig_parameters_commit_cleanup;
 		}
 #endif /* CONFIG_BT_CTLR_CONN_ISO_INTERLEAVED */
 
