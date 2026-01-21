@@ -486,6 +486,10 @@ ll_cig_parameters_commit_retry:
 			/* For interleaved packing with low latency policy, use reliability
 			 * policy approach to calculate flush timeout. This requires the
 			 * reliability policy to be enabled.
+			 *
+			 * Set CIG_Sync_Delay = ISO_Interval as the maximum allowed value.
+			 * This provides maximum scheduling flexibility for interleaved
+			 * subevents across multiple CISes while respecting the Max_Transport_Latency.
 			 */
 			if (cig->central.packing == BT_ISO_PACKING_INTERLEAVED) {
 				uint32_t cig_sync_delay_us_max = iso_interval_us;

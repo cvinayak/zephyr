@@ -1065,12 +1065,25 @@ config BT_CTLR_CONN_ISO
 config BT_CTLR_CONN_ISO_SEQUENTIAL
 	bool "LE Connected Isochronous Stream sequential packing"
 	depends on BT_CTLR_CONN_ISO
+	select BT_CTLR_CONN_ISO_INTERLEAVED if !BT_CTLR_CONN_ISO_SEQUENTIAL
 	default y
+	help
+	  Enable support for sequential packing of CIS subevents where all
+	  subevents of one CIS complete before the next CIS starts.
+	  At least one of sequential or interleaved packing must be enabled.
 
 config BT_CTLR_CONN_ISO_INTERLEAVED
 	bool "LE Connected Isochronous Stream interleaved packing"
 	depends on BT_CTLR_CONN_ISO
+	select BT_CTLR_CONN_ISO_SEQUENTIAL if !BT_CTLR_CONN_ISO_INTERLEAVED
+	select BT_CTLR_CONN_ISO_RELIABILITY_POLICY if BT_CTLR_CONN_ISO_LOW_LATENCY_POLICY
 	default y
+	help
+	  Enable support for interleaved packing of CIS subevents where first
+	  subevents of all CISes are adjacent, then second subevents, etc.
+	  At least one of sequential or interleaved packing must be enabled.
+	  Note: Interleaved packing with low latency policy requires the
+	  reliability policy to also be enabled for flush timeout calculation.
 
 config BT_CTLR_CONN_ISO_STREAMS
 	int "LE Connected Isochronous Streams"
