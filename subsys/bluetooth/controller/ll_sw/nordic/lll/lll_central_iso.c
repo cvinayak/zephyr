@@ -151,7 +151,15 @@ static int prepare_cb(struct lll_prepare_param *p)
 	 */
 	cis_lll->prepared = 1U;
 
-	/* Save first active CIS offset */
+	/* Save first active CIS offset
+	 *
+	 * This is used as the baseline reference for calculating subevent timing
+	 * for both sequential and interleaved packing modes. The actual timing
+	 * formula (offset + sub_interval * se_curr) works for both modes because:
+	 * - ULL sets different offset and sub_interval values based on packing
+	 * - Sequential: offset varies per CIS, sub_interval = SE_Length
+	 * - Interleaved: offset distributed evenly, sub_interval = num_cis * max_se_length
+	 */
 	cis_offset_first = cis_lll->offset;
 
 	/* Get reference to ACL context */
@@ -594,7 +602,24 @@ static void isr_tx(void *param)
 
 	radio_isr_set(isr_rx, param);
 
-	/* Schedule next subevent */
+	/* Schedule next subevent
+	 *
+	 * CIS supports both sequential and interleaved packing through the
+	 * offset and sub_interval parameters calculated by ULL:
+	 *
+	 * Sequential packing:
+	 *   - Each CIS has distinct offset values
+	 *   - sub_interval = SE_Length
+	 *   - All subevents of one CIS complete before next CIS starts
+	 *
+	 * Interleaved packing:
+	 *   - CIS offsets are distributed evenly (offset = CIS_num * spacing)
+	 *   - sub_interval = num_cis * max_se_length
+	 *   - Subevents of different CISes are interleaved
+	 *
+	 * Both modes use the same scheduling formula:
+	 *   subevent_time = offset + (sub_interval * se_curr)
+	 */
 	if (se_curr < cis_lll->nse) {
 		const struct lll_conn *evt_conn_lll;
 		uint16_t data_chan_id;
