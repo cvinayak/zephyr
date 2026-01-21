@@ -4469,22 +4469,22 @@ static void le_cis_established(struct pdu_data *pdu_data,
 
 	est = node;
 
+	if (!cig) {
+		/* CIS was not established and instance was released */
+		return;
+	}
+
+	lll_cis = &cis->lll;
+	is_central = cig->lll.role == BT_CONN_ROLE_CENTRAL;
+	lll_cis_c = is_central ? &lll_cis->tx : &lll_cis->rx;
+	lll_cis_p = is_central ? &lll_cis->rx : &lll_cis->tx;
+
 	if (use_v2) {
 		struct bt_hci_evt_le_cis_established_v2 *sep_v2;
 
 		sep_v2 = meta_evt(buf, BT_HCI_EVT_LE_CIS_ESTABLISHED_V2, sizeof(*sep_v2));
 		sep_v2->status = est->status;
 		sep_v2->conn_handle = sys_cpu_to_le16(est->cis_handle);
-
-		if (!cig) {
-			/* CIS was not established and instance was released */
-			return;
-		}
-
-		lll_cis = &cis->lll;
-		is_central = cig->lll.role == BT_CONN_ROLE_CENTRAL;
-		lll_cis_c = is_central ? &lll_cis->tx : &lll_cis->rx;
-		lll_cis_p = is_central ? &lll_cis->rx : &lll_cis->tx;
 
 		sys_put_le24(cig->sync_delay, sep_v2->cig_sync_delay);
 		sys_put_le24(cis->sync_delay, sep_v2->cis_sync_delay);
@@ -4514,16 +4514,6 @@ static void le_cis_established(struct pdu_data *pdu_data,
 		sep = meta_evt(buf, BT_HCI_EVT_LE_CIS_ESTABLISHED, sizeof(*sep));
 		sep->status = est->status;
 		sep->conn_handle = sys_cpu_to_le16(est->cis_handle);
-
-		if (!cig) {
-			/* CIS was not established and instance was released */
-			return;
-		}
-
-		lll_cis = &cis->lll;
-		is_central = cig->lll.role == BT_CONN_ROLE_CENTRAL;
-		lll_cis_c = is_central ? &lll_cis->tx : &lll_cis->rx;
-		lll_cis_p = is_central ? &lll_cis->rx : &lll_cis->tx;
 
 		sys_put_le24(cig->sync_delay, sep->cig_sync_delay);
 		sys_put_le24(cis->sync_delay, sep->cis_sync_delay);
