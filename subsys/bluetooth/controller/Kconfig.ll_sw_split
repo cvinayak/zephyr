@@ -976,7 +976,7 @@ config BT_CTLR_NRF_GRTC
 	depends on BT_TICKER_CNTR_FREE_RUNNING && (SOC_COMPATIBLE_NRF54LX || SOC_SERIES_NRF71)
 	default y
 	help
-	  Enable use of nRF54Lx and nRF7120 NRF_GRTC peripheral.
+	  Enable use of nRF54Lx and nRF71xx series NRF_GRTC peripheral.
 
 config BT_CTLR_NRF_GRTC_START
 	bool "Start nRF GRTC peripheral"
