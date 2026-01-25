@@ -318,14 +318,34 @@ static uint8_t pu_update_eff_times(struct ll_conn *conn, struct proc_ctx *ctx)
 }
 #endif /* CONFIG_BT_CTLR_DATA_LENGTH */
 
+/*
+ * Map PHY value to perphy[] index.
+ *
+ * PHY encodings (from Bluetooth specification / bt_hci_types.h):
+ *   BT_HCI_LE_PHY_1M    = 1
+ *   BT_HCI_LE_PHY_2M    = 2
+ *   BT_HCI_LE_PHY_CODED = 4
+ *
+ * The perphy[] array is organized with indices:
+ *   index 0 -> 1M
+ *   index 1 -> 2M
+ *   index 2 -> Coded
+ *
+ * This helper intentionally preserves the original logic:
+ *   - Coded PHY (4) maps to index 2
+ *   - Other valid PHY values (1M, 2M) map to (phy - 1)
+ */
+static inline uint8_t pu_phy_to_index(uint8_t phy)
+{
+	return (phy == 4U) ? 2U : (phy - 1U);
+}
+
 static uint8_t pu_update_eff_tifs(struct ll_conn *conn, struct proc_ctx *ctx)
 {
 	uint8_t phy_index_tx, phy_index_rx;
 
-	phy_index_tx =
-		conn->lll.phy_tx == 4 ? 2 : conn->lll.phy_tx - 1; /* a bit tricky but should work */
-	phy_index_rx =
-		conn->lll.phy_rx == 4 ? 2 : conn->lll.phy_rx - 1; /* a bit tricky but should work */
+	phy_index_tx = pu_phy_to_index(conn->lll.phy_tx);
+	phy_index_rx = pu_phy_to_index(conn->lll.phy_rx);
 
 	if (((conn->lll.fsu.perphy[phy_index_tx].spacing_type & T_IFS_ACL_CP) ==
 	     T_IFS_ACL_CP) &&

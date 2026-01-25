@@ -142,7 +142,7 @@ struct lll_conn {
 #endif /* CONFIG_BT_CTLR_DATA_LENGTH */
 	struct {
 		struct data_pdu_fsu local;
-		struct data_pdu_fsu perphy[4]; /* store frame-space for each PHY */
+		struct data_pdu_fsu perphy[3]; /* store frame-space for each PHY (1M, 2M, CODED) */
 		struct data_pdu_fsu eff;
 		uint8_t update;
 	} fsu;

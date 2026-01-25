@@ -757,7 +757,6 @@ void llcp_pdu_encode_fsu_rsp(struct ll_conn *conn, struct pdu_data *pdu)
 	p->fsu = sys_cpu_to_le16(conn->lll.fsu.local.fsu_min);
 	p->phys = conn->lll.fsu.local.phys;
 	p->spacing_type = sys_cpu_to_le16(conn->lll.fsu.local.spacing_type);
-	printk("%s: fsu %u\n", __func__, p->fsu);
 }
 
 void llcp_ntf_encode_fsu_change(struct ll_conn *conn, struct pdu_data *pdu)
@@ -783,8 +782,8 @@ void llcp_pdu_decode_fsu_req(struct ll_conn *conn, struct pdu_data *pdu)
 	conn->lll.fsu.local.fsu_max = sys_le16_to_cpu(p->fsu_max);
 	conn->lll.fsu.local.phys = p->phys & 0x07; /* mask out RFU bits */
 	conn->lll.fsu.local.spacing_type =
-		sys_le16_to_cpu(p->spacing_type & 0x1F); /* mask out RFU bits */
-	/* nitpic, perphy is confusing, call it phy*/
+		sys_le16_to_cpu(p->spacing_type) & 0x1F; /* mask out RFU bits */
+	/* Initialize per-PHY FSU parameters for each enabled PHY bit */
 	for (size_t i = 0; i < 3; i++) {
 		if (p->phys & BIT(i)) {
 			conn->lll.fsu.perphy[i].fsu_min =
@@ -793,7 +792,7 @@ void llcp_pdu_decode_fsu_req(struct ll_conn *conn, struct pdu_data *pdu)
 				sys_le16_to_cpu(p->fsu_max);
 			conn->lll.fsu.perphy[i].phys = p->phys & 0x07;
 			conn->lll.fsu.perphy[i].spacing_type =
-				sys_le16_to_cpu(p->spacing_type & 0x1F);
+				sys_le16_to_cpu(p->spacing_type) & 0x1F;
 		}
 	}
 }
@@ -808,7 +807,7 @@ void llcp_pdu_decode_fsu_rsp(struct ll_conn *conn, struct pdu_data *pdu)
 	conn->lll.fsu.local.fsu_max = sys_le16_to_cpu(p->fsu);
 	conn->lll.fsu.local.phys = p->phys & 0x07; /* mask out RFU bits */
 	conn->lll.fsu.local.spacing_type =
-		sys_le16_to_cpu(p->spacing_type & 0x1F); /* mask out RFU bits */
+		sys_le16_to_cpu(p->spacing_type) & 0x1F; /* mask out RFU bits */
 
 	for (size_t i = 0; i < 3; i++) {
 		if (p->phys & BIT(i)) {
@@ -818,7 +817,7 @@ void llcp_pdu_decode_fsu_rsp(struct ll_conn *conn, struct pdu_data *pdu)
 				sys_le16_to_cpu(p->fsu);
 			conn->lll.fsu.perphy[i].phys = p->phys & 0x07;
 			conn->lll.fsu.perphy[i].spacing_type =
-				sys_le16_to_cpu(p->spacing_type & 0x1F);
+				sys_le16_to_cpu(p->spacing_type) & 0x1F;
 		}
 	}
 }

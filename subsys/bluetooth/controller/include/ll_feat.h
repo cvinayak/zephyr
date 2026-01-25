@@ -254,7 +254,11 @@
 	*/
 
 /* FIXME: Conditional Compilation for FSU feature, and handle feature bits > 64 bits */
-#define LL_FEAT_BIT_FRAME_SPACE 0U
+/* Note: BT_LE_FEAT_BIT_FRAME_SPACE_UPDATE is bit 65, which requires extended 
+ * feature support beyond 64 bits. For testing purposes, we temporarily use a 
+ * placeholder bit (bit 63) until proper extended feature support is added.
+ */
+#define LL_FEAT_BIT_FRAME_SPACE BIT64(63)
 
 /* All defined feature bits */
 #define LL_FEAT_BIT_MASK         0xFFFFFFFFFFULL

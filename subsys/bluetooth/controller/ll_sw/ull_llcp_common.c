@@ -1135,11 +1135,8 @@ static void rp_comm_tx(struct ll_conn *conn, struct proc_ctx *ctx)
 		break;
 #endif /* CONFIG_BT_CTLR_DATA_LENGTH */
 	case PROC_FRAME_SPACE:
-		if ((conn->lll.fsu.local.phys & 0x04)) {
-			llcp_pdu_encode_reject_ext_ind(pdu, PDU_DATA_LLCTRL_TYPE_FRAME_SPACE_REQ,
-						       BT_HCI_ERR_UNSUPP_FEATURE_PARAM_VAL);
-		} else if (!IS_ENABLED(CONFIG_BT_ISO) &&
-			   ((conn->lll.fsu.local.spacing_type & (T_IFS_CIS | T_MSS_CIS)))) {
+		if (!IS_ENABLED(CONFIG_BT_ISO) &&
+		    ((conn->lll.fsu.local.spacing_type & (T_IFS_CIS | T_MSS_CIS)))) {
 			llcp_pdu_encode_reject_ext_ind(pdu, PDU_DATA_LLCTRL_TYPE_FRAME_SPACE_REQ,
 						       BT_HCI_ERR_UNSUPP_FEATURE_PARAM_VAL);
 		} else {
