@@ -129,6 +129,10 @@ ZTEST(fsu_central, test_frame_space_update_central_loc)
 	/* Connect */
 	ull_cp_state_set(&conn, ULL_CP_CONNECTED);
 
+	/* Set the current PHY to 1M */
+	conn.lll.phy_tx = PHY_1M;
+	conn.lll.phy_rx = PHY_1M;
+
 	/* Initiate a Frame Space Update Procedure */
 	err = ull_cp_fsu(&conn, fsu_min, fsu_max, phys, spacing_type);
 	zassert_equal(err, BT_HCI_ERR_SUCCESS);
@@ -209,6 +213,10 @@ ZTEST(fsu_central, test_frame_space_update_central_loc_unknown_rsp)
 
 	/* Connect */
 	ull_cp_state_set(&conn, ULL_CP_CONNECTED);
+
+	/* Set the current PHY to 1M */
+	conn.lll.phy_tx = PHY_1M;
+	conn.lll.phy_rx = PHY_1M;
 
 	/* Initiate a Frame Space Update Procedure */
 	err = ull_cp_fsu(&conn, fsu_min, fsu_max, phys, spacing_type);
@@ -384,6 +392,10 @@ ZTEST(fsu_central, test_frame_space_update_central_rem)
 	/* Connect */
 	ull_cp_state_set(&conn, ULL_CP_CONNECTED);
 
+	/* Set the current PHY to 1M */
+	conn.lll.phy_tx = PHY_1M;
+	conn.lll.phy_rx = PHY_1M;
+
 	/* Prepare */
 	event_prepare(&conn);
 
@@ -465,6 +477,10 @@ ZTEST(fsu_peripheral, test_frame_space_update_peripheral_rem)
 
 	/* Connect */
 	ull_cp_state_set(&conn, ULL_CP_CONNECTED);
+
+	/* Set the current PHY to 1M */
+	conn.lll.phy_tx = PHY_1M;
+	conn.lll.phy_rx = PHY_1M;
 
 	/* Prepare */
 	event_prepare(&conn);
@@ -651,6 +667,10 @@ ZTEST(fsu_central, test_frame_space_update_multi_phy)
 	/* Connect */
 	ull_cp_state_set(&conn, ULL_CP_CONNECTED);
 
+	/* Set the current PHY to 1M */
+	conn.lll.phy_tx = PHY_1M;
+	conn.lll.phy_rx = PHY_1M;
+
 	/* Initiate a Frame Space Update Procedure for all PHYs */
 	err = ull_cp_fsu(&conn, fsu_min, fsu_max, phys, spacing_type);
 	zassert_equal(err, BT_HCI_ERR_SUCCESS);
@@ -735,6 +755,10 @@ ZTEST(fsu_central, test_frame_space_update_eff_value)
 	test_set_role(&conn, BT_HCI_ROLE_CENTRAL);
 	ull_cp_state_set(&conn, ULL_CP_CONNECTED);
 
+	/* Set the current PHY to 1M */
+	conn.lll.phy_tx = PHY_1M;
+	conn.lll.phy_rx = PHY_1M;
+
 	/* Set FSU values below CONFIG minimum */
 	conn.lll.fsu.local.fsu_min = fsu_min_below_config;
 	conn.lll.fsu.local.fsu_max = fsu_max_below_config;
@@ -761,6 +785,10 @@ ZTEST(fsu_central, test_frame_space_update_local_tx_update)
 
 	test_set_role(&conn, BT_HCI_ROLE_CENTRAL);
 	ull_cp_state_set(&conn, ULL_CP_CONNECTED);
+
+	/* Set the current PHY to 1M */
+	conn.lll.phy_tx = PHY_1M;
+	conn.lll.phy_rx = PHY_1M;
 
 	/* Set existing tifs values higher than requested fsu_max */
 	conn.lll.tifs_tx_us = 250;
@@ -804,6 +832,10 @@ ZTEST(fsu_central, test_frame_space_update_phy_transition)
 {
 	test_set_role(&conn, BT_HCI_ROLE_CENTRAL);
 	ull_cp_state_set(&conn, ULL_CP_CONNECTED);
+
+	/* Set the current PHY to 1M */
+	conn.lll.phy_tx = PHY_1M;
+	conn.lll.phy_rx = PHY_1M;
 
 	/* Set up per-PHY FSU values for different PHYs */
 	/* 1M PHY (index 0) */
