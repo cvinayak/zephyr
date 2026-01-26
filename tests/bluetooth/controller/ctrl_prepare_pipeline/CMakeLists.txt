@@ -7,9 +7,8 @@ find_package(Zephyr COMPONENTS unittest REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(bluetooth_ull_prepare_pipeline)
 
 add_subdirectory(${ZEPHYR_BASE}/tests/bluetooth/controller/common common)
-add_subdirectory(${ZEPHYR_BASE}/tests/bluetooth/controller/mock_ctrl mock_ctrl)
 
-target_link_libraries(testbinary PRIVATE common mock_ctrl)
+target_link_libraries(testbinary PRIVATE common)
 
 target_sources(testbinary
   PRIVATE
@@ -27,4 +26,6 @@ target_include_directories(testbinary PRIVATE
   ${ZEPHYR_BASE}/subsys/bluetooth/controller/ll_sw/nordic
   ${ZEPHYR_BASE}/subsys/bluetooth/controller/include
   ${ZEPHYR_BASE}/subsys/bluetooth/controller/util
+  ${ZEPHYR_BASE}/subsys/bluetooth
+  ${ZEPHYR_BASE}/include/zephyr/bluetooth
 )

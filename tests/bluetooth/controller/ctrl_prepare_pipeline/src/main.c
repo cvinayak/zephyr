@@ -8,6 +8,12 @@
  * @file
  * @brief Comprehensive unit tests for ULL prepare pipeline (PR #79444)
  *
+ * ⚠️ IMPORTANT: These tests are written for the FUTURE implementation
+ * described in PR #79444, which replaces MFIFO with an ordered linked list.
+ *
+ * Current implementation uses MFIFO; these tests will need adaptation
+ * when PR #79444 is merged.
+ *
  * This test suite validates the ordered linked list implementation that
  * replaces the FIFO-based prepare pipeline in PR #79444.
  *

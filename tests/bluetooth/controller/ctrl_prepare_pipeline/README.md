@@ -1,5 +1,17 @@
 # Prepare Pipeline Unit Tests
 
+## ⚠️ Important Note
+
+**These tests are written for the FUTURE implementation described in PR #79444.**
+
+The current Zephyr codebase uses an MFIFO (Multi-producer FIFO) implementation for the prepare pipeline. PR #79444 will replace this with an ordered linked list implementation and change the iterator interface from `uint8_t*` to `void**`.
+
+**These tests will need to be adapted once PR #79444 is merged**, specifically:
+
+1. The iterator tests assume `void **idx` parameter (PR #79444's new interface)
+2. The ordering tests assume ordered insertion based on `ticks_at_expire` (new behavior)
+3. The tests assume resume events go to tail automatically (new behavior)
+
 ## Overview
 
 This test suite provides comprehensive unit tests for PR #79444, which replaces the Bluetooth controller's prepare pipeline implementation from a FIFO-based approach to an ordered linked list.
