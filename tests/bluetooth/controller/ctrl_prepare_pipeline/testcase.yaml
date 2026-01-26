@@ -1,0 +1,11 @@
+common:
+  tags:
+    - bluetooth
+    - bt_controller
+    - bt_ull
+tests:
+  bluetooth.ctrl_prepare_pipeline.test:
+    type: unit
+    tags:
+      - bluetooth_controller
+      - prepare_pipeline
