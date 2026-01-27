@@ -23,6 +23,8 @@
 #include "lll.h"
 #include "ull_internal.h"
 
+#include "test_common.h"
+
 /* Mock callbacks for testing */
 static int test_prepare_cb(struct lll_prepare_param *prepare_param)
 {
@@ -209,18 +211,14 @@ static void *test_ull_prepare_basic_setup(void)
 
 static void test_ull_prepare_basic_before(void *f)
 {
-	/* Note: Pipeline initialization/cleanup would happen here if needed.
-	 * For now, we rely on the implementation's internal state management.
-	 * In a real scenario after PR #79444, we might need to initialize
-	 * the ordered list structure here.
-	 */
+	/* Initialize pipeline before each test */
+	ull_prepare_pipeline_init();
 }
 
 static void test_ull_prepare_basic_after(void *f)
 {
-	/* Cleanup after each test - drain the pipeline
-	 * This ensures each test starts with a clean state.
-	 */
+	/* Cleanup pipeline after each test to ensure clean state */
+	ull_prepare_pipeline_cleanup();
 }
 
 static void test_ull_prepare_basic_teardown(void *f)

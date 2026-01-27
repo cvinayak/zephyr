@@ -23,6 +23,8 @@
 #include "lll.h"
 #include "ull_internal.h"
 
+#include "test_common.h"
+
 /* Mock callbacks */
 static int test_prepare_cb(struct lll_prepare_param *prepare_param)
 {
@@ -314,10 +316,12 @@ static void *test_ull_prepare_iterator_setup(void)
 
 static void test_ull_prepare_iterator_before(void *f)
 {
+	ull_prepare_pipeline_init();
 }
 
 static void test_ull_prepare_iterator_after(void *f)
 {
+	ull_prepare_pipeline_cleanup();
 }
 
 static void test_ull_prepare_iterator_teardown(void *f)

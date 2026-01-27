@@ -13,10 +13,12 @@ target_link_libraries(testbinary PRIVATE common)
 target_sources(testbinary
   PRIVATE
     src/main.c
+    src/ull_prepare_impl.c
     src/test_ull_prepare_basic.c
     src/test_ull_prepare_ordering.c
     src/test_ull_prepare_iterator.c
     src/test_ull_prepare_edge_cases.c
+    ${ZEPHYR_BASE}/subsys/bluetooth/controller/util/mem.c
 )
 
 # Include paths for controller sources

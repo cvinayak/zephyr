@@ -23,6 +23,8 @@
 #include "lll.h"
 #include "ull_internal.h"
 
+#include "test_common.h"
+
 /* Event pipeline maximum size as defined in ull.c */
 #define EVENT_DEFER_MAX 2
 #define EVENT_PIPELINE_MAX (7U + (EVENT_DEFER_MAX))
@@ -370,10 +372,12 @@ static void *test_ull_prepare_edge_cases_setup(void)
 
 static void test_ull_prepare_edge_cases_before(void *f)
 {
+	ull_prepare_pipeline_init();
 }
 
 static void test_ull_prepare_edge_cases_after(void *f)
 {
+	ull_prepare_pipeline_cleanup();
 }
 
 static void test_ull_prepare_edge_cases_teardown(void *f)

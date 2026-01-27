@@ -23,6 +23,8 @@
 #include "lll.h"
 #include "ull_internal.h"
 
+#include "test_common.h"
+
 /* Mock callbacks */
 static int test_prepare_cb(struct lll_prepare_param *prepare_param)
 {
@@ -316,11 +318,13 @@ static void *test_ull_prepare_ordering_setup(void)
 static void test_ull_prepare_ordering_before(void *f)
 {
 	/* Initialize pipeline state */
+	ull_prepare_pipeline_init();
 }
 
 static void test_ull_prepare_ordering_after(void *f)
 {
 	/* Cleanup pipeline */
+	ull_prepare_pipeline_cleanup();
 }
 
 static void test_ull_prepare_ordering_teardown(void *f)
