@@ -3861,6 +3861,7 @@ static void le_set_per_adv_param_v2(struct net_buf *buf, struct net_buf **evt)
 	}
 
 	/* TODO: Implement PAwR parameter configuration with subevents */
+	ARG_UNUSED(handle);
 	status = BT_HCI_ERR_CMD_DISALLOWED;
 
 	*evt = cmd_complete_status(status);
@@ -3883,6 +3884,7 @@ static void le_set_per_adv_subevent_data(struct net_buf *buf, struct net_buf **e
 	}
 
 	/* TODO: Implement PAwR subevent data configuration */
+	ARG_UNUSED(handle);
 	status = BT_HCI_ERR_CMD_DISALLOWED;
 
 	*evt = cmd_complete_status(status);
@@ -4238,6 +4240,7 @@ static void le_set_per_adv_sync_subevent(struct net_buf *buf, struct net_buf **e
 	handle = sys_le16_to_cpu(cmd->sync_handle);
 
 	/* TODO: Implement PAwR subevent synchronization */
+	ARG_UNUSED(handle);
 	status = BT_HCI_ERR_CMD_DISALLOWED;
 
 	ccst = hci_cmd_complete(evt, sizeof(*ccst));
@@ -4258,6 +4261,7 @@ static void le_set_per_adv_response_data(struct net_buf *buf, struct net_buf **e
 	handle = sys_le16_to_cpu(cmd->sync_handle);
 
 	/* TODO: Implement PAwR response data transmission */
+	ARG_UNUSED(handle);
 	status = BT_HCI_ERR_CMD_DISALLOWED;
 
 	ccst = hci_cmd_complete(evt, sizeof(*ccst));
