@@ -34,11 +34,12 @@
 		};
 
 		cpuflpr: cpu@1 {
-			compatible = "nordic,vpr";
+			compatible = "nordic,vpr", "riscv";
 			reg = <1>;
 			device_type = "cpu";
 			clock-frequency = <DT_FREQ_M(256)>;
-			riscv,isa = "rv32emc";
+			riscv,isa-base = "rv32e";
+			riscv,isa-extensions = "e", "m", "c", "zicsr";
 			nordic,bus-width = <32>;
 		};
 	};
@@ -383,11 +384,6 @@
 
 				ieee802154: ieee802154 {
 					compatible = "nordic,nrf-ieee802154";
-					status = "disabled";
-				};
-
-				bt_hci_sdc: bt_hci_sdc {
-					compatible = "nordic,bt-hci-sdc";
 					status = "disabled";
 				};
 
