@@ -15,8 +15,7 @@
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/hci.h>
 #include <zephyr/bluetooth/hci_types.h>
-
-#include "ll.h"
+#include <zephyr/net/buf.h>
 
 #include "bs_types.h"
 #include "bs_tracing.h"
@@ -38,7 +37,6 @@
 extern enum bst_result_t bst_result;
 
 /* Test parameters */
-#define ADV_HANDLE              0
 #define ADV_INTERVAL            0x00A0  /* 100 ms */
 #define PER_ADV_INTERVAL_MIN    0x00A0  /* 200 ms */
 #define PER_ADV_INTERVAL_MAX    0x00A0  /* 200 ms */
@@ -154,7 +152,6 @@ static void test_pawr_adv_main(void)
 	struct bt_le_adv_param adv_param;
 	struct bt_le_per_adv_param per_adv_param;
 	int err;
-	uint8_t handle;
 
 	printk("Starting PAwR Advertiser test\n");
 
@@ -180,52 +177,12 @@ static void test_pawr_adv_main(void)
 	}
 	printk("success.\n");
 
-	/* Get the handle for lower-level API calls */
-	handle = ADV_HANDLE;
-
-	printk("Setting PAwR parameters (v2)...");
-	/* Use lower-level controller API to test PAwR parameter setting */
-	err = ll_adv_sync_param_set_v2(handle, 
-				       PER_ADV_INTERVAL_MAX,
-				       0,  /* properties/flags */
-				       NUM_SUBEVENTS,
-				       SUBEVENT_INTERVAL,
-				       RESPONSE_SLOT_DELAY,
-				       RESPONSE_SLOT_SPACING,
-				       NUM_RESPONSE_SLOTS);
-	if (err) {
-		FAIL("Failed to set PAwR parameters (err %d)\n", err);
-		return;
-	}
-	printk("success.\n");
-
-	printk("Setting subevent data...");
-	/* Prepare subevent data parameters */
-	uint8_t subevent = 0;
-	uint8_t response_slot_start = 0;
-	uint8_t response_slot_count = NUM_RESPONSE_SLOTS;
-	uint8_t subevent_data_len = sizeof(test_subevent_data);
-	const uint8_t *subevent_data_ptr = test_subevent_data;
-
-	err = ll_adv_sync_subevent_data_set(handle,
-					     1,  /* num_subevents */
-					     &subevent,
-					     &response_slot_start,
-					     &response_slot_count,
-					     &subevent_data_len,
-					     &subevent_data_ptr);
-	if (err) {
-		FAIL("Failed to set subevent data (err %d)\n", err);
-		return;
-	}
-	printk("success.\n");
-
-	printk("Enabling periodic advertising...");
+	printk("Setting PAwR parameters...");
 	memset(&per_adv_param, 0, sizeof(per_adv_param));
 	per_adv_param.interval_min = PER_ADV_INTERVAL_MIN;
 	per_adv_param.interval_max = PER_ADV_INTERVAL_MAX;
-#if defined(CONFIG_BT_PER_ADV_RSP)
 	per_adv_param.options = BT_LE_PER_ADV_OPT_NONE;
+#if defined(CONFIG_BT_PER_ADV_RSP)
 	per_adv_param.num_subevents = NUM_SUBEVENTS;
 	per_adv_param.subevent_interval = SUBEVENT_INTERVAL;
 	per_adv_param.response_slot_delay = RESPONSE_SLOT_DELAY;
@@ -239,6 +196,28 @@ static void test_pawr_adv_main(void)
 		return;
 	}
 	printk("success.\n");
+
+#if defined(CONFIG_BT_PER_ADV_RSP)
+	printk("Setting subevent data...");
+	/* Prepare subevent data parameters */
+	struct bt_le_per_adv_subevent_data_params subevent_params;
+	struct net_buf_simple subevent_buf;
+	
+	subevent_params.subevent = 0;
+	subevent_params.response_slot_start = 0;
+	subevent_params.response_slot_count = NUM_RESPONSE_SLOTS;
+	
+	net_buf_simple_init_with_data(&subevent_buf, (void *)test_subevent_data,
+				       sizeof(test_subevent_data));
+	subevent_params.data = &subevent_buf;
+
+	err = bt_le_per_adv_set_subevent_data(adv, 1, &subevent_params);
+	if (err) {
+		FAIL("Failed to set subevent data (err %d)\n", err);
+		return;
+	}
+	printk("success.\n");
+#endif
 
 	printk("Starting extended advertising...");
 	err = bt_le_ext_adv_start(adv, BT_LE_EXT_ADV_START_DEFAULT);
@@ -355,14 +334,17 @@ static void test_pawr_sync_main(void)
 
 #if defined(CONFIG_BT_PER_ADV_SYNC_RSP)
 	printk("Setting subevent selection...");
-	/* Test subevent selection API */
-	uint16_t sync_handle = 0;  /* Would need to get actual handle */
+	/* Use host API to select subevents */
+	struct bt_le_per_adv_sync_subevent_params subevent_params;
 	uint8_t subevents[] = {0};  /* Select subevent 0 */
 	
-	err = ll_sync_subevent_set(sync_handle, 0, 1, subevents);
-	if (err && err != BT_HCI_ERR_UNKNOWN_ADV_IDENTIFIER) {
-		/* It's okay if we don't have the handle yet */
-		printk("Note: subevent selection returned %d\n", err);
+	subevent_params.properties = 0;
+	subevent_params.num_subevents = 1;
+	subevent_params.subevents = subevents;
+	
+	err = bt_le_per_adv_sync_subevent(sync, &subevent_params);
+	if (err) {
+		printk("Note: subevent selection returned %d (may not be implemented yet)\n", err);
 	} else {
 		printk("success.\n");
 	}
