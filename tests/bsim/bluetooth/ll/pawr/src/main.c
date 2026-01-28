@@ -208,12 +208,11 @@ static void test_pawr_adv_main(void)
 	const uint8_t *subevent_data_ptr = test_subevent_data;
 
 	err = ll_adv_sync_subevent_data_set(handle,
-					     1,  /* num_subevents */
-					     &subevent,
-					     &response_slot_start,
-					     &response_slot_count,
-					     &subevent_data_len,
-					     &subevent_data_ptr);
+					     subevent,
+					     response_slot_start,
+					     response_slot_count,
+					     subevent_data_len,
+					     (uint8_t *)subevent_data_ptr);
 	if (err) {
 		FAIL("Failed to set subevent data (err %d)\n", err);
 		return;
