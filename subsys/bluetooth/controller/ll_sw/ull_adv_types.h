@@ -108,6 +108,15 @@ struct ll_adv_sync_set {
 #if !defined(CONFIG_BT_TICKER_EXT_EXPIRE_INFO)
 	uint32_t aux_remainder;
 #endif /* !CONFIG_BT_TICKER_EXT_EXPIRE_INFO */
+
+#if defined(CONFIG_BT_CTLR_ADV_PERIODIC_RSP)
+	/* PAwR (Periodic Advertising with Responses) parameters */
+	uint8_t num_subevents;
+	uint8_t subevent_interval;        /* N * 1.25ms */
+	uint8_t response_slot_delay;      /* N * 1.25ms */
+	uint8_t response_slot_spacing;    /* N * 0.125ms */
+	uint8_t num_response_slots;
+#endif /* CONFIG_BT_CTLR_ADV_PERIODIC_RSP */
 };
 
 struct ll_adv_iso_set {

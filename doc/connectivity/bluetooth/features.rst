@@ -14,7 +14,7 @@ implementations of the Bluetooth specification (Linux's BlueZ) as well as the
 design and development of Bluetooth LE radio hardware, the protocol stack in Zephyr has
 grown to be mature and feature-rich, as can be seen in the section below.
 
-* Bluetooth v5.3 compliant
+* Bluetooth v5.4 compliant
 
   * Highly configurable
 
@@ -38,7 +38,7 @@ grown to be mature and feature-rich, as can be seen in the section below.
 * :ref:`Bluetooth Low Energy Controller <bluetooth-ctlr-arch>` (LE Link Layer)
 
   * Unlimited role and connection count, all roles supported
-  * All v5.3 specification features supported (except a few minor items)
+  * All v5.4 specification features supported (except a few minor items)
   * Concurrent multi-protocol support ready
   * Intelligent scheduling of roles to minimize overlap
   * Portable design to any open Bluetooth LE radio, currently supports Nordic
@@ -57,7 +57,7 @@ grown to be mature and feature-rich, as can be seen in the section below.
     * Observer & Broadcaster
     * Multiple PHY support (2Mbit/s, Coded)
     * Extended Advertising
-    * Periodic Advertising (including Sync Transfer)
+    * Periodic Advertising (including Sync Transfer and Responses)
 
   * GATT (Generic Attribute Profile)
 
