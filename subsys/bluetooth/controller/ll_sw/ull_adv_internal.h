@@ -352,3 +352,6 @@ uint32_t ull_adv_iso_max_time_get(const struct ll_adv_iso_set *adv_iso);
 /* helper function to release unused DF configuration memory */
 void ull_df_adv_cfg_release(struct lll_df_adv_cfg *df_adv_cfg);
 #endif /* CONFIG_BT_CTLR_DF_ADV_CTE_TX */
+
+/* Helper function to acquire an advertising sync set */
+struct ll_adv_sync_set *sync_acquire(void);

@@ -94,7 +94,7 @@ static uint8_t ull_adv_sync_remove_adi(struct lll_adv_sync *lll_sync,
 				       struct pdu_adv *pdu);
 #endif /* CONFIG_BT_CTLR_ADV_PERIODIC_ADI_SUPPORT */
 static uint8_t adv_type_check(struct ll_adv_set *adv);
-static inline struct ll_adv_sync_set *sync_acquire(void);
+static inline uint16_t sync_handle_get(const struct ll_adv_sync_set *sync);
 static inline void sync_release(struct ll_adv_sync_set *sync);
 static inline uint16_t sync_handle_get(const struct ll_adv_sync_set *sync);
 static uint32_t sync_time_get(const struct ll_adv_sync_set *sync,
@@ -2441,7 +2441,7 @@ static uint8_t adv_type_check(struct ll_adv_set *adv)
 	return 0;
 }
 
-static inline struct ll_adv_sync_set *sync_acquire(void)
+struct ll_adv_sync_set *sync_acquire(void)
 {
 	return mem_acquire(&adv_sync_free);
 }

@@ -3847,6 +3847,9 @@ static void le_set_per_adv_enable(struct net_buf *buf, struct net_buf **evt)
 static void le_set_per_adv_param_v2(struct net_buf *buf, struct net_buf **evt)
 {
 	struct bt_hci_cp_le_set_per_adv_param_v2 *cmd = (void *)buf->data;
+	uint16_t min_interval;
+	uint16_t max_interval;
+	uint16_t props;
 	uint8_t status;
 	uint8_t handle;
 
@@ -3860,9 +3863,15 @@ static void le_set_per_adv_param_v2(struct net_buf *buf, struct net_buf **evt)
 		return;
 	}
 
-	/* TODO: Implement PAwR parameter configuration with subevents */
-	ARG_UNUSED(handle);
-	status = BT_HCI_ERR_CMD_DISALLOWED;
+	min_interval = sys_le16_to_cpu(cmd->min_interval);
+	max_interval = sys_le16_to_cpu(cmd->max_interval);
+	props = sys_le16_to_cpu(cmd->props);
+
+	/* Call ULL function to set PAwR parameters */
+	status = ll_adv_sync_param_set_v2(handle, max_interval, props,
+					   cmd->num_subevents, cmd->subevent_interval,
+					   cmd->response_slot_delay, cmd->response_slot_spacing,
+					   cmd->num_response_slots);
 
 	*evt = cmd_complete_status(status);
 }
@@ -3870,8 +3879,15 @@ static void le_set_per_adv_param_v2(struct net_buf *buf, struct net_buf **evt)
 static void le_set_per_adv_subevent_data(struct net_buf *buf, struct net_buf **evt)
 {
 	struct bt_hci_cp_le_set_pawr_subevent_data *cmd = (void *)buf->data;
+	struct bt_hci_cp_le_set_pawr_subevent_data_element *element;
 	uint8_t status;
 	uint8_t handle;
+	uint8_t *subevent;
+	uint8_t *response_slot_start;
+	uint8_t *response_slot_count;
+	uint8_t *subevent_data_len;
+	uint8_t **subevent_data;
+	uint8_t i;
 
 	if (adv_cmds_ext_check(evt)) {
 		return;
@@ -3883,9 +3899,45 @@ static void le_set_per_adv_subevent_data(struct net_buf *buf, struct net_buf **e
 		return;
 	}
 
-	/* TODO: Implement PAwR subevent data configuration */
-	ARG_UNUSED(handle);
-	status = BT_HCI_ERR_CMD_DISALLOWED;
+	/* Allocate temporary arrays for subevent data */
+	subevent = k_malloc(cmd->num_subevents);
+	response_slot_start = k_malloc(cmd->num_subevents);
+	response_slot_count = k_malloc(cmd->num_subevents);
+	subevent_data_len = k_malloc(cmd->num_subevents);
+	subevent_data = k_malloc(cmd->num_subevents * sizeof(uint8_t *));
+
+	if (!subevent || !response_slot_start || !response_slot_count ||
+	    !subevent_data_len || !subevent_data) {
+		status = BT_HCI_ERR_MEM_CAPACITY_EXCEEDED;
+		goto cleanup;
+	}
+
+	/* Parse subevent data elements */
+	element = (struct bt_hci_cp_le_set_pawr_subevent_data_element *)cmd->subevents;
+	for (i = 0; i < cmd->num_subevents; i++) {
+		subevent[i] = element->subevent;
+		response_slot_start[i] = element->response_slot_start;
+		response_slot_count[i] = element->response_slot_count;
+		subevent_data_len[i] = element->subevent_data_length;
+		subevent_data[i] = element->subevent_data;
+
+		/* Move to next element */
+		element = (struct bt_hci_cp_le_set_pawr_subevent_data_element *)
+			  ((uint8_t *)element + sizeof(*element) + element->subevent_data_length);
+	}
+
+	/* Call ULL function to set subevent data */
+	status = ll_adv_sync_subevent_data_set(handle, cmd->num_subevents,
+						subevent, response_slot_start,
+						response_slot_count, subevent_data_len,
+						(const uint8_t *const *)subevent_data);
+
+cleanup:
+	k_free(subevent);
+	k_free(response_slot_start);
+	k_free(response_slot_count);
+	k_free(subevent_data_len);
+	k_free(subevent_data);
 
 	*evt = cmd_complete_status(status);
 }
@@ -4231,6 +4283,7 @@ static void le_set_per_adv_sync_subevent(struct net_buf *buf, struct net_buf **e
 	struct bt_hci_cp_le_set_pawr_sync_subevent *cmd = (void *)buf->data;
 	struct bt_hci_evt_cc_status *ccst;
 	uint16_t handle;
+	uint16_t props;
 	uint8_t status;
 
 	if (adv_cmds_ext_check(evt)) {
@@ -4238,10 +4291,10 @@ static void le_set_per_adv_sync_subevent(struct net_buf *buf, struct net_buf **e
 	}
 
 	handle = sys_le16_to_cpu(cmd->sync_handle);
+	props = sys_le16_to_cpu(cmd->periodic_adv_properties);
 
-	/* TODO: Implement PAwR subevent synchronization */
-	ARG_UNUSED(handle);
-	status = BT_HCI_ERR_CMD_DISALLOWED;
+	/* Call ULL function to set subevent selection */
+	status = ll_sync_subevent_set(handle, props, cmd->num_subevents, cmd->subevents);
 
 	ccst = hci_cmd_complete(evt, sizeof(*ccst));
 	ccst->status = status;
@@ -4252,6 +4305,7 @@ static void le_set_per_adv_response_data(struct net_buf *buf, struct net_buf **e
 	struct bt_hci_cp_le_set_pawr_response_data *cmd = (void *)buf->data;
 	struct bt_hci_evt_cc_status *ccst;
 	uint16_t handle;
+	uint16_t request_event;
 	uint8_t status;
 
 	if (adv_cmds_ext_check(evt)) {
@@ -4259,10 +4313,13 @@ static void le_set_per_adv_response_data(struct net_buf *buf, struct net_buf **e
 	}
 
 	handle = sys_le16_to_cpu(cmd->sync_handle);
+	request_event = sys_le16_to_cpu(cmd->request_event);
 
-	/* TODO: Implement PAwR response data transmission */
-	ARG_UNUSED(handle);
-	status = BT_HCI_ERR_CMD_DISALLOWED;
+	/* Call ULL function to set response data */
+	status = ll_sync_response_data_set(handle, request_event,
+					    cmd->request_subevent, cmd->response_subevent,
+					    cmd->response_slot, cmd->response_data_length,
+					    cmd->response_data);
 
 	ccst = hci_cmd_complete(evt, sizeof(*ccst));
 	ccst->status = status;
