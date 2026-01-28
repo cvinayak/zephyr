@@ -160,6 +160,12 @@ struct lll_adv_sync {
 	 */
 	uint8_t cte_started:1;
 #endif /* CONFIG_BT_CTLR_DF_ADV_CTE_TX */
+
+#if defined(CONFIG_BT_CTLR_ADV_PERIODIC_RSP)
+	/* PAwR (Periodic Advertising with Responses) state */
+	uint8_t is_pawr:1;                /* Indicates PAwR mode */
+	uint8_t subevent_current;         /* Current subevent being transmitted */
+#endif /* CONFIG_BT_CTLR_ADV_PERIODIC_RSP */
 };
 
 struct lll_adv_aux {

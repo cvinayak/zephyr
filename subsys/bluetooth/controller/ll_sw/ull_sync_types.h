@@ -98,6 +98,12 @@ struct ll_sync_set {
 #if defined(CONFIG_BT_CTLR_SYNC_TRANSFER_SENDER)
 	uint16_t interval;
 #endif /* CONFIG_BT_CTLR_SYNC_TRANSFER_SENDER */
+
+#if defined(CONFIG_BT_CTLR_SYNC_PERIODIC_RSP)
+	/* PAwR (Periodic Advertising with Responses) scanner-side state */
+	uint8_t num_subevents;            /* Number of subevents to sync to */
+	uint8_t subevents[BT_HCI_PAWR_SUBEVENT_MAX]; /* Subevent indices */
+#endif /* CONFIG_BT_CTLR_SYNC_PERIODIC_RSP */
 };
 
 struct node_rx_sync {

@@ -97,20 +97,16 @@ uint8_t ll_adv_sync_param_set_v2(uint8_t handle, uint16_t interval, uint16_t fla
 
 	/* Store PAwR parameters in sync context */
 	sync->interval = interval;
-	
-	/* TODO: Store PAwR specific parameters when data structures are extended
-	 * - num_subevents
-	 * - subevent_interval
-	 * - response_slot_delay
-	 * - response_slot_spacing
-	 * - num_response_slots
-	 */
+	sync->num_subevents = num_subevents;
+	sync->subevent_interval = subevent_interval;
+	sync->response_slot_delay = response_slot_delay;
+	sync->response_slot_spacing = response_slot_spacing;
+	sync->num_response_slots = num_response_slots;
+
+	/* Mark LLL as PAwR mode */
+	sync->lll.is_pawr = 1;
 
 	ARG_UNUSED(flags);
-	ARG_UNUSED(subevent_interval);
-	ARG_UNUSED(response_slot_delay);
-	ARG_UNUSED(response_slot_spacing);
-	ARG_UNUSED(num_response_slots);
 
 	return BT_HCI_ERR_SUCCESS;
 }

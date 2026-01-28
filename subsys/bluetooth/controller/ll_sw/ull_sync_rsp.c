@@ -5,6 +5,7 @@
  */
 
 #include <stdlib.h>
+#include <string.h>
 #include <zephyr/kernel.h>
 #include <soc.h>
 #include <zephyr/sys/byteorder.h>
@@ -81,12 +82,14 @@ uint8_t ll_sync_subevent_set(uint16_t handle, uint16_t periodic_adv_properties,
 		return BT_HCI_ERR_INVALID_PARAM;
 	}
 
-	/* TODO: Store subevent selection when data structures are extended
-	 * For now, we just validate and accept the command
-	 */
+	/* Store subevent selection */
+	sync->num_subevents = num_subevents;
+	memcpy(sync->subevents, subevents, num_subevents);
+
+	/* Mark LLL as PAwR mode */
+	sync->lll.is_pawr = 1;
 
 	ARG_UNUSED(periodic_adv_properties);
-	ARG_UNUSED(subevents);
 
 	return BT_HCI_ERR_SUCCESS;
 }
