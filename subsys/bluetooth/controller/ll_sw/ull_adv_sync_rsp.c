@@ -73,10 +73,10 @@ uint8_t ll_adv_sync_param_set_v2(uint8_t handle, uint16_t interval, uint16_t fla
 	}
 
 	/* Get or allocate sync context */
-	sync = adv->lll.sync;
+	sync = HDR_LLL2ULL(adv->lll.sync);
 	if (!sync) {
 		/* Allocate a new sync set if not already present */
-		sync = sync_acquire();
+		sync = ull_adv_sync_acquire();
 		if (!sync) {
 			return BT_HCI_ERR_MEM_CAPACITY_EXCEEDED;
 		}
@@ -104,7 +104,7 @@ uint8_t ll_adv_sync_param_set_v2(uint8_t handle, uint16_t interval, uint16_t fla
 	sync->num_response_slots = num_response_slots;
 
 	/* Mark LLL as PAwR mode */
-	sync->lll.is_pawr = 1;
+	sync->lll.is_rsp = 1;
 
 	ARG_UNUSED(flags);
 
@@ -112,10 +112,10 @@ uint8_t ll_adv_sync_param_set_v2(uint8_t handle, uint16_t interval, uint16_t fla
 }
 
 /**
- * @brief Set subevent data for periodic advertising with responses
+ * @brief Set subevent data for periodic advertising with responses, function
+ *        handle one subevent, caller can call multiple times for each subvent.
  *
  * @param handle         Advertising set handle
- * @param num_subevents  Number of subevents to set data for
  * @param subevent       Array of subevent indices
  * @param response_slot_start Array of response slot start values
  * @param response_slot_count Array of response slot count values
@@ -124,12 +124,12 @@ uint8_t ll_adv_sync_param_set_v2(uint8_t handle, uint16_t interval, uint16_t fla
  *
  * @return 0 on success, error code otherwise
  */
-uint8_t ll_adv_sync_subevent_data_set(uint8_t handle, uint8_t num_subevents,
-				       const uint8_t *subevent,
-				       const uint8_t *response_slot_start,
-				       const uint8_t *response_slot_count,
-				       const uint8_t *subevent_data_len,
-				       const uint8_t *const *subevent_data)
+uint8_t ll_adv_sync_subevent_data_set(uint8_t handle,
+				      uint8_t subevent,
+				      uint8_t response_slot_start,
+				      uint8_t response_slot_count,
+				      uint8_t subevent_data_len,
+				      uint8_t *subevent_data)
 {
 	struct ll_adv_sync_set *sync;
 	struct ll_adv_set *adv;
@@ -141,14 +141,9 @@ uint8_t ll_adv_sync_subevent_data_set(uint8_t handle, uint8_t num_subevents,
 	}
 
 	/* Get sync context */
-	sync = adv->lll.sync;
+	sync = HDR_LLL2ULL(adv->lll.sync);
 	if (!sync) {
 		return BT_HCI_ERR_CMD_DISALLOWED;
-	}
-
-	/* Validate parameters */
-	if (num_subevents == 0) {
-		return BT_HCI_ERR_INVALID_PARAM;
 	}
 
 	/* TODO: Store subevent data when data structures are extended

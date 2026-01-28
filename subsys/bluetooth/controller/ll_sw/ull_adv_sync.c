@@ -94,7 +94,6 @@ static uint8_t ull_adv_sync_remove_adi(struct lll_adv_sync *lll_sync,
 				       struct pdu_adv *pdu);
 #endif /* CONFIG_BT_CTLR_ADV_PERIODIC_ADI_SUPPORT */
 static uint8_t adv_type_check(struct ll_adv_set *adv);
-static inline uint16_t sync_handle_get(const struct ll_adv_sync_set *sync);
 static inline void sync_release(struct ll_adv_sync_set *sync);
 static inline uint16_t sync_handle_get(const struct ll_adv_sync_set *sync);
 static uint32_t sync_time_get(const struct ll_adv_sync_set *sync,
@@ -156,7 +155,7 @@ uint8_t ll_adv_sync_param_set(uint8_t handle, uint16_t interval, uint16_t flags)
 		struct lll_adv *lll;
 		uint8_t chm_last;
 
-		sync = sync_acquire();
+		sync = ull_adv_sync_acquire();
 		if (!sync) {
 			return BT_HCI_ERR_MEM_CAPACITY_EXCEEDED;
 		}
@@ -734,6 +733,17 @@ int ull_adv_sync_reset_finalize(void)
 	return 0;
 }
 
+struct ll_adv_sync_set *ull_adv_sync_acquire(void)
+{
+	return mem_acquire(&adv_sync_free);
+}
+
+void ull_adv_sync_release(struct ll_adv_sync_set *sync)
+{
+	lll_adv_sync_data_release(&sync->lll);
+	sync_release(sync);
+}
+
 struct ll_adv_sync_set *ull_adv_sync_get(uint8_t handle)
 {
 	if (handle >= CONFIG_BT_CTLR_ADV_SYNC_SET) {
@@ -751,12 +761,6 @@ uint16_t ull_adv_sync_handle_get(const struct ll_adv_sync_set *sync)
 uint16_t ull_adv_sync_lll_handle_get(const struct lll_adv_sync *lll)
 {
 	return sync_handle_get((void *)lll->hdr.parent);
-}
-
-void ull_adv_sync_release(struct ll_adv_sync_set *sync)
-{
-	lll_adv_sync_data_release(&sync->lll);
-	sync_release(sync);
 }
 
 uint32_t ull_adv_sync_time_get(const struct ll_adv_sync_set *sync,
@@ -2439,11 +2443,6 @@ static uint8_t adv_type_check(struct ll_adv_set *adv)
 	}
 
 	return 0;
-}
-
-struct ll_adv_sync_set *sync_acquire(void)
-{
-	return mem_acquire(&adv_sync_free);
 }
 
 static inline void sync_release(struct ll_adv_sync_set *sync)

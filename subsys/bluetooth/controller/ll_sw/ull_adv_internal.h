@@ -229,14 +229,17 @@ int ull_adv_sync_init(void);
 int ull_adv_sync_reset(void);
 int ull_adv_sync_reset_finalize(void);
 
+/* Helper function to acquire an advertising sync set */
+struct ll_adv_sync_set *ull_adv_sync_acquire(void);
+
+/* helper function to release periodic advertising instance */
+void ull_adv_sync_release(struct ll_adv_sync_set *sync);
+
 /* Return ll_adv_sync_set context (unconditional) */
 struct ll_adv_sync_set *ull_adv_sync_get(uint8_t handle);
 
 /* Return the aux set handle given the sync set instance */
 uint16_t ull_adv_sync_handle_get(const struct ll_adv_sync_set *sync);
-
-/* helper function to release periodic advertising instance */
-void ull_adv_sync_release(struct ll_adv_sync_set *sync);
 
 /* helper function to return event time reservation */
 uint32_t ull_adv_sync_time_get(const struct ll_adv_sync_set *sync,
@@ -352,6 +355,3 @@ uint32_t ull_adv_iso_max_time_get(const struct ll_adv_iso_set *adv_iso);
 /* helper function to release unused DF configuration memory */
 void ull_df_adv_cfg_release(struct lll_df_adv_cfg *df_adv_cfg);
 #endif /* CONFIG_BT_CTLR_DF_ADV_CTE_TX */
-
-/* Helper function to acquire an advertising sync set */
-struct ll_adv_sync_set *sync_acquire(void);

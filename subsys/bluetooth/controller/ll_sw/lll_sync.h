@@ -82,8 +82,8 @@ struct lll_sync {
 
 #if defined(CONFIG_BT_CTLR_SYNC_PERIODIC_RSP)
 	/* PAwR (Periodic Advertising with Responses) scanner-side LLL state */
-	uint8_t is_pawr:1;                /* Indicates PAwR mode */
-	uint8_t subevent_current;         /* Current subevent */
+	uint8_t is_rsp:1; /* Indicates PAwR mode */
+	uint8_t subevent_curr; /* Current subevent */
 #endif /* CONFIG_BT_CTLR_SYNC_PERIODIC_RSP */
 };
 

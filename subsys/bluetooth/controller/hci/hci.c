@@ -3879,15 +3879,15 @@ static void le_set_per_adv_param_v2(struct net_buf *buf, struct net_buf **evt)
 static void le_set_per_adv_subevent_data(struct net_buf *buf, struct net_buf **evt)
 {
 	struct bt_hci_cp_le_set_pawr_subevent_data *cmd = (void *)buf->data;
-	struct bt_hci_cp_le_set_pawr_subevent_data_element *element;
-	uint8_t status;
-	uint8_t handle;
-	uint8_t *subevent;
 	uint8_t *response_slot_start;
 	uint8_t *response_slot_count;
+	uint8_t *subevent_data_next;
 	uint8_t *subevent_data_len;
-	uint8_t **subevent_data;
-	uint8_t i;
+	uint8_t *subevent_data;
+	uint8_t *subevent;
+	uint8_t handle;
+	uint8_t status;
+	uint8_t *p;
 
 	if (adv_cmds_ext_check(evt)) {
 		return;
@@ -3899,45 +3899,41 @@ static void le_set_per_adv_subevent_data(struct net_buf *buf, struct net_buf **e
 		return;
 	}
 
-	/* Allocate temporary arrays for subevent data */
-	subevent = k_malloc(cmd->num_subevents);
-	response_slot_start = k_malloc(cmd->num_subevents);
-	response_slot_count = k_malloc(cmd->num_subevents);
-	subevent_data_len = k_malloc(cmd->num_subevents);
-	subevent_data = k_malloc(cmd->num_subevents * sizeof(uint8_t *));
-
-	if (!subevent || !response_slot_start || !response_slot_count ||
-	    !subevent_data_len || !subevent_data) {
-		status = BT_HCI_ERR_MEM_CAPACITY_EXCEEDED;
-		goto cleanup;
+	if (cmd->num_subevents == 0U) {
+		*evt = cmd_complete_status(BT_HCI_ERR_INVALID_PARAM);
+		return;
 	}
 
-	/* Parse subevent data elements */
-	element = (struct bt_hci_cp_le_set_pawr_subevent_data_element *)cmd->subevents;
-	for (i = 0; i < cmd->num_subevents; i++) {
-		subevent[i] = element->subevent;
-		response_slot_start[i] = element->response_slot_start;
-		response_slot_count[i] = element->response_slot_count;
-		subevent_data_len[i] = element->subevent_data_length;
-		subevent_data[i] = element->subevent_data;
+	/* TODO: validate buf->len versus the amount of values to be parsed */
 
-		/* Move to next element */
-		element = (struct bt_hci_cp_le_set_pawr_subevent_data_element *)
-			  ((uint8_t *)element + sizeof(*element) + element->subevent_data_length);
+	/* parse the cmd parameters */
+	p = (void *)&cmd->subevents[0];
+	subevent_data_next = p + (sizeof(struct bt_hci_cp_le_set_pawr_subevent_data_element) *
+				  cmd->num_subevents);
+	for (uint8_t i = 0U; i < cmd->num_subevents; i++) {
+		subevent = p;
+		p += offsetof(struct bt_hci_cp_le_set_pawr_subevent_data_element, subevent) +
+		     sizeof(*subevent);
+		response_slot_start = p;
+		p += offsetof(struct bt_hci_cp_le_set_pawr_subevent_data_element,
+			      response_slot_start) +
+		     sizeof(*response_slot_start);
+		response_slot_count = p;
+		p += offsetof(struct bt_hci_cp_le_set_pawr_subevent_data_element,
+			      response_slot_count) +
+		     sizeof(*response_slot_count);
+		subevent_data_len = p;
+		subevent_data = subevent_data_next;
+		subevent_data_next += *subevent_data_len;
+
+		/* Call ULL function to set subevent data */
+		status = ll_adv_sync_subevent_data_set(handle,
+						       *subevent,
+						       *response_slot_start,
+						       *response_slot_count,
+						       *subevent_data_len,
+						       subevent_data);
 	}
-
-	/* Call ULL function to set subevent data */
-	status = ll_adv_sync_subevent_data_set(handle, cmd->num_subevents,
-						subevent, response_slot_start,
-						response_slot_count, subevent_data_len,
-						(const uint8_t *const *)subevent_data);
-
-cleanup:
-	k_free(subevent);
-	k_free(response_slot_start);
-	k_free(response_slot_count);
-	k_free(subevent_data_len);
-	k_free(subevent_data);
 
 	*evt = cmd_complete_status(status);
 }

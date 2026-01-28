@@ -78,12 +78,12 @@ uint8_t ll_adv_sync_param_set_v2(uint8_t handle, uint16_t interval, uint16_t fla
 				  uint8_t num_subevents, uint8_t subevent_interval,
 				  uint8_t response_slot_delay, uint8_t response_slot_spacing,
 				  uint8_t num_response_slots);
-uint8_t ll_adv_sync_subevent_data_set(uint8_t handle, uint8_t num_subevents,
-				       const uint8_t *subevent,
-				       const uint8_t *response_slot_start,
-				       const uint8_t *response_slot_count,
-				       const uint8_t *subevent_data_len,
-				       const uint8_t *const *subevent_data);
+uint8_t ll_adv_sync_subevent_data_set(uint8_t handle,
+				      uint8_t subevent,
+				      uint8_t response_slot_start,
+				      uint8_t response_slot_count,
+				      uint8_t subevent_data_len,
+				      uint8_t *subevent_data);
 #endif /* CONFIG_BT_CTLR_ADV_PERIODIC_RSP */
 
 /* Advertising Enable  and Disable Interfaces */
