@@ -1488,6 +1488,8 @@ void ull_iso_lll_ack_enqueue(uint16_t handle, struct node_tx_iso *node_tx)
 		 */
 		ll_data_path_tx_pdu_release(handle, node_tx);
 		return;
+#else
+		/* No datapath and no vendor datapath - fall through to MFIFO */
 #endif /* CONFIG_BT_CTLR_ISO_VENDOR_DATA_PATH */
 	} else if (IS_ENABLED(CONFIG_BT_CTLR_ADV_ISO) && IS_ADV_ISO_HANDLE(handle)) {
 		struct lll_adv_iso_stream *stream;
@@ -1506,13 +1508,17 @@ void ull_iso_lll_ack_enqueue(uint16_t handle, struct node_tx_iso *node_tx)
 #if defined(CONFIG_BT_CTLR_ISO_VENDOR_DATA_PATH)
 		ll_data_path_tx_pdu_release(handle, node_tx);
 		return;
+#else
+		/* No datapath and no vendor datapath - fall through to MFIFO */
 #endif /* CONFIG_BT_CTLR_ISO_VENDOR_DATA_PATH */
 	} else {
 		LL_ASSERT_DBG(0);
 		return;
 	}
 
-	/* Context-safe fallback: Enqueue to iso_ack MFIFO */
+	/* Context-safe fallback: Enqueue to iso_ack MFIFO when no datapath.
+	 * This handles CIS/BIS without datapath and without vendor data path support.
+	 */
 	struct lll_tx *lll_tx;
 	uint8_t idx;
 
