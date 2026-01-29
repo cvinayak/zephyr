@@ -600,6 +600,11 @@ static inline void rx_demux_conn_tx_ack(uint8_t ack_last, uint16_t handle,
 					memq_link_t *link,
 					struct node_tx *node_tx);
 #endif /* CONFIG_BT_CONN || CONFIG_BT_CTLR_ADV_ISO */
+#if defined(CONFIG_BT_CTLR_ADV_ISO) || defined(CONFIG_BT_CTLR_CONN_ISO)
+static inline void rx_demux_iso_tx_ack(uint8_t ack_last, uint16_t handle,
+				       memq_link_t *link,
+				       struct node_tx_iso *node_tx);
+#endif /* CONFIG_BT_CTLR_ADV_ISO || CONFIG_BT_CTLR_CONN_ISO */
 static inline void rx_demux_rx(memq_link_t *link, struct node_rx_hdr *rx_hdr);
 static inline void rx_demux_event_done(memq_link_t *link,
 				       struct node_rx_event_done *done);
@@ -2726,6 +2731,17 @@ static void rx_demux(void *param)
 		cpu_dmb();
 #endif /* CONFIG_BT_CONN */
 
+#if defined(CONFIG_BT_CTLR_ADV_ISO) || defined(CONFIG_BT_CTLR_CONN_ISO)
+		/* Add ISO ack handling similar to conn_ack */
+		struct node_tx_iso *iso_tx;
+		uint16_t iso_handle;
+		uint8_t iso_ack_last;
+		memq_link_t *link_iso_tx;
+
+		link_iso_tx = ull_iso_ack_peek(&iso_ack_last, &iso_handle, &iso_tx);
+		cpu_dmb();
+#endif /* CONFIG_BT_CTLR_ADV_ISO || CONFIG_BT_CTLR_CONN_ISO */
+
 		link = memq_peek(memq_ull_rx.head, memq_ull_rx.tail, (void **)&rx);
 		if (link) {
 			LL_ASSERT_DBG(rx);
@@ -2754,6 +2770,17 @@ static void rx_demux(void *param)
 			link = link_tx;
 #endif /* !CONFIG_BT_CTLR_LOW_LAT_ULL */
 #endif /* CONFIG_BT_CONN */
+#if defined(CONFIG_BT_CTLR_ADV_ISO) || defined(CONFIG_BT_CTLR_CONN_ISO)
+		} else if (link_iso_tx) {
+			/* Process ISO TX acks when no RX or conn acks pending */
+			rx_demux_iso_tx_ack(iso_ack_last, iso_handle, link_iso_tx, iso_tx);
+
+#if defined(CONFIG_BT_CTLR_LOW_LAT_ULL)
+			rx_demux_yield();
+#else /* !CONFIG_BT_CTLR_LOW_LAT_ULL */
+			link = link_iso_tx;
+#endif /* !CONFIG_BT_CTLR_LOW_LAT_ULL */
+#endif /* CONFIG_BT_CTLR_ADV_ISO || CONFIG_BT_CTLR_CONN_ISO */
 		}
 
 #if !defined(CONFIG_BT_CTLR_LOW_LAT_ULL)
@@ -2953,6 +2980,39 @@ static inline void rx_demux_conn_tx_ack(uint8_t ack_last, uint16_t handle,
 			ll_rx_sched();
 		}
 }
+
+#if defined(CONFIG_BT_CTLR_ADV_ISO) || defined(CONFIG_BT_CTLR_CONN_ISO)
+static inline void rx_demux_iso_tx_ack(uint8_t ack_last, uint16_t handle,
+				       memq_link_t *link,
+				       struct node_tx_iso *node_tx)
+{
+#if !defined(CONFIG_BT_CTLR_LOW_LAT_ULL)
+	do {
+#endif /* CONFIG_BT_CTLR_LOW_LAT_ULL */
+		/* Dequeue from iso_ack MFIFO */
+		ull_iso_ack_dequeue();
+
+		/* Now safely call ll_tx_ack_put in ULL context */
+		ll_tx_ack_put(handle, (struct node_tx *)node_tx);
+
+		/* Release link mem */
+		ll_iso_link_tx_release(link);
+
+		/* check for more iso ack */
+		link = ull_iso_ack_by_last_peek(ack_last, &handle, &node_tx);
+
+#if defined(CONFIG_BT_CTLR_LOW_LAT_ULL)
+		if (!link)
+#else /* CONFIG_BT_CTLR_LOW_LAT_ULL */
+	} while (link);
+#endif /* CONFIG_BT_CTLR_LOW_LAT_ULL */
+
+		{
+			/* trigger thread to call ll_rx_get() */
+			ll_rx_sched();
+		}
+}
+#endif /* CONFIG_BT_CTLR_ADV_ISO || CONFIG_BT_CTLR_CONN_ISO */
 #endif /* CONFIG_BT_CONN || CONFIG_BT_CTLR_ADV_ISO */
 
 /**

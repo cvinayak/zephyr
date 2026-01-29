@@ -53,6 +53,15 @@ void ll_iso_transmit_test_send_sdu(uint16_t handle, uint32_t ticks_at_expire);
 uint32_t ull_iso_big_sync_delay(uint8_t num_bis, uint32_t bis_spacing, uint8_t nse,
 				uint32_t sub_interval, uint8_t phy, uint8_t max_pdu, bool enc);
 
+#if defined(CONFIG_BT_CTLR_ADV_ISO) || defined(CONFIG_BT_CTLR_CONN_ISO)
+uint8_t ull_iso_ack_last_idx_get(void);
+memq_link_t *ull_iso_ack_peek(uint8_t *ack_last, uint16_t *handle,
+			      struct node_tx_iso **tx);
+memq_link_t *ull_iso_ack_by_last_peek(uint8_t last, uint16_t *handle,
+				      struct node_tx_iso **tx);
+void *ull_iso_ack_dequeue(void);
+#endif /* CONFIG_BT_CTLR_ADV_ISO || CONFIG_BT_CTLR_CONN_ISO */
+
 /* Must be implemented by vendor if vendor-specific data path is supported */
 bool ll_data_path_configured(uint8_t data_path_dir, uint8_t data_path_id);
 /* Must be implemented by vendor if vendor-specific data path is supported */
