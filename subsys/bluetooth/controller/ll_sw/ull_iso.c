@@ -153,6 +153,9 @@ static void iso_rx_demux(void *param);
 void ll_iso_link_tx_release(void *link);
 void ll_iso_tx_mem_release(void *node_tx);
 
+static void iso_tx_ack_demux(void *param);
+#endif /* CONFIG_BT_CTLR_ADV_ISO || CONFIG_BT_CTLR_CONN_ISO */
+
 #define NODE_TX_BUFFER_SIZE MROUND(offsetof(struct node_tx_iso, pdu) + \
 				   offsetof(struct pdu_iso, payload) + \
 				   MAX(LL_BIS_OCTETS_TX_MAX, \
@@ -1529,21 +1532,16 @@ void ull_iso_lll_ack_enqueue(uint16_t handle, struct node_tx_iso *node_tx)
 	lll_tx->node = (struct node_tx *)node_tx;
 
 	MFIFO_ENQUEUE(iso_ack, idx);
-}
 
-/**
- * @brief Get last index of iso_ack MFIFO for serialization
- */
-uint8_t ull_iso_ack_last_idx_get(void)
-{
-	return mfifo_fifo_iso_ack.l;
+	/* Schedule independent ISO TX ack processing (not serialized with RX) */
+	ull_iso_tx_ack_sched();
 }
 
 /**
  * @brief Peek at next ISO TX ack without dequeuing
  */
-memq_link_t *ull_iso_ack_peek(uint8_t *ack_last, uint16_t *handle,
-			      struct node_tx_iso **tx)
+static memq_link_t *ull_iso_ack_peek(uint8_t *ack_last, uint16_t *handle,
+				     struct node_tx_iso **tx)
 {
 	struct lll_tx *lll_tx;
 
@@ -1552,27 +1550,9 @@ memq_link_t *ull_iso_ack_peek(uint8_t *ack_last, uint16_t *handle,
 		return NULL;
 	}
 
-	*ack_last = mfifo_fifo_iso_ack.l;
-	*handle = lll_tx->handle;
-	*tx = (struct node_tx_iso *)lll_tx->node;
-
-	return (*tx)->link;
-}
-
-/**
- * @brief Peek at ISO TX ack by specific index
- */
-memq_link_t *ull_iso_ack_by_last_peek(uint8_t last, uint16_t *handle,
-				      struct node_tx_iso **tx)
-{
-	struct lll_tx *lll_tx;
-
-	lll_tx = mfifo_dequeue_get(mfifo_fifo_iso_ack.m, mfifo_iso_ack.s,
-				   mfifo_fifo_iso_ack.f, last);
-	if (!lll_tx) {
-		return NULL;
+	if (ack_last) {
+		*ack_last = mfifo_fifo_iso_ack.l;
 	}
-
 	*handle = lll_tx->handle;
 	*tx = (struct node_tx_iso *)lll_tx->node;
 
@@ -1582,9 +1562,50 @@ memq_link_t *ull_iso_ack_by_last_peek(uint8_t last, uint16_t *handle,
 /**
  * @brief Dequeue ISO TX ack from MFIFO
  */
-void *ull_iso_ack_dequeue(void)
+static void *ull_iso_ack_dequeue(void)
 {
 	return MFIFO_DEQUEUE(iso_ack);
+}
+
+/**
+ * @brief Schedule ISO TX ack processing
+ */
+static void ull_iso_tx_ack_sched(void)
+{
+	static memq_link_t link;
+	static struct mayfly mfy = {0, 0, &link, NULL, iso_tx_ack_demux};
+
+	/* Kick the ULL (using the mayfly, tailchain it) */
+	mayfly_enqueue(TICKER_USER_ID_LLL, TICKER_USER_ID_ULL_HIGH, 1, &mfy);
+}
+
+/**
+ * @brief Process ISO TX acknowledgments independently
+ * @details Processes iso_ack MFIFO without serialization with RX
+ */
+static void iso_tx_ack_demux(void *param)
+{
+	struct node_tx_iso *node_tx;
+	memq_link_t *link;
+	uint16_t handle;
+
+	/* Process all pending ISO TX acks */
+	do {
+		link = ull_iso_ack_peek(NULL, &handle, &node_tx);
+		if (link) {
+			/* Dequeue from iso_ack MFIFO */
+			ull_iso_ack_dequeue();
+
+			/* Now safely call ll_tx_ack_put in ULL context */
+			ll_tx_ack_put(handle, (struct node_tx *)node_tx);
+
+			/* Release link mem */
+			ll_iso_link_tx_release(link);
+		}
+	} while (link);
+
+	/* Trigger thread to call ll_rx_get() */
+	ll_rx_sched();
 }
 
 void ull_iso_lll_event_prepare(uint16_t handle, uint64_t event_count)
