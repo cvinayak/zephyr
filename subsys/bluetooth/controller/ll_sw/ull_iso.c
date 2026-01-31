@@ -1556,7 +1556,7 @@ uint32_t ull_iso_big_sync_delay(uint8_t num_bis, uint32_t bis_spacing, uint8_t n
 #endif /* CONFIG_BT_CTLR_ADV_ISO || CONFIG_BT_CTLR_SYNC_ISO */
 
 #if defined(CONFIG_BT_CTLR_SYNC_ISO) || defined(CONFIG_BT_CTLR_CONN_ISO)
-void *ull_iso_pdu_rx_alloc_peek(uint8_t count)
+void *ull_iso_pdu_lll_rx_alloc_peek(uint8_t count)
 {
 	if (count > MFIFO_AVAIL_COUNT_GET(iso_rx)) {
 		return NULL;
@@ -1565,19 +1565,19 @@ void *ull_iso_pdu_rx_alloc_peek(uint8_t count)
 	return MFIFO_DEQUEUE_PEEK(iso_rx);
 }
 
-void *ull_iso_pdu_rx_alloc(void)
+void *ull_iso_pdu_lll_rx_alloc(void)
 {
 	return MFIFO_DEQUEUE(iso_rx);
 }
 
 #if defined(CONFIG_BT_CTLR_ISO_VENDOR_DATA_PATH)
-void ull_iso_rx_put(memq_link_t *link, void *rx)
+void ull_iso_lll_rx_put(memq_link_t *link, void *rx)
 {
 	/* Enqueue the Rx object */
 	memq_enqueue(link, rx, &memq_ull_iso_rx.tail);
 }
 
-void ull_iso_rx_sched(void)
+void ull_iso_lll_rx_sched(void)
 {
 	static memq_link_t link;
 	static struct mayfly mfy = {0, 0, &link, NULL, iso_rx_demux};

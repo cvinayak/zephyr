@@ -494,7 +494,7 @@ void lll_disable(void *param)
 		uint8_t idx;
 
 		idx = UINT8_MAX;
-		next = ull_prepare_dequeue_iter(&idx);
+		next = ull_prepare_lll_dequeue_iter(&idx);
 		while (next) {
 			if (!next->is_aborted &&
 			    (!param || (param == next->prepare_param.param))) {
@@ -511,7 +511,7 @@ void lll_disable(void *param)
 #endif /* CONFIG_BT_CTLR_LOW_LAT_ULL_DONE */
 			}
 
-			next = ull_prepare_dequeue_iter(&idx);
+			next = ull_prepare_lll_dequeue_iter(&idx);
 		}
 	}
 }
@@ -543,7 +543,7 @@ int lll_done(void *param)
 	void *evdone;
 
 	/* Assert if param supplied without a pending prepare to cancel. */
-	next = ull_prepare_dequeue_get();
+	next = ull_prepare_lll_dequeue_get();
 	LL_ASSERT_ERR(!param || next);
 
 	/* check if current LLL event is done */
@@ -577,7 +577,7 @@ int lll_done(void *param)
 	}
 
 #if !defined(CONFIG_BT_CTLR_LOW_LAT_ULL_DONE)
-	ull_prepare_dequeue(TICKER_USER_ID_LLL);
+	ull_prepare_lll_dequeue(TICKER_USER_ID_LLL);
 #else /* CONFIG_BT_CTLR_LOW_LAT_ULL_DONE */
 	done_inc();
 #endif /* CONFIG_BT_CTLR_LOW_LAT_ULL_DONE */
@@ -591,7 +591,7 @@ int lll_done(void *param)
 
 	lll_done_score(param, result);
 
-	extra = ull_event_done_extra_get();
+	extra = ull_event_lll_done_extra_get();
 	LL_ASSERT_ERR(extra);
 
 	/* Set result in done extra data - type was set by the role */
@@ -599,7 +599,7 @@ int lll_done(void *param)
 #endif /* CONFIG_BT_CTLR_JIT_SCHEDULING */
 
 	/* Let ULL know about LLL event done */
-	evdone = ull_event_done(ull);
+	evdone = ull_event_lll_done(ull);
 	LL_ASSERT_ERR(evdone);
 
 	return 0;
@@ -952,7 +952,7 @@ int lll_prepare_resolve(lll_is_abort_cb_t is_abort_cb, lll_abort_cb_t abort_cb,
 		}
 
 		/* Store the next prepare for deferred call */
-		next = ull_prepare_enqueue(is_abort_cb, abort_cb, prepare_param,
+		next = ull_prepare_lll_enqueue(is_abort_cb, abort_cb, prepare_param,
 					   prepare_cb, is_resume);
 		LL_ASSERT_ERR(next);
 
@@ -988,7 +988,7 @@ int lll_prepare_resolve(lll_is_abort_cb_t is_abort_cb, lll_abort_cb_t abort_cb,
 				}
 			}
 
-			ready = ull_prepare_dequeue_iter(&idx);
+			ready = ull_prepare_lll_dequeue_iter(&idx);
 		}
 
 		if (next) {
@@ -1088,7 +1088,7 @@ static inline struct lll_event *prepare_dequeue_iter_ready_get(uint8_t *idx)
 	struct lll_event *ready;
 
 	do {
-		ready = ull_prepare_dequeue_iter(idx);
+		ready = ull_prepare_lll_dequeue_iter(idx);
 	} while ((ready != NULL) && ((ready->is_aborted != 0U) || (ready->is_resume != 0U) ||
 				     (ready->prepare_param.defer != 0U)));
 
@@ -1103,7 +1103,7 @@ static inline struct lll_event *resume_enqueue(lll_is_abort_cb_t is_abort_cb,
 
 	prepare_param.param = param;
 
-	return ull_prepare_enqueue(is_abort_cb, abort_cb, &prepare_param, resume_cb, 1U);
+	return ull_prepare_lll_enqueue(is_abort_cb, abort_cb, &prepare_param, resume_cb, 1U);
 }
 
 static void isr_race(void *param)
@@ -1300,7 +1300,7 @@ static void preempt(void *param)
 			event.curr.has_margin = 1U;
 
 			/* Execute the enqueued ready LLL prepare callbacks */
-			ull_prepare_dequeue(TICKER_USER_ID_LLL);
+			ull_prepare_lll_dequeue(TICKER_USER_ID_LLL);
 		}
 
 		return;
@@ -1469,7 +1469,7 @@ preempt_find_preemptor:
 preempt_abort_resume:
 		/* Abort any duplicate non-resume, that they get dequeued */
 		iter_idx = UINT8_MAX;
-		iter = ull_prepare_dequeue_iter(&iter_idx);
+		iter = ull_prepare_lll_dequeue_iter(&iter_idx);
 		while (iter) {
 			if (!iter->is_aborted &&
 			    (is_resume_abort || !iter->is_resume) &&
@@ -1487,7 +1487,7 @@ preempt_abort_resume:
 #endif /* CONFIG_BT_CTLR_LOW_LAT_ULL_DONE */
 			}
 
-			iter = ull_prepare_dequeue_iter(&iter_idx);
+			iter = ull_prepare_lll_dequeue_iter(&iter_idx);
 		}
 
 		if (!is_resume_abort) {

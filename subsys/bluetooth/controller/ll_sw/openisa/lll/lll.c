@@ -225,7 +225,7 @@ void lll_disable(void *param)
 		uint8_t idx;
 
 		idx = UINT8_MAX;
-		next = ull_prepare_dequeue_iter(&idx);
+		next = ull_prepare_lll_dequeue_iter(&idx);
 		while (next) {
 			if (!next->is_aborted &&
 			    (!param || (param == next->prepare_param.param))) {
@@ -242,7 +242,7 @@ void lll_disable(void *param)
 #endif /* CONFIG_BT_CTLR_LOW_LAT_ULL_DONE */
 			}
 
-			next = ull_prepare_dequeue_iter(&idx);
+			next = ull_prepare_lll_dequeue_iter(&idx);
 		}
 	}
 }
@@ -274,7 +274,7 @@ int lll_done(void *param)
 	void *evdone;
 
 	/* Assert if param supplied without a pending prepare to cancel. */
-	next = ull_prepare_dequeue_get();
+	next = ull_prepare_lll_dequeue_get();
 	LL_ASSERT(!param || next);
 
 	/* check if current LLL event is done */
@@ -308,7 +308,7 @@ int lll_done(void *param)
 	}
 
 #if !defined(CONFIG_BT_CTLR_LOW_LAT_ULL_DONE)
-	ull_prepare_dequeue(TICKER_USER_ID_LLL);
+	ull_prepare_lll_dequeue(TICKER_USER_ID_LLL);
 #endif /* !CONFIG_BT_CTLR_LOW_LAT_ULL_DONE */
 
 #if defined(CONFIG_BT_CTLR_JIT_SCHEDULING)
@@ -316,7 +316,7 @@ int lll_done(void *param)
 #endif /* CONFIG_BT_CTLR_JIT_SCHEDULING */
 
 	/* Let ULL know about LLL event done */
-	evdone = ull_event_done(ull);
+	evdone = ull_event_lll_done(ull);
 	LL_ASSERT(evdone);
 
 	return 0;
@@ -503,9 +503,9 @@ int lll_prepare_resolve(lll_is_abort_cb_t is_abort_cb, lll_abort_cb_t abort_cb,
 
 	/* Find the ready prepare in the pipeline */
 	idx = UINT8_MAX;
-	p = ull_prepare_dequeue_iter(&idx);
+	p = ull_prepare_lll_dequeue_iter(&idx);
 	while (p && (p->is_aborted || p->is_resume)) {
-		p = ull_prepare_dequeue_iter(&idx);
+		p = ull_prepare_lll_dequeue_iter(&idx);
 	}
 
 	/* Current event active or another prepare is ready in the pipeline */
@@ -523,7 +523,7 @@ int lll_prepare_resolve(lll_is_abort_cb_t is_abort_cb, lll_abort_cb_t abort_cb,
 		}
 
 		/* Store the next prepare for deferred call */
-		next = ull_prepare_enqueue(is_abort_cb, abort_cb, prepare_param,
+		next = ull_prepare_lll_enqueue(is_abort_cb, abort_cb, prepare_param,
 					   prepare_cb, is_resume);
 		LL_ASSERT(next);
 
@@ -553,7 +553,7 @@ int lll_prepare_resolve(lll_is_abort_cb_t is_abort_cb, lll_abort_cb_t abort_cb,
 				}
 			}
 
-			p = ull_prepare_dequeue_iter(&idx);
+			p = ull_prepare_lll_dequeue_iter(&idx);
 		}
 
 		if (next) {
@@ -596,7 +596,7 @@ int lll_prepare_resolve(lll_is_abort_cb_t is_abort_cb, lll_abort_cb_t abort_cb,
 
 	/* Find next prepare needing preempt timeout to be setup */
 	do {
-		p = ull_prepare_dequeue_iter(&idx);
+		p = ull_prepare_lll_dequeue_iter(&idx);
 		if (!p) {
 			return err;
 		}
@@ -618,7 +618,7 @@ static struct lll_event *resume_enqueue(lll_prepare_cb_t resume_cb)
 	prepare_param.param = event.curr.param;
 	event.curr.param = NULL;
 
-	return ull_prepare_enqueue(event.curr.is_abort_cb, event.curr.abort_cb,
+	return ull_prepare_lll_enqueue(event.curr.is_abort_cb, event.curr.abort_cb,
 				   &prepare_param, resume_cb, 1);
 }
 
@@ -712,14 +712,14 @@ static void preempt(void *param)
 
 	/* Check if any prepare in pipeline */
 	idx = UINT8_MAX;
-	next = ull_prepare_dequeue_iter(&idx);
+	next = ull_prepare_lll_dequeue_iter(&idx);
 	if (!next) {
 		return;
 	}
 
 	/* Find a prepare that is ready and not a resume */
 	while (next && (next->is_aborted || next->is_resume)) {
-		next = ull_prepare_dequeue_iter(&idx);
+		next = ull_prepare_lll_dequeue_iter(&idx);
 	}
 
 	/* No ready prepare */
@@ -761,7 +761,7 @@ static void preempt(void *param)
 
 		/* Abort any duplicates so that they get dequeued */
 		iter_idx = UINT8_MAX;
-		iter = ull_prepare_dequeue_iter(&iter_idx);
+		iter = ull_prepare_lll_dequeue_iter(&iter_idx);
 		while (iter) {
 			if (!iter->is_aborted &&
 			    event.curr.param == iter->prepare_param.param) {
@@ -778,7 +778,7 @@ static void preempt(void *param)
 #endif /* CONFIG_BT_CTLR_LOW_LAT_ULL_DONE */
 			}
 
-			iter = ull_prepare_dequeue_iter(&iter_idx);
+			iter = ull_prepare_lll_dequeue_iter(&iter_idx);
 		}
 
 		/* Enqueue as resume event */

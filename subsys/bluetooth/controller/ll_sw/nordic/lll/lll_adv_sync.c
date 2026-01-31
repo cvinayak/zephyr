@@ -335,13 +335,13 @@ static void isr_done(void *param)
 		 * complete message towards ULL, then subsequently to
 		 * the thread context.
 		 */
-		rx = ull_pdu_rx_alloc();
+		rx = ull_pdu_lll_rx_alloc();
 		LL_ASSERT_ERR(rx);
 
 		rx->hdr.type = NODE_RX_TYPE_SYNC_CHM_COMPLETE;
 		rx->rx_ftr.param = lll;
 
-		ull_rx_put_sched(rx->hdr.link, rx);
+		ull_lll_rx_put_sched(rx->hdr.link, rx);
 	}
 
 	lll_isr_done(lll);

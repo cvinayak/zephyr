@@ -410,7 +410,7 @@ static void isr_early_abort(void *param)
 	int err;
 
 	/* Generate auxiliary radio event done */
-	extra = ull_done_extra_type_set(EVENT_DONE_EXTRA_TYPE_ADV_AUX);
+	extra = ull_lll_done_extra_type_set(EVENT_DONE_EXTRA_TYPE_ADV_AUX);
 	LL_ASSERT_ERR(extra);
 
 	radio_isr_set(isr_race, param);
@@ -433,7 +433,7 @@ static void isr_done(void *param)
 	lll_isr_status_reset();
 
 	/* Generate auxiliary radio event done */
-	extra = ull_done_extra_type_set(EVENT_DONE_EXTRA_TYPE_ADV_AUX);
+	extra = ull_lll_done_extra_type_set(EVENT_DONE_EXTRA_TYPE_ADV_AUX);
 	LL_ASSERT_ERR(extra);
 
 	/* Cleanup radio event and dispatch the done event */
@@ -602,7 +602,7 @@ static void isr_tx_rx(void *param)
 	radio_switch_complete_and_tx(lll->phy_s, 0, lll->phy_s, lll->phy_flags);
 
 	/* setup Rx buffer */
-	node_rx = ull_pdu_rx_alloc_peek(1);
+	node_rx = ull_pdu_lll_rx_alloc_peek(1);
 	LL_ASSERT_DBG(node_rx);
 	radio_pkt_rx_set(node_rx->pdu);
 
@@ -758,7 +758,7 @@ static inline int isr_rx_pdu(struct lll_adv_aux *lll_aux, uint8_t phy_flags_rx,
 
 	lll = lll_aux->adv;
 
-	node_rx = ull_pdu_rx_alloc_peek(1);
+	node_rx = ull_pdu_lll_rx_alloc_peek(1);
 	LL_ASSERT_DBG(node_rx);
 
 	pdu_rx = (void *)node_rx->pdu;
@@ -874,9 +874,9 @@ static inline int isr_rx_pdu(struct lll_adv_aux *lll_aux, uint8_t phy_flags_rx,
 		struct pdu_adv *pdu_tx;
 
 		if (IS_ENABLED(CONFIG_BT_CTLR_CHAN_SEL_2)) {
-			rx = ull_pdu_rx_alloc_peek(4);
+			rx = ull_pdu_lll_rx_alloc_peek(4);
 		} else {
-			rx = ull_pdu_rx_alloc_peek(3);
+			rx = ull_pdu_lll_rx_alloc_peek(3);
 		}
 
 		if (!rx) {
@@ -919,7 +919,7 @@ static inline int isr_rx_pdu(struct lll_adv_aux *lll_aux, uint8_t phy_flags_rx,
 #endif /* HAL_RADIO_GPIO_HAVE_PA_PIN */
 
 		/* Note: this is the same as previous result from alloc_peek */
-		rx = ull_pdu_rx_alloc();
+		rx = ull_pdu_lll_rx_alloc();
 
 		rx->hdr.type = NODE_RX_TYPE_CONNECTION;
 		rx->hdr.handle = 0xffff;
@@ -936,7 +936,7 @@ static inline int isr_rx_pdu(struct lll_adv_aux *lll_aux, uint8_t phy_flags_rx,
 #endif /* CONFIG_BT_CTLR_PRIVACY */
 
 		if (IS_ENABLED(CONFIG_BT_CTLR_CHAN_SEL_2)) {
-			ftr->extra = ull_pdu_rx_alloc();
+			ftr->extra = ull_pdu_lll_rx_alloc();
 		}
 
 		return 0;
@@ -1011,14 +1011,14 @@ static void isr_tx_connect_rsp(void *param)
 		rx->hdr.type = NODE_RX_TYPE_RELEASE;
 
 		if (IS_ENABLED(CONFIG_BT_CTLR_CHAN_SEL_2)) {
-			ull_rx_put(rx->hdr.link, rx);
+			ull_lll_rx_put(rx->hdr.link, rx);
 
 			rx = ftr->extra;
 			rx->hdr.type = NODE_RX_TYPE_RELEASE;
 		}
 	}
 
-	ull_rx_put_sched(rx->hdr.link, rx);
+	ull_lll_rx_put_sched(rx->hdr.link, rx);
 
 	if (is_done) {
 		/* Stop further LLL radio events */

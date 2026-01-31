@@ -232,7 +232,7 @@ static int prepare_cb(struct lll_prepare_param *p)
 	radio_crc_configure(PDU_CRC_POLYNOMIAL, sys_get_le24(conn_lll->crc_init));
 	lll_chan_set(data_chan_use);
 
-	node_rx = ull_iso_pdu_rx_alloc_peek(1U);
+	node_rx = ull_iso_pdu_lll_rx_alloc_peek(1U);
 	LL_ASSERT_DBG(node_rx);
 
 	/* Encryption */
@@ -585,7 +585,7 @@ static void isr_rx(void *param)
 		struct pdu_cis *pdu_rx;
 
 		/* Get reference to received PDU */
-		node_rx = ull_iso_pdu_rx_alloc_peek(1U);
+		node_rx = ull_iso_pdu_lll_rx_alloc_peek(1U);
 		LL_ASSERT_DBG(node_rx);
 
 		pdu_rx = (void *)node_rx->pdu;
@@ -611,7 +611,7 @@ static void isr_rx(void *param)
 		if (!pdu_rx->npi &&
 		    (cis_lll->rx.bn_curr <= cis_lll->rx.bn) &&
 		    (pdu_rx->sn == cis_lll->nesn) &&
-		    ull_iso_pdu_rx_alloc_peek(2U)) {
+		    ull_iso_pdu_lll_rx_alloc_peek(2U)) {
 			struct lll_conn_iso_group *cig_lll;
 			struct node_rx_iso_meta *iso_meta;
 
@@ -660,7 +660,7 @@ static void isr_rx(void *param)
 				HAL_TICKER_TICKS_TO_US_64BIT(BIT64(HAL_TICKER_CNTR_MSBIT + 1U));
 			iso_meta->status = 0U;
 
-			ull_iso_pdu_rx_alloc();
+			ull_iso_pdu_lll_rx_alloc();
 			iso_rx_put(node_rx->hdr.link, node_rx);
 			iso_rx_sched();
 
@@ -915,7 +915,7 @@ static void isr_tx(void *param)
 	/* Get reference to CIS LLL context */
 	cis_lll = param;
 
-	node_rx = ull_iso_pdu_rx_alloc_peek(1U);
+	node_rx = ull_iso_pdu_lll_rx_alloc_peek(1U);
 	LL_ASSERT_DBG(node_rx);
 
 #if defined(CONFIG_BT_CTLR_LE_ENC)
@@ -1148,7 +1148,7 @@ static void isr_prepare_subevent_common(void *param)
 	/* Get reference to CIS LLL context */
 	cis_lll = param;
 
-	node_rx = ull_iso_pdu_rx_alloc_peek(1U);
+	node_rx = ull_iso_pdu_lll_rx_alloc_peek(1U);
 	LL_ASSERT_DBG(node_rx);
 
 #if defined(CONFIG_BT_CTLR_LE_ENC)
@@ -1296,7 +1296,7 @@ static void isr_done(void *param)
 
 	payload_count_rx_flush_or_txrx_inc(cis_lll);
 
-	e = ull_event_done_extra_get();
+	e = ull_event_lll_done_extra_get();
 	LL_ASSERT_ERR(e);
 
 	e->type = EVENT_DONE_EXTRA_TYPE_CIS;
