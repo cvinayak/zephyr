@@ -1179,6 +1179,18 @@ config BT_CTLR_CHANNEL_SOUNDING
 	  Enable support for Bluetooth 6.0 Channel Sounding in the
 	  Controller.
 
+if BT_CTLR_CHANNEL_SOUNDING
+
+config BT_CTLR_CHANNEL_SOUNDING_MAX_CONFIG
+	int "Maximum number of CS configurations per connection"
+	range 1 4
+	default 4
+	help
+	  Maximum number of Channel Sounding configurations that can be
+	  created per connection.
+
+endif # BT_CTLR_CHANNEL_SOUNDING
+
 config BT_CTLR_EXTENDED_FEAT_SET
 	bool "LL Extended Feature Set support"
 	depends on BT_CTLR_EXTENDED_FEAT_SET_SUPPORT

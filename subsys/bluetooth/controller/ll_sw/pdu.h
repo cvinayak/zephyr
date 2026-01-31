@@ -624,6 +624,13 @@ enum pdu_data_llctrl_type {
 	PDU_DATA_LLCTRL_TYPE_CIS_RSP = 0x20,
 	PDU_DATA_LLCTRL_TYPE_CIS_IND = 0x21,
 	PDU_DATA_LLCTRL_TYPE_CIS_TERMINATE_IND = 0x22,
+	PDU_DATA_LLCTRL_TYPE_CS_REQ = 0x23,
+	PDU_DATA_LLCTRL_TYPE_CS_RSP = 0x24,
+	PDU_DATA_LLCTRL_TYPE_CS_IND = 0x25,
+	PDU_DATA_LLCTRL_TYPE_CS_TERMINATE_REQ = 0x26,
+	PDU_DATA_LLCTRL_TYPE_CS_TERMINATE_RSP = 0x27,
+	PDU_DATA_LLCTRL_TYPE_CS_FAE_REQ = 0x28,
+	PDU_DATA_LLCTRL_TYPE_CS_FAE_RSP = 0x29,
 	PDU_DATA_LLCTRL_TYPE_UNUSED = 0xFF
 };
 
@@ -892,6 +899,37 @@ struct pdu_data_llctrl_cis_terminate_ind {
 	uint8_t  error_code;
 } __packed;
 
+struct pdu_data_llctrl_cs_req {
+	uint8_t config_id;
+} __packed;
+
+struct pdu_data_llctrl_cs_rsp {
+	uint8_t  access_address[4];
+	uint16_t conn_event_counter;
+} __packed;
+
+struct pdu_data_llctrl_cs_ind {
+	uint8_t  access_address[4];
+	uint16_t conn_event_counter;
+	uint8_t  config_id;
+} __packed;
+
+struct pdu_data_llctrl_cs_terminate_req {
+	/* no members */
+} __packed;
+
+struct pdu_data_llctrl_cs_terminate_rsp {
+	/* no members */
+} __packed;
+
+struct pdu_data_llctrl_cs_fae_req {
+	/* no members */
+} __packed;
+
+struct pdu_data_llctrl_cs_fae_rsp {
+	int8_t fae_table[72];
+} __packed;
+
 struct pdu_data_llctrl_periodic_sync_ind {
 	uint16_t id;
 	struct pdu_adv_sync_info sync_info;
@@ -949,6 +987,13 @@ struct pdu_data_llctrl {
 		struct pdu_data_llctrl_cis_ind cis_ind;
 		struct pdu_data_llctrl_cis_terminate_ind cis_terminate_ind;
 		struct pdu_data_llctrl_periodic_sync_ind periodic_sync_ind;
+		struct pdu_data_llctrl_cs_req cs_req;
+		struct pdu_data_llctrl_cs_rsp cs_rsp;
+		struct pdu_data_llctrl_cs_ind cs_ind;
+		struct pdu_data_llctrl_cs_terminate_req cs_terminate_req;
+		struct pdu_data_llctrl_cs_terminate_rsp cs_terminate_rsp;
+		struct pdu_data_llctrl_cs_fae_req cs_fae_req;
+		struct pdu_data_llctrl_cs_fae_rsp cs_fae_rsp;
 	} __packed;
 } __packed;
 
