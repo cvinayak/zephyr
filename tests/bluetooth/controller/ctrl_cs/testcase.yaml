@@ -1,0 +1,8 @@
+common:
+  tags:
+    - bluetooth
+    - bt_cs
+    - bt_ull_cs
+tests:
+  bluetooth.controller.ctrl_cs.test:
+    type: unit

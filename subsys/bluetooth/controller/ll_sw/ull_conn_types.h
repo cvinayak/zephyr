@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#if defined(CONFIG_BT_CTLR_CHANNEL_SOUNDING)
+#include "ull_cs_types.h"
+#endif /* CONFIG_BT_CTLR_CHANNEL_SOUNDING */
+
 #define IS_ACL_HANDLE(_handle) ((_handle) < CONFIG_BT_MAX_CONN)
 
 enum llcp {
@@ -145,6 +149,10 @@ struct llcp_struct {
 	struct {
 		uint8_t terminate_ack;
 	} cis;
+
+#if defined(CONFIG_BT_CTLR_CHANNEL_SOUNDING)
+	struct ll_conn_cs_data cs;
+#endif /* CONFIG_BT_CTLR_CHANNEL_SOUNDING */
 
 	uint8_t tx_buffer_alloc;
 	uint8_t tx_q_pause_data_mask;
