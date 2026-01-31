@@ -576,8 +576,8 @@ static inline void lll_hdr_init(void *lll, void *parent)
 
 /* If ISO vendor data path is not used, queue directly to ll_iso_rx */
 #if defined(CONFIG_BT_CTLR_ISO_VENDOR_DATA_PATH)
-#define iso_rx_put(link, rx) ull_iso_rx_put(link, rx)
-#define iso_rx_sched() ull_iso_rx_sched()
+#define iso_rx_put(link, rx) ull_iso_lll_rx_put(link, rx)
+#define iso_rx_sched() ull_iso_lll_rx_sched()
 #else
 #define iso_rx_put(link, rx) ll_iso_rx_put(link, rx)
 #define iso_rx_sched() ll_rx_sched()
@@ -605,30 +605,30 @@ int lll_csrand_isr_get(void *buf, size_t len);
 int lll_rand_get(void *buf, size_t len);
 int lll_rand_isr_get(void *buf, size_t len);
 
-struct lll_event *ull_prepare_enqueue(lll_is_abort_cb_t is_abort_cb,
-				      lll_abort_cb_t abort_cb,
-				      struct lll_prepare_param *prepare_param,
-				      lll_prepare_cb_t prepare_cb,
-				      uint8_t is_resume);
-void *ull_prepare_dequeue_get(void);
-void *ull_prepare_dequeue_iter(uint8_t *idx);
-void ull_prepare_dequeue(uint8_t caller_id);
-void *ull_pdu_rx_alloc_peek(uint8_t count);
-void *ull_pdu_rx_alloc_peek_iter(uint8_t *idx);
-void *ull_pdu_rx_alloc(void);
-void *ull_iso_pdu_rx_alloc_peek(uint8_t count);
-void *ull_iso_pdu_rx_alloc(void);
-void ull_rx_put(memq_link_t *link, void *rx);
-void ull_rx_sched(void);
-void ull_rx_put_sched(memq_link_t *link, void *rx);
-void ull_iso_rx_put(memq_link_t *link, void *rx);
-void ull_iso_rx_sched(void);
-void *ull_iso_tx_ack_dequeue(void);
+struct lll_event *ull_prepare_lll_enqueue(lll_is_abort_cb_t is_abort_cb,
+					   lll_abort_cb_t abort_cb,
+					   struct lll_prepare_param *prepare_param,
+					   lll_prepare_cb_t prepare_cb,
+					   uint8_t is_resume);
+void *ull_prepare_lll_dequeue_get(void);
+void *ull_prepare_lll_dequeue_iter(uint8_t *idx);
+void ull_prepare_lll_dequeue(uint8_t caller_id);
+void *ull_pdu_lll_rx_alloc_peek(uint8_t count);
+void *ull_pdu_lll_rx_alloc_peek_iter(uint8_t *idx);
+void *ull_pdu_lll_rx_alloc(void);
+void *ull_iso_pdu_lll_rx_alloc_peek(uint8_t count);
+void *ull_iso_pdu_lll_rx_alloc(void);
+void ull_lll_rx_put(memq_link_t *link, void *rx);
+void ull_lll_rx_sched(void);
+void ull_lll_rx_put_sched(memq_link_t *link, void *rx);
+void ull_iso_lll_rx_put(memq_link_t *link, void *rx);
+void ull_iso_lll_rx_sched(void);
+void *ull_iso_lll_tx_ack_dequeue(void);
 void ull_iso_lll_ack_enqueue(uint16_t handle, struct node_tx_iso *tx);
 void ull_iso_lll_event_prepare(uint16_t handle, uint64_t event_count);
-struct event_done_extra *ull_event_done_extra_get(void);
-struct event_done_extra *ull_done_extra_type_set(uint8_t type);
-void *ull_event_done(void *param);
+struct event_done_extra *ull_event_lll_done_extra_get(void);
+struct event_done_extra *ull_lll_done_extra_type_set(uint8_t type);
+void *ull_event_lll_done(void *param);
 
 int lll_prepare(lll_is_abort_cb_t is_abort_cb,
 		lll_abort_cb_t abort_cb,

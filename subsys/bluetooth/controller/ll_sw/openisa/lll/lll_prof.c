@@ -115,12 +115,12 @@ void lll_prof_send(void)
 		struct node_rx_pdu *rx;
 
 		/* NOTE: enqueue only if rx buffer available, else ignore */
-		rx = ull_pdu_rx_alloc_peek(3);
+		rx = ull_pdu_lll_rx_alloc_peek(3);
 		if (rx) {
 			struct pdu_data *pdu;
 			struct profile *p;
 
-			ull_pdu_rx_alloc();
+			ull_pdu_lll_rx_alloc();
 
 			rx->hdr.type = NODE_RX_TYPE_PROFILE;
 			rx->hdr.handle = 0xFFFF;
@@ -134,7 +134,7 @@ void lll_prof_send(void)
 			p->min = cputime_min;
 			p->max = cputime_max;
 
-			ull_rx_put_sched(rx->hdr.link, rx);
+			ull_lll_rx_put_sched(rx->hdr.link, rx);
 		}
 	}
 }

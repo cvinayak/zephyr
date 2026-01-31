@@ -164,7 +164,7 @@ static int create_iq_report(bool crc_ok)
 	ftr->param = NULL;
 	ftr->rssi = BT_HCI_LE_RSSI_NOT_AVAILABLE;
 
-	ull_rx_put(iq_report->rx.hdr.link, iq_report);
+	ull_lll_rx_put(iq_report->rx.hdr.link, iq_report);
 
 	return 0;
 }
@@ -271,7 +271,7 @@ static void isr_rx(void *param)
 
 		err = create_iq_report(crc_ok);
 		if (!err) {
-			ull_rx_sched();
+			ull_lll_rx_sched();
 		}
 	}
 #endif

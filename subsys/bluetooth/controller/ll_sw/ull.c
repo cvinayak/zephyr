@@ -2156,7 +2156,7 @@ int ull_disable(void *lll)
 	return 0;
 }
 
-void *ull_pdu_rx_alloc_peek(uint8_t count)
+void *ull_pdu_lll_rx_alloc_peek(uint8_t count)
 {
 	if (count > MFIFO_AVAIL_COUNT_GET(pdu_rx_free)) {
 		return NULL;
@@ -2165,17 +2165,17 @@ void *ull_pdu_rx_alloc_peek(uint8_t count)
 	return MFIFO_DEQUEUE_PEEK(pdu_rx_free);
 }
 
-void *ull_pdu_rx_alloc_peek_iter(uint8_t *idx)
+void *ull_pdu_lll_rx_alloc_peek_iter(uint8_t *idx)
 {
 	return *(void **)MFIFO_DEQUEUE_ITER_GET(pdu_rx_free, idx);
 }
 
-void *ull_pdu_rx_alloc(void)
+void *ull_pdu_lll_rx_alloc(void)
 {
 	return MFIFO_DEQUEUE(pdu_rx_free);
 }
 
-void ull_rx_put(memq_link_t *link, void *rx)
+void ull_lll_rx_put(memq_link_t *link, void *rx)
 {
 #if defined(CONFIG_BT_CONN)
 	struct node_rx_hdr *rx_hdr = rx;
@@ -2190,7 +2190,7 @@ void ull_rx_put(memq_link_t *link, void *rx)
 	memq_enqueue(link, rx, &memq_ull_rx.tail);
 }
 
-void ull_rx_sched(void)
+void ull_lll_rx_sched(void)
 {
 	static memq_link_t link;
 	static struct mayfly mfy = {0, 0, &link, NULL, rx_demux};
@@ -2199,17 +2199,17 @@ void ull_rx_sched(void)
 	mayfly_enqueue(TICKER_USER_ID_LLL, TICKER_USER_ID_ULL_HIGH, 1, &mfy);
 }
 
-void ull_rx_put_sched(memq_link_t *link, void *rx)
+void ull_lll_rx_put_sched(memq_link_t *link, void *rx)
 {
-	ull_rx_put(link, rx);
-	ull_rx_sched();
+	ull_lll_rx_put(link, rx);
+	ull_lll_rx_sched();
 }
 
-struct lll_event *ull_prepare_enqueue(lll_is_abort_cb_t is_abort_cb,
-				      lll_abort_cb_t abort_cb,
-				      struct lll_prepare_param *prepare_param,
-				      lll_prepare_cb_t prepare_cb,
-				      uint8_t is_resume)
+struct lll_event *ull_prepare_lll_enqueue(lll_is_abort_cb_t is_abort_cb,
+					   lll_abort_cb_t abort_cb,
+					   struct lll_prepare_param *prepare_param,
+					   lll_prepare_cb_t prepare_cb,
+					   uint8_t is_resume)
 {
 	struct lll_event *e;
 	uint8_t idx;
@@ -2231,17 +2231,17 @@ struct lll_event *ull_prepare_enqueue(lll_is_abort_cb_t is_abort_cb,
 	return e;
 }
 
-void *ull_prepare_dequeue_get(void)
+void *ull_prepare_lll_dequeue_get(void)
 {
 	return MFIFO_DEQUEUE_GET(prep);
 }
 
-void *ull_prepare_dequeue_iter(uint8_t *idx)
+void *ull_prepare_lll_dequeue_iter(uint8_t *idx)
 {
 	return MFIFO_DEQUEUE_ITER_GET(prep, idx);
 }
 
-void ull_prepare_dequeue(uint8_t caller_id)
+void ull_prepare_lll_dequeue(uint8_t caller_id)
 {
 	uint32_t param_normal_head_ticks = 0U;
 	uint32_t param_normal_next_ticks = 0U;
@@ -2279,7 +2279,7 @@ void ull_prepare_dequeue(uint8_t caller_id)
 	 */
 	loop = (EVENT_PIPELINE_MAX + 3U);
 
-	next = ull_prepare_dequeue_get();
+	next = ull_prepare_lll_dequeue_get();
 	while (next) {
 		uint32_t ticks = next->prepare_param.ticks_at_expire;
 		void *param = next->prepare_param.param;
@@ -2309,7 +2309,7 @@ void ull_prepare_dequeue(uint8_t caller_id)
 		MFIFO_DEQUEUE(prep);
 
 		/* Check for anymore more prepare elements in queue */
-		next = ull_prepare_dequeue_get();
+		next = ull_prepare_lll_dequeue_get();
 		if (!next) {
 			break;
 		}
@@ -2363,7 +2363,7 @@ void ull_prepare_dequeue(uint8_t caller_id)
 	}
 }
 
-struct event_done_extra *ull_event_done_extra_get(void)
+struct event_done_extra *ull_event_lll_done_extra_get(void)
 {
 	struct node_rx_event_done *evdone;
 
@@ -2375,11 +2375,11 @@ struct event_done_extra *ull_event_done_extra_get(void)
 	return &evdone->extra;
 }
 
-struct event_done_extra *ull_done_extra_type_set(uint8_t type)
+struct event_done_extra *ull_lll_done_extra_type_set(uint8_t type)
 {
 	struct event_done_extra *extra;
 
-	extra = ull_event_done_extra_get();
+	extra = ull_event_lll_done_extra_get();
 	if (!extra) {
 		return NULL;
 	}
@@ -2389,7 +2389,7 @@ struct event_done_extra *ull_done_extra_type_set(uint8_t type)
 	return extra;
 }
 
-void *ull_event_done(void *param)
+void *ull_event_lll_done(void *param)
 {
 	struct node_rx_event_done *evdone;
 	memq_link_t *link;
@@ -2414,7 +2414,7 @@ void *ull_event_done(void *param)
 	evdone->hdr.type = NODE_RX_TYPE_EVENT_DONE;
 	evdone->param = param;
 
-	ull_rx_put_sched(link, evdone);
+	ull_lll_rx_put_sched(link, evdone);
 
 	return evdone;
 }
@@ -3255,7 +3255,7 @@ static inline void rx_demux_event_done(memq_link_t *link,
 
 #if defined(CONFIG_BT_CTLR_LOW_LAT_ULL_DONE)
 	/* dequeue prepare pipeline */
-	ull_prepare_dequeue(TICKER_USER_ID_ULL_HIGH);
+	ull_prepare_lll_dequeue(TICKER_USER_ID_ULL_HIGH);
 
 	/* LLL done synchronize count */
 	lll_done_ull_inc();
