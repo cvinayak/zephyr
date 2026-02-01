@@ -962,6 +962,11 @@ static inline uint32_t isr_rx_pdu(struct lll_scan *lll, uint8_t devmatch_ok,
 		  ((pdu_adv_rx->type == PDU_ADV_TYPE_EXT_IND) &&
 		   (lll->phy)) ||
 #endif /* CONFIG_BT_CTLR_ADV_EXT */
+#if defined(CONFIG_BT_CTLR_DECISION_BASED_FILTERING)
+		  ((pdu_adv_rx->type == PDU_ADV_TYPE_ADV_DECISION_IND) &&
+		   (pdu_adv_rx->len <= sizeof(struct pdu_adv_decision_ind)) &&
+		   ((lll->filter_policy & SCAN_FP_DECISION) != 0U)) ||
+#endif /* CONFIG_BT_CTLR_DECISION_BASED_FILTERING */
 		  ((pdu_adv_rx->type == PDU_ADV_TYPE_SCAN_RSP) &&
 		   (pdu_adv_rx->len <= sizeof(struct pdu_adv_scan_rsp)) &&
 		   (lll->state != 0U) &&
