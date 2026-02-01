@@ -41,6 +41,7 @@ struct node_tx {
 		memq_link_t *link;
 	};
 
+	uint16_t flush_event_counter;  /* Connection event counter at which this buffer should be flushed */
 	uint8_t pdu[];
 };
 

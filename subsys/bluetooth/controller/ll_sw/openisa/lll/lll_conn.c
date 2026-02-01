@@ -793,5 +793,65 @@ static struct pdu_data *empty_tx_enqueue(struct lll_conn *lll)
 
 void lll_conn_flush(uint16_t handle, struct lll_conn *lll)
 {
-	/* Nothing to be flushed */
+	struct node_tx *tx;
+	memq_link_t *link;
+	uint16_t current_event_counter;
+
+	/* Get current event counter */
+	current_event_counter = lll->event_counter;
+
+	/* Iterate through tx queue and check for expired buffers */
+	link = memq_peek(lll->memq_tx.head, lll->memq_tx.tail, (void **)&tx);
+	
+	while (link) {
+		memq_link_t *link_next;
+		struct node_tx *tx_next;
+		bool should_flush = false;
+
+		/* Peek at next element before potentially removing current */
+		link_next = link->next;
+		if (link_next != lll->memq_tx.tail) {
+			tx_next = (void *)link_next->mem;
+		} else {
+			tx_next = NULL;
+		}
+
+		/* Check if this buffer should be flushed
+		 * Using 16-bit counter arithmetic to handle wraparound:
+		 * If (current - flush_deadline) is positive (< 0x8000), deadline has passed
+		 */
+		if (tx->flush_event_counter != 0xFFFF) {
+			uint16_t diff = (current_event_counter - tx->flush_event_counter) & 0xFFFF;
+			should_flush = (diff < 0x8000U);
+		}
+
+		if (should_flush) {
+			/* Remove from tx queue */
+			memq_dequeue(lll->memq_tx.tail, &lll->memq_tx.head, NULL);
+
+			/* Place into ack path to notify upper layers that packet was flushed
+			 * TX node UPSTREAM, i.e. Tx node ack path
+			 */
+			link->next = tx->next; /* Indicates ctrl or data pool */
+			tx->next = link;
+
+			/* Enqueue to ack path */
+			ull_conn_lll_ack_enqueue(handle, tx);
+
+			/* Reset packet head tracking if this was the current tx packet */
+			if (lll->packet_tx_head_len > 0) {
+				lll->packet_tx_head_len = 0;
+				lll->packet_tx_head_offset = 0;
+			}
+		}
+
+		/* Move to next element */
+		if (should_flush) {
+			/* After dequeue, head now points to next element */
+			link = memq_peek(lll->memq_tx.head, lll->memq_tx.tail, (void **)&tx);
+		} else {
+			link = link_next;
+			tx = tx_next;
+		}
+	}
 }

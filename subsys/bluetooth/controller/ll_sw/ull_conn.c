@@ -1473,6 +1473,7 @@ void ull_conn_tx_lll_enqueue(struct ll_conn *conn, uint8_t count)
 	while (count--) {
 		struct node_tx *tx;
 		memq_link_t *link;
+		uint16_t event_counter;
 
 		tx = tx_ull_dequeue(conn, NULL);
 		if (!tx) {
@@ -1482,6 +1483,13 @@ void ull_conn_tx_lll_enqueue(struct ll_conn *conn, uint8_t count)
 
 		link = mem_acquire(&mem_link_tx.free);
 		LL_ASSERT_ERR(link);
+
+		/* Set flush deadline: current event counter + reasonable window
+		 * For now, use 0xFFFF (never flush) as default behavior
+		 * This maintains backward compatibility
+		 */
+		event_counter = ull_conn_event_counter(conn);
+		tx->flush_event_counter = 0xFFFF;
 
 		/* Enqueue towards LLL */
 		memq_enqueue(link, tx, &conn->lll.memq_tx.tail);
@@ -2012,8 +2020,11 @@ static void conn_cleanup(struct ll_conn *conn, uint8_t reason)
 static void tx_ull_flush(struct ll_conn *conn)
 {
 	struct node_tx *tx;
+	uint16_t event_counter;
 
 	ull_tx_q_resume_data(&conn->tx_q);
+
+	event_counter = ull_conn_event_counter(conn);
 
 	tx = tx_ull_dequeue(conn, NULL);
 	while (tx) {
@@ -2021,6 +2032,9 @@ static void tx_ull_flush(struct ll_conn *conn)
 
 		link = mem_acquire(&mem_link_tx.free);
 		LL_ASSERT_ERR(link);
+
+		/* Set flush deadline: use 0xFFFF (never flush) as default */
+		tx->flush_event_counter = 0xFFFF;
 
 		/* Enqueue towards LLL */
 		memq_enqueue(link, tx, &conn->lll.memq_tx.tail);
