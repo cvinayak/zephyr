@@ -147,7 +147,9 @@ static void test_observer_main(void)
 	printk("Waiting for advertising reports...\n");
 
 	/* Wait for at least one report or timeout */
-	WAIT_FOR_FLAG_UNSET_WITH_TIMEOUT(flag_adv_received, 8 * USEC_PER_SEC);
+	for (int i = 0; i < 8 && !TEST_FLAG(flag_adv_received); i++) {
+		k_sleep(K_SECONDS(1));
+	}
 
 	if (!TEST_FLAG(flag_adv_received)) {
 		TEST_FAIL("No advertising reports received\n");

@@ -24,7 +24,7 @@ static void scan_recv(const struct bt_le_scan_recv_info *info,
 		      struct net_buf_simple *buf)
 {
 	char addr_str[BT_ADDR_LE_STR_LEN];
-	char name[NAME_LEN];
+	char name[NAME_LEN] = {0};
 	uint8_t data_len;
 	uint8_t data_type;
 
