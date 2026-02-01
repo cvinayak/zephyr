@@ -6663,8 +6663,25 @@ static void le_advertising_report(struct pdu_data *pdu_data,
 				  struct node_rx_pdu *node_rx,
 				  struct net_buf *buf)
 {
+#if defined(CONFIG_BT_CTLR_DECISION_BASED_FILTERING)
+	/* Mapping PDU types to HCI advertising event types:
+	 * Index 0: PDU_ADV_TYPE_ADV_IND → BT_HCI_ADV_IND (0x00)
+	 * Index 1: PDU_ADV_TYPE_DIRECT_IND → BT_HCI_ADV_DIRECT_IND (0x01)
+	 * Index 2: PDU_ADV_TYPE_NONCONN_IND → BT_HCI_ADV_NONCONN_IND (0x03)
+	 * Index 3: PDU_ADV_TYPE_SCAN_REQ → invalid (0xff)
+	 * Index 4: PDU_ADV_TYPE_SCAN_RSP → BT_HCI_ADV_SCAN_RSP (0x04)
+	 * Index 5: PDU_ADV_TYPE_CONNECT_IND → invalid (0xff)
+	 * Index 6: PDU_ADV_TYPE_SCAN_IND → BT_HCI_ADV_SCAN_IND (0x02)
+	 * Index 7: (not used for EXT_IND)
+	 * Index 8: (not used for AUX_CONNECT_RSP)
+	 * Index 9: PDU_ADV_TYPE_ADV_DECISION_IND → BT_HCI_ADV_NONCONN_IND (0x03)
+	 */
+	const uint8_t c_adv_type[] = { 0x00, 0x01, 0x03, 0xff, 0x04,
+				    0xff, 0x02, 0xff, 0xff, 0x03 };
+#else
 	const uint8_t c_adv_type[] = { 0x00, 0x01, 0x03, 0xff, 0x04,
 				    0xff, 0x02 };
+#endif /* CONFIG_BT_CTLR_DECISION_BASED_FILTERING */
 	struct bt_hci_evt_le_advertising_report *sep;
 	struct pdu_adv *adv = (void *)pdu_data;
 	struct bt_hci_evt_le_advertising_info *adv_info;
@@ -6752,12 +6769,30 @@ static void le_advertising_report(struct pdu_data *pdu_data,
 #endif /* CONFIG_BT_CTLR_PRIVACY */
 
 		adv_info->addr.type = adv->tx_addr;
-		memcpy(&adv_info->addr.a.val[0], &adv->adv_ind.addr[0],
-		       sizeof(bt_addr_t));
+#if defined(CONFIG_BT_CTLR_DECISION_BASED_FILTERING)
+		/* ADV_DECISION_IND has same structure as ADV_IND (addr + data),
+		 * so we can use adv_ind for both types
+		 */
+		if (adv->type == PDU_ADV_TYPE_ADV_DECISION_IND) {
+			memcpy(&adv_info->addr.a.val[0], &adv->decision_ind.addr[0],
+			       sizeof(bt_addr_t));
+		} else
+#endif /* CONFIG_BT_CTLR_DECISION_BASED_FILTERING */
+		{
+			memcpy(&adv_info->addr.a.val[0], &adv->adv_ind.addr[0],
+			       sizeof(bt_addr_t));
+		}
 	}
 
 	adv_info->length = data_len;
-	memcpy(&adv_info->data[0], &adv->adv_ind.data[0], data_len);
+#if defined(CONFIG_BT_CTLR_DECISION_BASED_FILTERING)
+	if (adv->type == PDU_ADV_TYPE_ADV_DECISION_IND) {
+		memcpy(&adv_info->data[0], &adv->decision_ind.data[0], data_len);
+	} else
+#endif /* CONFIG_BT_CTLR_DECISION_BASED_FILTERING */
+	{
+		memcpy(&adv_info->data[0], &adv->adv_ind.data[0], data_len);
+	}
 	/* RSSI */
 	prssi = &adv_info->data[0] + data_len;
 	*prssi = rssi;
@@ -6769,6 +6804,33 @@ static void le_ext_adv_legacy_report(struct pdu_data *pdu_data,
 				     struct net_buf *buf)
 {
 	/* Lookup event type based on pdu_adv_type set by LLL */
+#if defined(CONFIG_BT_CTLR_DECISION_BASED_FILTERING)
+	const uint8_t evt_type_lookup[] = {
+		(BT_HCI_LE_ADV_EVT_TYPE_LEGACY | BT_HCI_LE_ADV_EVT_TYPE_SCAN |
+		 BT_HCI_LE_ADV_EVT_TYPE_CONN),   /* ADV_IND */
+		(BT_HCI_LE_ADV_EVT_TYPE_LEGACY | BT_HCI_LE_ADV_EVT_TYPE_DIRECT |
+		 BT_HCI_LE_ADV_EVT_TYPE_CONN),   /* DIRECT_IND */
+		(BT_HCI_LE_ADV_EVT_TYPE_LEGACY), /* NONCONN_IND */
+		0xff,                            /* Invalid index lookup */
+		(BT_HCI_LE_ADV_EVT_TYPE_LEGACY |
+		 BT_HCI_LE_ADV_EVT_TYPE_SCAN_RSP |
+		 BT_HCI_LE_ADV_EVT_TYPE_SCAN),   /* SCAN_RSP to an ADV_SCAN_IND
+						  */
+		(BT_HCI_LE_ADV_EVT_TYPE_LEGACY |
+		 BT_HCI_LE_ADV_EVT_TYPE_SCAN_RSP |
+		 BT_HCI_LE_ADV_EVT_TYPE_SCAN |
+		 BT_HCI_LE_ADV_EVT_TYPE_CONN), /* SCAN_RSP to an ADV_IND,
+						* NOTE: LLL explicitly sets
+						* adv_type to
+						* PDU_ADV_TYPE_ADV_IND_SCAN_RSP
+						*/
+		(BT_HCI_LE_ADV_EVT_TYPE_LEGACY |
+		 BT_HCI_LE_ADV_EVT_TYPE_SCAN),   /* SCAN_IND */
+		0xff,                            /* Invalid - EXT_IND */
+		0xff,                            /* Invalid - AUX_CONNECT_RSP */
+		(BT_HCI_LE_ADV_EVT_TYPE_LEGACY)  /* ADV_DECISION_IND */
+	};
+#else
 	const uint8_t evt_type_lookup[] = {
 		(BT_HCI_LE_ADV_EVT_TYPE_LEGACY | BT_HCI_LE_ADV_EVT_TYPE_SCAN |
 		 BT_HCI_LE_ADV_EVT_TYPE_CONN),   /* ADV_IND */
@@ -6791,6 +6853,7 @@ static void le_ext_adv_legacy_report(struct pdu_data *pdu_data,
 		(BT_HCI_LE_ADV_EVT_TYPE_LEGACY |
 		 BT_HCI_LE_ADV_EVT_TYPE_SCAN)    /* SCAN_IND */
 	};
+#endif /* CONFIG_BT_CTLR_DECISION_BASED_FILTERING */
 	struct bt_hci_evt_le_ext_advertising_info *adv_info;
 	struct bt_hci_evt_le_ext_advertising_report *sep;
 	struct pdu_adv *adv = (void *)pdu_data;
