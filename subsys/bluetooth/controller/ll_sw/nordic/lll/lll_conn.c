@@ -172,11 +172,12 @@ void lll_conn_flush(uint16_t handle, struct lll_conn *lll)
 
 		/* Check if this buffer should be flushed
 		 * Using 16-bit counter arithmetic to handle wraparound:
-		 * If (current - flush_deadline) is positive (< 0x8000), deadline has passed
+		 * If (current - flush_deadline) is in range [0, 0x7FFF], deadline has passed
+		 * This means current >= flush_deadline (accounting for wraparound)
 		 */
 		if (tx->flush_event_counter != 0xFFFF) {
 			uint16_t diff = (current_event_counter - tx->flush_event_counter) & 0xFFFF;
-			should_flush = (diff < 0x8000U);
+			should_flush = (diff <= 0x7FFFU);
 		}
 
 		if (should_flush) {
