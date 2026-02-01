@@ -797,13 +797,15 @@ void lll_conn_flush(uint16_t handle, struct lll_conn *lll)
 	struct node_tx *tx;
 	memq_link_t *link;
 	uint16_t current_event_counter;
+	bool is_first_packet;
 
 	/* Get current event counter */
 	current_event_counter = lll->event_counter;
 
 	/* Iterate through tx queue and check for expired buffers */
 	link = memq_peek(lll->memq_tx.head, lll->memq_tx.tail, (void **)&tx);
-	
+	is_first_packet = true;
+
 	while (link) {
 		memq_link_t *link_next;
 		struct node_tx *tx_next;
@@ -839,8 +841,10 @@ void lll_conn_flush(uint16_t handle, struct lll_conn *lll)
 			/* Enqueue to ack path */
 			ull_conn_lll_ack_enqueue(handle, tx);
 
-			/* Reset packet head tracking if this was the current tx packet */
-			if (lll->packet_tx_head_len > 0) {
+			/* Reset packet head tracking only if this was the first (head) packet
+			 * and it was partially transmitted
+			 */
+			if (is_first_packet && lll->packet_tx_head_len > 0) {
 				lll->packet_tx_head_len = 0;
 				lll->packet_tx_head_offset = 0;
 			}
@@ -848,11 +852,15 @@ void lll_conn_flush(uint16_t handle, struct lll_conn *lll)
 
 		/* Move to next element */
 		if (should_flush) {
-			/* After dequeue, head now points to next element */
+			/* After dequeue, head now points to next element
+			 * The new head is now the first packet
+			 */
 			link = memq_peek(lll->memq_tx.head, lll->memq_tx.tail, (void **)&tx);
+			is_first_packet = true;
 		} else {
 			link = link_next;
 			tx = tx_next;
+			is_first_packet = false;
 		}
 	}
 #else
