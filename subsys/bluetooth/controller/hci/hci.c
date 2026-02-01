@@ -6664,21 +6664,30 @@ static void le_advertising_report(struct pdu_data *pdu_data,
 				  struct net_buf *buf)
 {
 #if defined(CONFIG_BT_CTLR_DECISION_BASED_FILTERING)
-	/* Mapping PDU types to HCI advertising event types:
-	 * Index 0: PDU_ADV_TYPE_ADV_IND → BT_HCI_ADV_IND (0x00)
-	 * Index 1: PDU_ADV_TYPE_DIRECT_IND → BT_HCI_ADV_DIRECT_IND (0x01)
-	 * Index 2: PDU_ADV_TYPE_NONCONN_IND → BT_HCI_ADV_NONCONN_IND (0x03)
-	 * Index 3: PDU_ADV_TYPE_SCAN_REQ → invalid (0xff)
-	 * Index 4: PDU_ADV_TYPE_SCAN_RSP → BT_HCI_ADV_SCAN_RSP (0x04)
-	 * Index 5: PDU_ADV_TYPE_CONNECT_IND → invalid (0xff)
-	 * Index 6: PDU_ADV_TYPE_SCAN_IND → BT_HCI_ADV_SCAN_IND (0x02)
-	 * Index 7: (not used for EXT_IND)
-	 * Index 8: (not used for AUX_CONNECT_RSP)
-	 * Index 9: PDU_ADV_TYPE_ADV_DECISION_IND → BT_HCI_ADV_NONCONN_IND (0x03)
+	/* Mapping PDU types to HCI advertising event types (10 elements, indices 0-9):
+	 * Index 0: PDU_ADV_TYPE_ADV_IND (0x00) → BT_HCI_ADV_IND (0x00)
+	 * Index 1: PDU_ADV_TYPE_DIRECT_IND (0x01) → BT_HCI_ADV_DIRECT_IND (0x01)
+	 * Index 2: PDU_ADV_TYPE_NONCONN_IND (0x02) → BT_HCI_ADV_NONCONN_IND (0x03)
+	 * Index 3: PDU_ADV_TYPE_SCAN_REQ (0x03) → invalid (0xff)
+	 * Index 4: PDU_ADV_TYPE_SCAN_RSP (0x04) → BT_HCI_ADV_SCAN_RSP (0x04)
+	 * Index 5: PDU_ADV_TYPE_CONNECT_IND (0x05) → invalid (0xff)
+	 * Index 6: PDU_ADV_TYPE_SCAN_IND (0x06) → BT_HCI_ADV_SCAN_IND (0x02)
+	 * Index 7: PDU_ADV_TYPE_EXT_IND (0x07) → invalid (0xff)
+	 * Index 8: PDU_ADV_TYPE_AUX_CONNECT_RSP (0x08) → invalid (0xff)
+	 * Index 9: PDU_ADV_TYPE_ADV_DECISION_IND (0x09) → BT_HCI_ADV_NONCONN_IND (0x03)
 	 */
 	const uint8_t c_adv_type[] = { 0x00, 0x01, 0x03, 0xff, 0x04,
 				    0xff, 0x02, 0xff, 0xff, 0x03 };
 #else
+	/* Mapping PDU types to HCI advertising event types (7 elements, indices 0-6):
+	 * Index 0: PDU_ADV_TYPE_ADV_IND (0x00) → BT_HCI_ADV_IND (0x00)
+	 * Index 1: PDU_ADV_TYPE_DIRECT_IND (0x01) → BT_HCI_ADV_DIRECT_IND (0x01)
+	 * Index 2: PDU_ADV_TYPE_NONCONN_IND (0x02) → BT_HCI_ADV_NONCONN_IND (0x03)
+	 * Index 3: PDU_ADV_TYPE_SCAN_REQ (0x03) → invalid (0xff)
+	 * Index 4: PDU_ADV_TYPE_SCAN_RSP (0x04) → BT_HCI_ADV_SCAN_RSP (0x04)
+	 * Index 5: PDU_ADV_TYPE_CONNECT_IND (0x05) → invalid (0xff)
+	 * Index 6: PDU_ADV_TYPE_SCAN_IND (0x06) → BT_HCI_ADV_SCAN_IND (0x02)
+	 */
 	const uint8_t c_adv_type[] = { 0x00, 0x01, 0x03, 0xff, 0x04,
 				    0xff, 0x02 };
 #endif /* CONFIG_BT_CTLR_DECISION_BASED_FILTERING */
