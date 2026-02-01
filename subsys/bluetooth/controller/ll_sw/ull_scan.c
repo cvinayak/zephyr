@@ -131,6 +131,24 @@ uint8_t ll_scan_params_set(uint8_t type, uint16_t interval, uint16_t window,
 	lll = &scan->lll;
 #endif /* !CONFIG_BT_CTLR_ADV_EXT */
 
+	/* Validate filter policy parameter */
+#if defined(CONFIG_BT_CTLR_DECISION_BASED_FILTERING)
+	/* Decision-based filtering: support values 0x00-0x07 */
+	if (filter_policy > 0x07) {
+		return BT_HCI_ERR_INVALID_PARAM;
+	}
+#elif defined(CONFIG_BT_CTLR_EXT_SCAN_FP)
+	/* Extended scan filtering: support values 0x00-0x03 */
+	if (filter_policy > 0x03) {
+		return BT_HCI_ERR_INVALID_PARAM;
+	}
+#else
+	/* Basic filtering: support values 0x00-0x01 */
+	if (filter_policy > 0x01) {
+		return BT_HCI_ERR_INVALID_PARAM;
+	}
+#endif /* CONFIG_BT_CTLR_DECISION_BASED_FILTERING */
+
 	scan->own_addr_type = own_addr_type;
 
 	scan->ticks_window = ull_scan_params_set(lll, type, interval, window,
@@ -374,7 +392,42 @@ uint32_t ull_scan_params_set(struct lll_scan *lll, uint8_t type,
 	 * 1001b - Ext. Coded active
 	 */
 	lll->type = type;
-	lll->filter_policy = filter_policy;
+
+	/* Convert HCI filter_policy to LLL filter_policy bit flags
+	 * HCI values:
+	 *   0x00 - Basic, no filter
+	 *   0x01 - Basic, use filter accept list
+	 *   0x02 - Extended, no filter
+	 *   0x03 - Extended, use filter accept list
+	 *   0x04 - Decision, no filter (if enabled)
+	 *   0x05 - Decision, use filter accept list (if enabled)
+	 *   0x06 - Decision + Extended, no filter (if enabled)
+	 *   0x07 - Decision + Extended, use filter accept list (if enabled)
+	 *
+	 * LLL flags:
+	 *   SCAN_FP_FILTER (bit 0) - Use filter accept list
+	 *   SCAN_FP_EXT (bit 1) - Extended scan filtering
+	 *   SCAN_FP_DECISION (bit 2) - Decision-based filtering
+	 */
+	lll->filter_policy = 0U;
+
+	/* Set SCAN_FP_FILTER if filter accept list is used (odd values) */
+	if (filter_policy & 0x01) {
+		lll->filter_policy |= SCAN_FP_FILTER;
+	}
+
+	/* Set SCAN_FP_EXT if extended filtering is used (0x02-0x03, 0x06-0x07) */
+	if (filter_policy & 0x02) {
+		lll->filter_policy |= SCAN_FP_EXT;
+	}
+
+#if defined(CONFIG_BT_CTLR_DECISION_BASED_FILTERING)
+	/* Set SCAN_FP_DECISION if decision-based filtering is used (0x04-0x07) */
+	if (filter_policy >= 0x04) {
+		lll->filter_policy |= SCAN_FP_DECISION;
+	}
+#endif /* CONFIG_BT_CTLR_DECISION_BASED_FILTERING */
+
 	lll->interval = interval;
 	lll->ticks_window = HAL_TICKER_US_TO_TICKS((uint64_t)window *
 						   SCAN_INT_UNIT_US);
