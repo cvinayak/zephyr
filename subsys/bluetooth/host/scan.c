@@ -216,6 +216,8 @@ int bt_le_scan_set_enable(uint8_t enable)
  * | DEC + EXT | 0x06 | Decision + Extended, no filter |
  * | DEC + EXT + FAL | 0x07 | Decision + Extended, use filter accept list |
  *
+ * Note: Bit 0 of the filter policy always indicates filter accept list usage.
+ *
  * @param options Scan options bit field
  * @return HCI filter policy value (0x00-0x07)
  */
@@ -232,26 +234,18 @@ static uint8_t scan_options_to_filter_policy(uint8_t options)
 		if (options & BT_LE_SCAN_OPT_EXTENDED_FILTER) {
 			filter_policy = BT_HCI_LE_SCAN_FP_DECISION_EXT_NO_FILTER;
 		}
-
-		/* Add filter accept list flag if requested (bit 1) */
-		if (IS_ENABLED(CONFIG_BT_FILTER_ACCEPT_LIST) &&
-		    (options & BT_LE_SCAN_OPT_FILTER_ACCEPT_LIST)) {
-			filter_policy |= 0x01; /* Set bit 0 for FAL */
-		}
-	} else
+	} else if (options & BT_LE_SCAN_OPT_EXTENDED_FILTER) {
+		/* Extended filtering without decision-based */
+		filter_policy = BT_HCI_LE_SCAN_FP_EXT_NO_FILTER;
+	}
 #endif /* CONFIG_BT_CTLR_DECISION_BASED_FILTERING */
-	{
-		/* Legacy/Extended filtering without decision-based */
-#if defined(CONFIG_BT_CTLR_DECISION_BASED_FILTERING)
-		if (options & BT_LE_SCAN_OPT_EXTENDED_FILTER) {
-			filter_policy = BT_HCI_LE_SCAN_FP_EXT_NO_FILTER;
-		}
-#endif
-		/* Add filter accept list flag if requested */
-		if (IS_ENABLED(CONFIG_BT_FILTER_ACCEPT_LIST) &&
-		    (options & BT_LE_SCAN_OPT_FILTER_ACCEPT_LIST)) {
-			filter_policy |= 0x01; /* Set bit 0 for FAL */
-		}
+
+	/* Add filter accept list flag if requested.
+	 * Bit 0 indicates filter accept list usage in all filter policy modes.
+	 */
+	if (IS_ENABLED(CONFIG_BT_FILTER_ACCEPT_LIST) &&
+	    (options & BT_LE_SCAN_OPT_FILTER_ACCEPT_LIST)) {
+		filter_policy |= 0x01;
 	}
 
 	return filter_policy;
