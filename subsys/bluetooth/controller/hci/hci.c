@@ -6779,8 +6779,8 @@ static void le_advertising_report(struct pdu_data *pdu_data,
 
 		adv_info->addr.type = adv->tx_addr;
 #if defined(CONFIG_BT_CTLR_DECISION_BASED_FILTERING)
-		/* ADV_DECISION_IND has same structure as ADV_IND (addr + data),
-		 * so we can use adv_ind for both types
+		/* ADV_DECISION_IND has same structure as ADV_IND (addr + data).
+		 * Access via decision_ind union member for type safety.
 		 */
 		if (adv->type == PDU_ADV_TYPE_ADV_DECISION_IND) {
 			memcpy(&adv_info->addr.a.val[0], &adv->decision_ind.addr[0],
