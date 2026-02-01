@@ -2350,6 +2350,36 @@ enum bt_le_scan_opt {
 	 * @note Requires @ref BT_LE_SCAN_OPT_CODED.
 	 */
 	BT_LE_SCAN_OPT_NO_1M = BIT(3),
+
+#if defined(CONFIG_BT_CTLR_DECISION_BASED_FILTERING) || defined(__DOXYGEN__)
+	/**
+	 * @brief Enable extended scan filtering.
+	 *
+	 * Enables extended scan filtering mode which provides enhanced
+	 * filtering capabilities. Can be combined with
+	 * @ref BT_LE_SCAN_OPT_FILTER_ACCEPT_LIST.
+	 *
+	 * @note Requires controller support for extended scan filtering.
+	 */
+	BT_LE_SCAN_OPT_EXTENDED_FILTER = BIT(4),
+
+	/**
+	 * @brief Enable decision-based advertising filtering.
+	 *
+	 * Enables decision-based advertising filtering as specified in
+	 * Bluetooth Core Specification v6.2. This allows the controller to
+	 * filter advertising PDUs based on decision criteria. Can be combined
+	 * with @ref BT_LE_SCAN_OPT_FILTER_ACCEPT_LIST and/or
+	 * @ref BT_LE_SCAN_OPT_EXTENDED_FILTER.
+	 *
+	 * When this option is set, the controller will accept ADV_DECISION_IND
+	 * PDUs according to the filter policy.
+	 *
+	 * @note Requires controller support for decision-based advertising
+	 *       filtering (CONFIG_BT_CTLR_DECISION_BASED_FILTERING).
+	 */
+	BT_LE_SCAN_OPT_DECISION_BASED = BIT(5),
+#endif /* CONFIG_BT_CTLR_DECISION_BASED_FILTERING */
 };
 
 enum bt_le_scan_type {
