@@ -153,6 +153,9 @@ static void iso_rx_demux(void *param);
 void ll_iso_link_tx_release(void *link);
 void ll_iso_tx_mem_release(void *node_tx);
 
+static void iso_tx_ack_demux(void *param);
+#endif /* CONFIG_BT_CTLR_ADV_ISO || CONFIG_BT_CTLR_CONN_ISO */
+
 #define NODE_TX_BUFFER_SIZE MROUND(offsetof(struct node_tx_iso, pdu) + \
 				   offsetof(struct pdu_iso, payload) + \
 				   MAX(LL_BIS_OCTETS_TX_MAX, \
@@ -169,6 +172,9 @@ static struct {
 	void *free;
 	uint8_t pool[sizeof(memq_link_t) * BT_CTLR_ISO_TX_PDU_BUFFERS];
 } mem_link_iso_tx;
+
+/* MFIFO for ISO TX acknowledgments from LLL to ULL */
+static MFIFO_DEFINE(iso_ack, sizeof(struct lll_tx), BT_CTLR_ISO_TX_PDU_BUFFERS);
 
 #endif /* CONFIG_BT_CTLR_ADV_ISO || CONFIG_BT_CTLR_CONN_ISO */
 
@@ -1477,34 +1483,129 @@ void ull_iso_lll_ack_enqueue(uint16_t handle, struct node_tx_iso *node_tx)
 
 		if (dp) {
 			isoal_tx_pdu_release(dp->source_hdl, node_tx);
-		} else {
-#if defined(CONFIG_BT_CTLR_ISO_VENDOR_DATA_PATH)
-			/* Possible race with Data Path remove - handle release in vendor
-			 * function.
-			 */
-			ll_data_path_tx_pdu_release(handle, node_tx);
-#else
-			/* FIXME: ll_tx_ack_put is not LLL callable as it is
-			 * used by ACL connections in ULL context to dispatch
-			 * ack.
-			 */
-			ll_tx_ack_put(handle, (void *)node_tx);
-			ll_rx_sched();
-#endif /* CONFIG_BT_CTLR_ISO_VENDOR_DATA_PATH */
+			return;
 		}
+#if defined(CONFIG_BT_CTLR_ISO_VENDOR_DATA_PATH)
+		/* Possible race with Data Path remove - handle release in vendor
+		 * function.
+		 */
+		ll_data_path_tx_pdu_release(handle, node_tx);
+		return;
+#else
+		/* No datapath and no vendor datapath - fall through to MFIFO */
+#endif /* CONFIG_BT_CTLR_ISO_VENDOR_DATA_PATH */
 	} else if (IS_ENABLED(CONFIG_BT_CTLR_ADV_ISO) && IS_ADV_ISO_HANDLE(handle)) {
-		/* Process as TX ack. TODO: Can be unified with CIS and use
-		 * ISOAL.
-		 */
-		/* FIXME: ll_tx_ack_put is not LLL callable as it is
-		 * used by ACL connections in ULL context to dispatch
-		 * ack.
-		 */
-		ll_tx_ack_put(handle, (void *)node_tx);
-		ll_rx_sched();
+		struct lll_adv_iso_stream *stream;
+		struct ll_iso_datapath *dp;
+		uint16_t stream_handle;
+
+		stream_handle = LL_BIS_ADV_IDX_FROM_HANDLE(handle);
+		stream = ull_adv_iso_stream_get(stream_handle);
+		dp = stream ? stream->dp : NULL;
+
+		if (dp) {
+			/* Unified: Use ISOAL like CIS */
+			isoal_tx_pdu_release(dp->source_hdl, node_tx);
+			return;
+		}
+#if defined(CONFIG_BT_CTLR_ISO_VENDOR_DATA_PATH)
+		ll_data_path_tx_pdu_release(handle, node_tx);
+		return;
+#else
+		/* No datapath and no vendor datapath - fall through to MFIFO */
+#endif /* CONFIG_BT_CTLR_ISO_VENDOR_DATA_PATH */
 	} else {
 		LL_ASSERT_DBG(0);
+		return;
 	}
+
+	/* Context-safe fallback: Enqueue to iso_ack MFIFO when no datapath.
+	 * This handles CIS/BIS without datapath and without vendor data path support.
+	 */
+	struct lll_tx *lll_tx;
+	uint8_t idx;
+
+	idx = MFIFO_ENQUEUE_GET(iso_ack, (void **)&lll_tx);
+	LL_ASSERT_ERR(lll_tx);
+
+	lll_tx->handle = handle;
+	lll_tx->node = (struct node_tx *)node_tx;
+
+	MFIFO_ENQUEUE(iso_ack, idx);
+
+	/* Schedule independent ISO TX ack processing (not serialized with RX) */
+	ull_iso_tx_ack_sched();
+}
+
+/**
+ * @brief Peek at next ISO TX ack without dequeuing
+ */
+static memq_link_t *ull_iso_ack_peek(uint8_t *ack_last, uint16_t *handle,
+				     struct node_tx_iso **tx)
+{
+	struct lll_tx *lll_tx;
+
+	lll_tx = MFIFO_DEQUEUE_GET(iso_ack);
+	if (!lll_tx) {
+		return NULL;
+	}
+
+	if (ack_last) {
+		*ack_last = mfifo_fifo_iso_ack.l;
+	}
+	*handle = lll_tx->handle;
+	*tx = (struct node_tx_iso *)lll_tx->node;
+
+	return (*tx)->link;
+}
+
+/**
+ * @brief Dequeue ISO TX ack from MFIFO
+ */
+static void *ull_iso_ack_dequeue(void)
+{
+	return MFIFO_DEQUEUE(iso_ack);
+}
+
+/**
+ * @brief Schedule ISO TX ack processing
+ */
+static void ull_iso_tx_ack_sched(void)
+{
+	static memq_link_t link;
+	static struct mayfly mfy = {0, 0, &link, NULL, iso_tx_ack_demux};
+
+	/* Kick the ULL (using the mayfly, tailchain it) */
+	mayfly_enqueue(TICKER_USER_ID_LLL, TICKER_USER_ID_ULL_HIGH, 1, &mfy);
+}
+
+/**
+ * @brief Process ISO TX acknowledgments independently
+ * @details Processes iso_ack MFIFO without serialization with RX
+ */
+static void iso_tx_ack_demux(void *param)
+{
+	struct node_tx_iso *node_tx;
+	memq_link_t *link;
+	uint16_t handle;
+
+	/* Process all pending ISO TX acks */
+	do {
+		link = ull_iso_ack_peek(NULL, &handle, &node_tx);
+		if (link) {
+			/* Dequeue from iso_ack MFIFO */
+			ull_iso_ack_dequeue();
+
+			/* Now safely call ll_tx_ack_put in ULL context */
+			ll_tx_ack_put(handle, (struct node_tx *)node_tx);
+
+			/* Release link mem */
+			ll_iso_link_tx_release(link);
+		}
+	} while (link);
+
+	/* Trigger thread to call ll_rx_get() */
+	ll_rx_sched();
 }
 
 void ull_iso_lll_event_prepare(uint16_t handle, uint64_t event_count)
@@ -1972,6 +2073,9 @@ static int init_reset(void)
 	/* Initialize tx link pool. */
 	mem_init(mem_link_iso_tx.pool, sizeof(memq_link_t), BT_CTLR_ISO_TX_PDU_BUFFERS,
 		 &mem_link_iso_tx.free);
+
+	/* Initialize iso_ack MFIFO */
+	MFIFO_INIT(iso_ack);
 #endif /* CONFIG_BT_CTLR_ADV_ISO || CONFIG_BT_CTLR_CONN_ISO */
 
 #if BT_CTLR_ISO_STREAMS
