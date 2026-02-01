@@ -1,0 +1,20 @@
+common:
+  build_only: true
+  tags:
+    - bluetooth
+  platform_allow:
+    - nrf52_bsim/native
+    - nrf5340bsim/nrf5340/cpunet
+  harness: bsim
+
+tests:
+  bluetooth.host.adv.decision.broadcaster:
+    harness_config:
+      bsim_exe_name: tests_bsim_bluetooth_host_adv_decision_prj_broadcaster_conf
+    extra_args:
+      CONF_FILE=prj_broadcaster.conf
+  bluetooth.host.adv.decision.observer:
+    harness_config:
+      bsim_exe_name: tests_bsim_bluetooth_host_adv_decision_prj_observer_conf
+    extra_args:
+      CONF_FILE=prj_observer.conf
