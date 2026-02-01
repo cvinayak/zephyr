@@ -793,6 +793,7 @@ static struct pdu_data *empty_tx_enqueue(struct lll_conn *lll)
 
 void lll_conn_flush(uint16_t handle, struct lll_conn *lll)
 {
+#if defined(CONFIG_BT_CTLR_ACL_DATA_FLUSH)
 	struct node_tx *tx;
 	memq_link_t *link;
 	uint16_t current_event_counter;
@@ -854,4 +855,9 @@ void lll_conn_flush(uint16_t handle, struct lll_conn *lll)
 			tx = tx_next;
 		}
 	}
+#else
+	ARG_UNUSED(handle);
+	ARG_UNUSED(lll);
+	/* Nothing to be flushed */
+#endif /* CONFIG_BT_CTLR_ACL_DATA_FLUSH */
 }
