@@ -1271,13 +1271,11 @@ struct bt_hci_cp_le_set_adv_enable {
 #define BT_HCI_LE_SCAN_FP_BASIC_FILTER          0x01
 #define BT_HCI_LE_SCAN_FP_EXT_NO_FILTER         0x02
 #define BT_HCI_LE_SCAN_FP_EXT_FILTER            0x03
-#if defined(CONFIG_BT_CTLR_DECISION_BASED_FILTERING)
 /* Decision-Based Advertising Filtering (BT Core Spec v6.2) */
 #define BT_HCI_LE_SCAN_FP_DECISION_NO_FILTER    0x04
 #define BT_HCI_LE_SCAN_FP_DECISION_FILTER       0x05
 #define BT_HCI_LE_SCAN_FP_DECISION_EXT_NO_FILTER 0x06
 #define BT_HCI_LE_SCAN_FP_DECISION_EXT_FILTER   0x07
-#endif /* CONFIG_BT_CTLR_DECISION_BASED_FILTERING */
 
 struct bt_hci_cp_le_set_scan_param {
 	uint8_t  scan_type;
