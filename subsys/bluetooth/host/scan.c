@@ -1789,6 +1789,47 @@ static bool valid_le_scan_param(const struct bt_le_scan_param *param)
 	return true;
 }
 
+#if defined(CONFIG_BT_CTLR_DECISION_BASED_FILTERING)
+int bt_le_scan_set_decision_instructions(const uint8_t *instructions,
+					 uint8_t instructions_len)
+{
+	struct bt_hci_cp_le_set_decision_instructions *cp;
+	struct bt_hci_rp_le_set_decision_instructions *rp;
+	struct net_buf *buf, *rsp = NULL;
+	int err;
+
+	if (!atomic_test_bit(bt_dev.flags, BT_DEV_READY)) {
+		return -EAGAIN;
+	}
+
+	CHECKIF(instructions == NULL || instructions_len == 0) {
+		LOG_DBG("Invalid decision instructions parameters");
+		return -EINVAL;
+	}
+
+	buf = bt_hci_cmd_alloc(K_FOREVER);
+	if (!buf) {
+		LOG_WRN("No HCI buffers");
+		return -ENOBUFS;
+	}
+
+	cp = net_buf_add(buf, sizeof(*cp));
+	cp->instructions_length = instructions_len;
+	net_buf_add_mem(buf, instructions, instructions_len);
+
+	err = bt_hci_cmd_send_sync(BT_HCI_OP_LE_SET_DECISION_INSTRUCTIONS, buf, &rsp);
+	if (err) {
+		return err;
+	}
+
+	rp = (void *)rsp->data;
+	err = rp->status;
+	net_buf_unref(rsp);
+
+	return err;
+}
+#endif /* CONFIG_BT_CTLR_DECISION_BASED_FILTERING */
+
 int bt_le_scan_start(const struct bt_le_scan_param *param, bt_le_scan_cb_t cb)
 {
 	int err;

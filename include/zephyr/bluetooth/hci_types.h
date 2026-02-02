@@ -2996,6 +2996,31 @@ struct bt_hci_op_le_connection_rate_request {
 
 #define BT_HCI_OP_LE_CONNECTION_RATE_REQUEST BT_OP(BT_OGF_LE, 0x00A1) /* 0x20A1 */
 
+/* LE Set Decision Data command (BT Core Spec v6.2, Vol 4, Part E, Section 7.8.144) */
+#define BT_HCI_OP_LE_SET_DECISION_DATA BT_OP(BT_OGF_LE, 0x00A3) /* 0x20A3 */
+
+struct bt_hci_cp_le_set_decision_data {
+	uint8_t  adv_handle;
+	uint8_t  data_length;
+	uint8_t  data[0];
+} __packed;
+
+struct bt_hci_rp_le_set_decision_data {
+	uint8_t status;
+} __packed;
+
+/* LE Set Decision Instructions command (BT Core Spec v6.2, Vol 4, Part E, Section 7.8.145) */
+#define BT_HCI_OP_LE_SET_DECISION_INSTRUCTIONS BT_OP(BT_OGF_LE, 0x00A4) /* 0x20A4 */
+
+struct bt_hci_cp_le_set_decision_instructions {
+	uint8_t  instructions_length;
+	uint8_t  instructions[0];
+} __packed;
+
+struct bt_hci_rp_le_set_decision_instructions {
+	uint8_t status;
+} __packed;
+
 /* Event definitions */
 
 #define BT_HCI_EVT_UNKNOWN                      0x00
