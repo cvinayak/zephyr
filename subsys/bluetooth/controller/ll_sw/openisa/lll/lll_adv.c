@@ -801,9 +801,8 @@ static void chan_prepare(struct lll_adv *lll)
 	radio_pkt_tx_set(pdu);
 
 	if ((pdu->type != PDU_ADV_TYPE_NONCONN_IND) &&
-#if defined(CONFIG_BT_CTLR_DECISION_BASED_FILTERING)
-	    (pdu->type != PDU_ADV_TYPE_ADV_DECISION_IND) &&
-#endif
+	    (!IS_ENABLED(CONFIG_BT_CTLR_DECISION_BASED_FILTERING) ||
+	     (pdu->type != PDU_ADV_TYPE_ADV_DECISION_IND)) &&
 	    (!IS_ENABLED(CONFIG_BT_CTLR_ADV_EXT) ||
 	     (pdu->type != PDU_ADV_TYPE_EXT_IND))) {
 		radio_isr_set(isr_tx, lll);
