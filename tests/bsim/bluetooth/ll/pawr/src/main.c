@@ -15,8 +15,7 @@
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/hci.h>
 #include <zephyr/bluetooth/hci_types.h>
-
-#include "ll.h"
+#include <zephyr/net/buf.h>
 
 #include "bs_types.h"
 #include "bs_tracing.h"
@@ -38,7 +37,6 @@
 extern enum bst_result_t bst_result;
 
 /* Test parameters */
-#define ADV_HANDLE              0
 #define ADV_INTERVAL            0x00A0  /* 100 ms */
 #define PER_ADV_INTERVAL_MIN    0x00A0  /* 200 ms */
 #define PER_ADV_INTERVAL_MAX    0x00A0  /* 200 ms */
@@ -154,7 +152,6 @@ static void test_pawr_adv_main(void)
 	struct bt_le_adv_param adv_param;
 	struct bt_le_per_adv_param per_adv_param;
 	int err;
-	uint8_t handle;
 
 	printk("Starting PAwR Advertiser test\n");
 
@@ -180,50 +177,20 @@ static void test_pawr_adv_main(void)
 	}
 	printk("success.\n");
 
-	/* Get the handle for LL API calls */
-	handle = ADV_HANDLE;
-
-	printk("Setting PAwR parameters via LL API...");
-	/* Use LL controller API to test PAwR parameter setting directly */
-	err = ll_adv_sync_param_set_v2(handle, 
-				       PER_ADV_INTERVAL_MAX,
-				       0,  /* properties/flags */
-				       NUM_SUBEVENTS,
-				       SUBEVENT_INTERVAL,
-				       RESPONSE_SLOT_DELAY,
-				       RESPONSE_SLOT_SPACING,
-				       NUM_RESPONSE_SLOTS);
-	if (err) {
-		FAIL("Failed to set PAwR parameters (err %d)\n", err);
-		return;
-	}
-	printk("success.\n");
-
-	printk("Setting subevent data via LL API...");
-	/* Prepare subevent data parameters for LL API */
-	uint8_t subevent = 0;
-	uint8_t response_slot_start = 0;
-	uint8_t response_slot_count = NUM_RESPONSE_SLOTS;
-	uint8_t subevent_data_len = sizeof(test_subevent_data);
-	const uint8_t *subevent_data_ptr = test_subevent_data;
-
-	err = ll_adv_sync_subevent_data_set(handle,
-					     subevent,
-					     response_slot_start,
-					     response_slot_count,
-					     subevent_data_len,
-					     (uint8_t *)subevent_data_ptr);
-	if (err) {
-		FAIL("Failed to set subevent data (err %d)\n", err);
-		return;
-	}
-	printk("success.\n");
-
-	printk("Setting periodic advertising parameters...");
+	printk("Setting periodic advertising parameters with PAwR...");
 	memset(&per_adv_param, 0, sizeof(per_adv_param));
 	per_adv_param.interval_min = PER_ADV_INTERVAL_MIN;
 	per_adv_param.interval_max = PER_ADV_INTERVAL_MAX;
 	per_adv_param.options = BT_LE_PER_ADV_OPT_NONE;
+
+#if defined(CONFIG_BT_PER_ADV_RSP)
+	/* Set PAwR parameters */
+	per_adv_param.num_subevents = NUM_SUBEVENTS;
+	per_adv_param.subevent_interval = SUBEVENT_INTERVAL;
+	per_adv_param.response_slot_delay = RESPONSE_SLOT_DELAY;
+	per_adv_param.response_slot_spacing = RESPONSE_SLOT_SPACING;
+	per_adv_param.num_response_slots = NUM_RESPONSE_SLOTS;
+#endif
 
 	err = bt_le_per_adv_set_param(adv, &per_adv_param);
 	if (err) {
@@ -231,6 +198,28 @@ static void test_pawr_adv_main(void)
 		return;
 	}
 	printk("success.\n");
+
+#if defined(CONFIG_BT_PER_ADV_RSP)
+	printk("Setting subevent data...");
+	/* Prepare subevent data parameters */
+	struct bt_le_per_adv_subevent_data_params subevent_params;
+	struct net_buf_simple subevent_buf;
+
+	subevent_params.subevent = 0;
+	subevent_params.response_slot_start = 0;
+	subevent_params.response_slot_count = NUM_RESPONSE_SLOTS;
+
+	net_buf_simple_init_with_data(&subevent_buf, (void *)test_subevent_data,
+				       sizeof(test_subevent_data));
+	subevent_params.data = &subevent_buf;
+
+	err = bt_le_per_adv_set_subevent_data(adv, 1, &subevent_params);
+	if (err) {
+		FAIL("Failed to set subevent data (err %d)\n", err);
+		return;
+	}
+	printk("success.\n");
+#endif
 
 	printk("Starting extended advertising...");
 	err = bt_le_ext_adv_start(adv, BT_LE_EXT_ADV_START_DEFAULT);
@@ -345,17 +334,19 @@ static void test_pawr_sync_main(void)
 	}
 	printk("Sync established.\n");
 
-#if defined(CONFIG_BT_CTLR_SYNC_PERIODIC_RSP)
-	printk("Setting subevent selection via LL API...");
-	/* Use LL API to test subevent selection directly */
-	/* Note: We use handle 0 as the first sync created */
-	uint16_t sync_handle = 0;
+#if defined(CONFIG_BT_PER_ADV_SYNC_RSP)
+	printk("Setting subevent selection...");
+	/* Use Host API to select subevents */
+	struct bt_le_per_adv_sync_subevent_params subevent_params;
 	uint8_t subevents[] = {0};  /* Select subevent 0 */
-	
-	err = ll_sync_subevent_set(sync_handle, 0, 1, subevents);
+
+	subevent_params.properties = 0;
+	subevent_params.num_subevents = 1;
+	subevent_params.subevents = subevents;
+
+	err = bt_le_per_adv_sync_subevent(sync, &subevent_params);
 	if (err) {
-		/* Controller may return error if sync isn't fully set up yet */
-		printk("Note: subevent selection returned %d (may not be implemented in LLL yet)\n", err);
+		printk("Note: subevent selection returned %d (may not be implemented yet)\n", err);
 	} else {
 		printk("success.\n");
 	}
