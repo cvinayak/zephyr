@@ -77,6 +77,24 @@ int main(void)
 
 	printk("Advertising data set\n");
 
+#if defined(CONFIG_BT_CTLR_DECISION_BASED_FILTERING)
+	/* Set decision data for decision-based filtering */
+	static const uint8_t decision_data[] = {
+		0x01,  /* Device type: sensor */
+		0x02,  /* Capability: temperature measurement */
+		0x05,  /* Battery level indicator */
+		0xFF   /* Custom application data */
+	};
+
+	err = bt_le_ext_adv_set_decision_data(adv, decision_data, sizeof(decision_data));
+	if (err) {
+		printk("Failed to set decision data (err %d)\n", err);
+		return 0;
+	}
+
+	printk("Decision data set (length: %d bytes)\n", sizeof(decision_data));
+#endif /* CONFIG_BT_CTLR_DECISION_BASED_FILTERING */
+
 	/* Start extended advertising */
 	err = bt_le_ext_adv_start(adv, BT_LE_EXT_ADV_START_DEFAULT);
 	if (err) {

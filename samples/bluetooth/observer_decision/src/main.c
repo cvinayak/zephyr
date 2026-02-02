@@ -112,6 +112,26 @@ int main(void)
 	/* Register scan callbacks */
 	bt_le_scan_cb_register(&scan_callbacks);
 
+#if defined(CONFIG_BT_CTLR_DECISION_BASED_FILTERING)
+	/* Set decision instructions for filtering */
+	static const uint8_t decision_instructions[] = {
+		0x01,  /* Filter on device type */
+		0x02,  /* Accept if capability matches */
+		0x00,  /* No additional criteria */
+	};
+
+	printk("Setting decision instructions\n");
+	err = bt_le_scan_set_decision_instructions(decision_instructions,
+						   sizeof(decision_instructions));
+	if (err) {
+		printk("Failed to set decision instructions (err %d)\n", err);
+		return 0;
+	}
+
+	printk("Decision instructions set (length: %d bytes)\n",
+	       sizeof(decision_instructions));
+#endif /* CONFIG_BT_CTLR_DECISION_BASED_FILTERING */
+
 	/* Start scanning with decision-based filtering */
 	printk("Starting scan with decision-based filtering\n");
 	err = bt_le_scan_start(&scan_param, NULL);
