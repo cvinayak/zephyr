@@ -3365,6 +3365,42 @@ static void le_df_read_ant_inf(struct net_buf *buf, struct net_buf **evt)
 }
 #endif /* CONFIG_BT_CTLR_DF */
 
+#if defined(CONFIG_BT_CTLR_DECISION_BASED_FILTERING)
+static void le_set_decision_data(struct net_buf *buf, struct net_buf **evt)
+{
+	struct bt_hci_cp_le_set_decision_data *cmd = (void *)buf->data;
+	uint8_t status;
+
+	/* For now, just return success - full implementation needed in controller */
+	/* This will store decision data per advertising set */
+	LOG_DBG("LE Set Decision Data: handle %u, len %u", cmd->adv_handle, cmd->data_length);
+
+	/* TODO: Store decision data in advertising set structure */
+	/* The data should be associated with the advertising handle */
+	/* and used during PDU transmission */
+
+	status = BT_HCI_ERR_SUCCESS;
+	*evt = cmd_complete_status(status);
+}
+
+static void le_set_decision_instructions(struct net_buf *buf, struct net_buf **evt)
+{
+	struct bt_hci_cp_le_set_decision_instructions *cmd = (void *)buf->data;
+	uint8_t status;
+
+	/* For now, just return success - full implementation needed in controller */
+	/* This will store decision instructions for scanner */
+	LOG_DBG("LE Set Decision Instructions: len %u", cmd->instructions_length);
+
+	/* TODO: Store decision instructions in scanner context */
+	/* The instructions should be used during scan filtering */
+	/* to match against decision data in received PDUs */
+
+	status = BT_HCI_ERR_SUCCESS;
+	*evt = cmd_complete_status(status);
+}
+#endif /* CONFIG_BT_CTLR_DECISION_BASED_FILTERING */
+
 #if defined(CONFIG_BT_CTLR_DTM_HCI)
 static void le_rx_test(struct net_buf *buf, struct net_buf **evt)
 {
@@ -5030,6 +5066,16 @@ static int controller_cmd_handle(uint16_t  ocf, struct net_buf *cmd,
 		break;
 #endif /* CONFIG_BT_CTLR_DF_CONN_CTE_RSP */
 #endif /* CONFIG_BT_CTLR_DF */
+
+#if defined(CONFIG_BT_CTLR_DECISION_BASED_FILTERING)
+	case BT_OCF(BT_HCI_OP_LE_SET_DECISION_DATA):
+		le_set_decision_data(cmd, evt);
+		break;
+
+	case BT_OCF(BT_HCI_OP_LE_SET_DECISION_INSTRUCTIONS):
+		le_set_decision_instructions(cmd, evt);
+		break;
+#endif /* CONFIG_BT_CTLR_DECISION_BASED_FILTERING */
 
 #if defined(CONFIG_BT_CTLR_DTM_HCI)
 	case BT_OCF(BT_HCI_OP_LE_RX_TEST):
