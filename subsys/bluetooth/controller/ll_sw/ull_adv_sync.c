@@ -130,118 +130,11 @@ static void *adv_sync_free;
 
 uint8_t ll_adv_sync_param_set(uint8_t handle, uint16_t interval, uint16_t flags)
 {
-#if defined(CONFIG_BT_CTLR_ADV_PERIODIC_RSP)
-	/* For non-PAwR periodic advertising, call v2 with default parameters */
+	/* Call v2 with default parameters for non-PAwR periodic advertising */
 	return ll_adv_sync_param_set_v2(handle, interval, flags,
 					0U, 0U, 0U, 0U, 0U);
-#else
-	void *extra_data_prev, *extra_data;
-	struct pdu_adv *pdu_prev, *pdu;
-	struct lll_adv_sync *lll_sync;
-	struct ll_adv_sync_set *sync;
-	struct ll_adv_set *adv;
-	uint8_t err, ter_idx;
-
-	adv = ull_adv_is_created_get(handle);
-	if (!adv) {
-		return BT_HCI_ERR_UNKNOWN_ADV_IDENTIFIER;
-	}
-
-	if (IS_ENABLED(CONFIG_BT_CTLR_PARAM_CHECK)) {
-		err = adv_type_check(adv);
-		if (err) {
-			return err;
-		}
-	}
-
-	lll_sync = adv->lll.sync;
-	if (!lll_sync) {
-		struct pdu_adv *ter_pdu;
-		struct lll_adv *lll;
-		uint8_t chm_last;
-
-		sync = ull_adv_sync_acquire();
-		if (!sync) {
-			return BT_HCI_ERR_MEM_CAPACITY_EXCEEDED;
-		}
-
-		lll = &adv->lll;
-		lll_sync = &sync->lll;
-		lll->sync = lll_sync;
-		lll_sync->adv = lll;
-
-		lll_adv_data_reset(&lll_sync->data);
-		err = lll_adv_sync_data_init(&lll_sync->data);
-		if (err) {
-			return BT_HCI_ERR_MEM_CAPACITY_EXCEEDED;
-		}
-
-		/* NOTE: ull_hdr_init(&sync->ull); is done on start */
-		lll_hdr_init(lll_sync, sync);
-
-		err = util_aa_le32(lll_sync->access_addr);
-		LL_ASSERT_DBG(!err);
-
-		lll_sync->data_chan_id = lll_chan_id(lll_sync->access_addr);
-		chm_last = lll_sync->chm_first;
-		lll_sync->chm_last = chm_last;
-		lll_sync->chm[chm_last].data_chan_count =
-			ull_chan_map_get(lll_sync->chm[chm_last].data_chan_map);
-
-		lll_csrand_get(lll_sync->crc_init, sizeof(lll_sync->crc_init));
-
-		lll_sync->latency_prepare = 0;
-		lll_sync->latency_event = 0;
-		lll_sync->event_counter = 0;
-
-#if defined(CONFIG_BT_CTLR_ADV_PDU_LINK)
-		lll_sync->data_chan_counter = 0U;
-#endif /* CONFIG_BT_CTLR_ADV_PDU_LINK */
-
-		sync->is_enabled = 0U;
-		sync->is_started = 0U;
-
-		ter_pdu = lll_adv_sync_data_peek(lll_sync, NULL);
-		ull_adv_sync_pdu_init(ter_pdu, 0U, 0U, 0U, NULL);
-	} else {
-		sync = HDR_LLL2ULL(lll_sync);
-	}
-
-	/* Periodic Advertising is already started */
-	if (sync->is_started) {
-		return BT_HCI_ERR_CMD_DISALLOWED;
-	}
-
-	sync->interval = interval;
-
-	err = ull_adv_sync_pdu_alloc(adv, ULL_ADV_PDU_EXTRA_DATA_ALLOC_IF_EXIST, &pdu_prev, &pdu,
-				     &extra_data_prev, &extra_data, &ter_idx);
-	if (err) {
-		return err;
-	}
-
-#if defined(CONFIG_BT_CTLR_DF_ADV_CTE_TX)
-	if (extra_data) {
-		ull_adv_sync_extra_data_set_clear(extra_data_prev, extra_data,
-						  0U, 0U, NULL);
-	}
-#endif /* CONFIG_BT_CTLR_DF_ADV_CTE_TX */
-
-	/* FIXME - handle flags (i.e. adding TxPower if specified) */
-	err = ull_adv_sync_duplicate(pdu_prev, pdu);
-	if (err) {
-		return err;
-	}
-
-	lll_adv_sync_data_enqueue(lll_sync, ter_idx);
-
-	sync->is_data_cmplt = 1U;
-
-	return 0;
-#endif /* CONFIG_BT_CTLR_ADV_PERIODIC_RSP */
 }
 
-#if defined(CONFIG_BT_CTLR_ADV_PERIODIC_RSP)
 /**
  * @brief Set periodic advertising parameters v2 (with PAwR support)
  *
@@ -267,7 +160,9 @@ uint8_t ll_adv_sync_param_set_v2(uint8_t handle, uint16_t interval, uint16_t fla
 	struct ll_adv_sync_set *sync;
 	struct ll_adv_set *adv;
 	uint8_t err, ter_idx;
+#if defined(CONFIG_BT_CTLR_ADV_PERIODIC_RSP)
 	bool is_pawr;
+#endif
 
 	/* Get the advertising set */
 	adv = ull_adv_is_created_get(handle);
@@ -282,6 +177,7 @@ uint8_t ll_adv_sync_param_set_v2(uint8_t handle, uint16_t interval, uint16_t fla
 		}
 	}
 
+#if defined(CONFIG_BT_CTLR_ADV_PERIODIC_RSP)
 	/* Determine if this is PAwR mode */
 	is_pawr = (num_subevents > 0);
 
@@ -295,6 +191,13 @@ uint8_t ll_adv_sync_param_set_v2(uint8_t handle, uint16_t interval, uint16_t fla
 			return BT_HCI_ERR_INVALID_PARAM;
 		}
 	}
+#else
+	ARG_UNUSED(num_subevents);
+	ARG_UNUSED(subevent_interval);
+	ARG_UNUSED(response_slot_delay);
+	ARG_UNUSED(response_slot_spacing);
+	ARG_UNUSED(num_response_slots);
+#endif
 
 	lll_sync = adv->lll.sync;
 	if (!lll_sync) {
@@ -358,6 +261,7 @@ uint8_t ll_adv_sync_param_set_v2(uint8_t handle, uint16_t interval, uint16_t fla
 	/* Store interval */
 	sync->interval = interval;
 
+#if defined(CONFIG_BT_CTLR_ADV_PERIODIC_RSP)
 	/* Store PAwR parameters if enabled */
 	if (is_pawr) {
 		sync->num_subevents = num_subevents;
@@ -374,6 +278,7 @@ uint8_t ll_adv_sync_param_set_v2(uint8_t handle, uint16_t interval, uint16_t fla
 		sync->num_subevents = 0;
 		lll_sync->is_rsp = 0;
 	}
+#endif
 
 	err = ull_adv_sync_pdu_alloc(adv, ULL_ADV_PDU_EXTRA_DATA_ALLOC_IF_EXIST, &pdu_prev, &pdu,
 				     &extra_data_prev, &extra_data, &ter_idx);
@@ -402,7 +307,6 @@ uint8_t ll_adv_sync_param_set_v2(uint8_t handle, uint16_t interval, uint16_t fla
 
 	return BT_HCI_ERR_SUCCESS;
 }
-#endif /* CONFIG_BT_CTLR_ADV_PERIODIC_RSP */
 
 #if defined(CONFIG_BT_CTLR_ADV_ISO) && defined(CONFIG_BT_TICKER_EXT_EXPIRE_INFO)
 void ull_adv_sync_iso_created(struct ll_adv_sync_set *sync)
