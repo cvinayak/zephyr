@@ -1477,7 +1477,6 @@ int bt_le_ext_adv_set_data(struct bt_le_ext_adv *adv,
 			   const struct bt_data *ad, size_t ad_len,
 			   const struct bt_data *sd, size_t sd_len);
 
-#if defined(CONFIG_BT_CTLR_DECISION_BASED_FILTERING) || defined(__DOXYGEN__)
 /**
  * @brief Set decision data for extended advertising.
  *
@@ -1499,7 +1498,6 @@ int bt_le_ext_adv_set_data(struct bt_le_ext_adv *adv,
  */
 int bt_le_ext_adv_set_decision_data(struct bt_le_ext_adv *adv,
 				    const uint8_t *data, uint8_t data_len);
-#endif /* CONFIG_BT_CTLR_DECISION_BASED_FILTERING */
 
 /**
  * @brief Update advertising parameters.
@@ -2375,7 +2373,6 @@ enum bt_le_scan_opt {
 	 */
 	BT_LE_SCAN_OPT_NO_1M = BIT(3),
 
-#if defined(CONFIG_BT_CTLR_DECISION_BASED_FILTERING) || defined(__DOXYGEN__)
 	/**
 	 * @brief Enable extended scan filtering.
 	 *
@@ -2403,7 +2400,6 @@ enum bt_le_scan_opt {
 	 *       filtering (CONFIG_BT_CTLR_DECISION_BASED_FILTERING).
 	 */
 	BT_LE_SCAN_OPT_DECISION_BASED = BIT(5),
-#endif /* CONFIG_BT_CTLR_DECISION_BASED_FILTERING */
 };
 
 enum bt_le_scan_type {
@@ -2674,7 +2670,6 @@ BUILD_ASSERT(BT_GAP_SCAN_FAST_WINDOW == BT_GAP_SCAN_FAST_INTERVAL_MIN,
  */
 int bt_le_scan_start(const struct bt_le_scan_param *param, bt_le_scan_cb_t cb);
 
-#if defined(CONFIG_BT_CTLR_DECISION_BASED_FILTERING) || defined(__DOXYGEN__)
 /**
  * @brief Set decision instructions for scanning.
  *
@@ -2696,7 +2691,6 @@ int bt_le_scan_start(const struct bt_le_scan_param *param, bt_le_scan_cb_t cb);
  */
 int bt_le_scan_set_decision_instructions(const uint8_t *instructions,
 					 uint8_t instructions_len);
-#endif /* CONFIG_BT_CTLR_DECISION_BASED_FILTERING */
 
 /**
  * @brief Stop (LE) scanning.

@@ -1606,10 +1606,10 @@ int bt_le_ext_adv_set_data(struct bt_le_ext_adv *adv,
 	return le_adv_update(adv, ad, ad_len, sd, sd_len, ext_adv, scannable);
 }
 
-#if defined(CONFIG_BT_CTLR_DECISION_BASED_FILTERING)
 int bt_le_ext_adv_set_decision_data(struct bt_le_ext_adv *adv,
 				    const uint8_t *data, uint8_t data_len)
 {
+#if defined(CONFIG_BT_CTLR_DECISION_BASED_FILTERING)
 	struct bt_hci_cp_le_set_decision_data *cp;
 	struct bt_hci_rp_le_set_decision_data *rp;
 	struct net_buf *buf, *rsp = NULL;
@@ -1650,8 +1650,13 @@ int bt_le_ext_adv_set_decision_data(struct bt_le_ext_adv *adv,
 	net_buf_unref(rsp);
 
 	return err;
-}
+#else
+	ARG_UNUSED(adv);
+	ARG_UNUSED(data);
+	ARG_UNUSED(data_len);
+	return -ENOTSUP;
 #endif /* CONFIG_BT_CTLR_DECISION_BASED_FILTERING */
+}
 
 int bt_le_ext_adv_delete(struct bt_le_ext_adv *adv)
 {

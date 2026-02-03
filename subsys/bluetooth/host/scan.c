@@ -1789,10 +1789,10 @@ static bool valid_le_scan_param(const struct bt_le_scan_param *param)
 	return true;
 }
 
-#if defined(CONFIG_BT_CTLR_DECISION_BASED_FILTERING)
 int bt_le_scan_set_decision_instructions(const uint8_t *instructions,
 					 uint8_t instructions_len)
 {
+#if defined(CONFIG_BT_CTLR_DECISION_BASED_FILTERING)
 	struct bt_hci_cp_le_set_decision_instructions *cp;
 	struct bt_hci_rp_le_set_decision_instructions *rp;
 	struct net_buf *buf, *rsp = NULL;
@@ -1827,8 +1827,12 @@ int bt_le_scan_set_decision_instructions(const uint8_t *instructions,
 	net_buf_unref(rsp);
 
 	return err;
-}
+#else
+	ARG_UNUSED(instructions);
+	ARG_UNUSED(instructions_len);
+	return -ENOTSUP;
 #endif /* CONFIG_BT_CTLR_DECISION_BASED_FILTERING */
+}
 
 int bt_le_scan_start(const struct bt_le_scan_param *param, bt_le_scan_cb_t cb)
 {
