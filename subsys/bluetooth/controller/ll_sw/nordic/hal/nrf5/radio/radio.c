@@ -201,6 +201,13 @@ static struct onoff_client mram_cli;
 static atomic_val_t mram_refcnt;
 static atomic_val_t mram_no_latency_complete;
 
+/* Timeout for waiting for MRAM no latency request completion.
+ * This is a conservative value - the callback should typically fire
+ * within microseconds to milliseconds. The iteration count provides
+ * a CPU-speed-independent safety net to prevent infinite loops.
+ */
+#define MRAM_NO_LATENCY_TIMEOUT_ITERATIONS 1000000U
+
 static void mram_no_latency_callback(struct onoff_manager *mgr,
 				     struct onoff_client *cli,
 				     uint32_t state, int res)
@@ -338,14 +345,18 @@ void radio_stop(void)
 			 * goes wrong. The timeout is conservative - the callback
 			 * should typically fire within microseconds to milliseconds.
 			 */
-			uint32_t timeout_iterations = 1000000; /* Conservative timeout */
+			uint32_t timeout_iterations = MRAM_NO_LATENCY_TIMEOUT_ITERATIONS;
 
 			while (!atomic_get(&mram_no_latency_complete) && timeout_iterations > 0) {
 				arch_spin_relax();
 				timeout_iterations--;
 			}
 
-			/* TODO: Consider adding error handling if timeout_iterations == 0 */
+			/* Note: If timeout occurs (timeout_iterations == 0), we proceed
+			 * with cancel/release anyway. In ISR context, there's no better
+			 * error handling option. The system is already in an error state
+			 * if the callback hasn't fired within the timeout period.
+			 */
 
 			(void)mram_no_latency_cancel_or_release(&mram_cli);
 		} else {
