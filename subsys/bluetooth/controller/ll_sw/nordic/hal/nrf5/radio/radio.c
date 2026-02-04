@@ -8,6 +8,7 @@
 #include <zephyr/toolchain.h>
 #include <zephyr/dt-bindings/gpio/gpio.h>
 #include <zephyr/sys/byteorder.h>
+#include <zephyr/arch/arch_interface.h>
 
 #include <soc.h>
 
@@ -19,6 +20,7 @@
 
 #include "util/mem.h"
 
+#include "hal/debug.h"
 #include "hal/cpu.h"
 #include "hal/ccm.h"
 #include "hal/cntr.h"
@@ -198,6 +200,26 @@ void radio_setup(void)
 #if defined(CONFIG_SOC_SERIES_NRF54H)
 static struct onoff_client mram_cli;
 static atomic_val_t mram_refcnt;
+static atomic_val_t mram_no_latency_complete;
+
+/* Timeout for waiting for MRAM no latency request completion.
+ * This is a conservative value - the callback should typically fire
+ * within microseconds to milliseconds. The iteration count provides
+ * a CPU-speed-independent safety net to prevent infinite loops.
+ */
+#define MRAM_NO_LATENCY_TIMEOUT_ITERATIONS 1000000U
+
+static void mram_no_latency_callback(struct onoff_manager *mgr,
+				     struct onoff_client *cli,
+				     uint32_t state, int res)
+{
+	/* Validate that the request completed successfully */
+	LL_ASSERT_DBG(res == 0);
+	LL_ASSERT_DBG(state == ONOFF_STATE_ON);
+
+	/* Mark that the MRAM no latency request has completed */
+	atomic_set(&mram_no_latency_complete, 1);
+}
 #endif /* CONFIG_SOC_SERIES_NRF54H */
 
 void radio_reset(void)
@@ -243,12 +265,21 @@ void radio_reset(void)
 
 #if defined(CONFIG_SOC_SERIES_NRF54H)
 	atomic_val_t refcnt;
+	int ret;
 
 	refcnt = atomic_inc(&mram_refcnt);
 	if (refcnt == 0) {
-		sys_notify_init_spinwait(&mram_cli.notify);
+		/* Clear completion state before making the request */
+		atomic_clear(&mram_no_latency_complete);
 
-		(void)mram_no_latency_request(&mram_cli);
+		/* Use callback-based notification instead of spinwait */
+		sys_notify_init_callback(&mram_cli.notify, mram_no_latency_callback);
+
+		ret = mram_no_latency_request(&mram_cli);
+		/* The return value is the current state or a negative error code.
+		 * Valid states are ONOFF_STATE_OFF, ONOFF_STATE_ON, or ONOFF_STATE_TO_ON.
+		 */
+		LL_ASSERT_DBG(ret >= 0);
 	} else {
 		/* Nothing to do, reference count increased. */
 	}
@@ -311,12 +342,38 @@ void radio_stop(void)
 
 #if defined(CONFIG_SOC_SERIES_NRF54H)
 	atomic_val_t refcnt;
+	int ret;
 
 	refcnt = atomic_get(&mram_refcnt);
 	if (refcnt > 0) {
 		refcnt = atomic_dec(&mram_refcnt);
 		if (refcnt == 1) {
-			(void)mram_no_latency_cancel_or_release(&mram_cli);
+			/* Wait for the MRAM no latency request to complete before
+			 * attempting to cancel or release. This prevents race
+			 * conditions when requests and releases happen quickly.
+			 *
+			 * Use a timeout to prevent infinite waiting if something
+			 * goes wrong. The timeout is conservative - the callback
+			 * should typically fire within microseconds to milliseconds.
+			 */
+			uint32_t timeout_iterations = MRAM_NO_LATENCY_TIMEOUT_ITERATIONS;
+
+			while (!atomic_get(&mram_no_latency_complete) && timeout_iterations > 0) {
+				arch_spin_relax();
+				timeout_iterations--;
+			}
+
+			/* Note: If timeout occurs (timeout_iterations == 0), we proceed
+			 * with cancel/release anyway. In ISR context, there's no better
+			 * error handling option. The system is already in an error state
+			 * if the callback hasn't fired within the timeout period.
+			 */
+
+			ret = mram_no_latency_cancel_or_release(&mram_cli);
+			/* The return value is the current state or a negative error code.
+			 * Valid states are ONOFF_STATE_TO_ON or ONOFF_STATE_ON.
+			 */
+			LL_ASSERT_DBG(ret >= 0);
 		} else {
 			/* Nothing to do, reference count decremented. */
 		}
