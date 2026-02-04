@@ -20,6 +20,7 @@
 
 #include "util/mem.h"
 
+#include "hal/debug.h"
 #include "hal/cpu.h"
 #include "hal/ccm.h"
 #include "hal/cntr.h"
@@ -212,6 +213,10 @@ static void mram_no_latency_callback(struct onoff_manager *mgr,
 				     struct onoff_client *cli,
 				     uint32_t state, int res)
 {
+	/* Validate that the request completed successfully */
+	LL_ASSERT_DBG(res == 0);
+	LL_ASSERT_DBG(state == ONOFF_STATE_ON);
+
 	/* Mark that the MRAM no latency request has completed */
 	atomic_set(&mram_no_latency_complete, 1);
 }
@@ -260,6 +265,7 @@ void radio_reset(void)
 
 #if defined(CONFIG_SOC_SERIES_NRF54H)
 	atomic_val_t refcnt;
+	int ret;
 
 	refcnt = atomic_inc(&mram_refcnt);
 	if (refcnt == 0) {
@@ -269,7 +275,11 @@ void radio_reset(void)
 		/* Use callback-based notification instead of spinwait */
 		sys_notify_init_callback(&mram_cli.notify, mram_no_latency_callback);
 
-		(void)mram_no_latency_request(&mram_cli);
+		ret = mram_no_latency_request(&mram_cli);
+		/* The return value is the current state or a negative error code.
+		 * Valid states are ONOFF_STATE_OFF, ONOFF_STATE_ON, or ONOFF_STATE_TO_ON.
+		 */
+		LL_ASSERT_DBG(ret >= 0);
 	} else {
 		/* Nothing to do, reference count increased. */
 	}
@@ -332,6 +342,7 @@ void radio_stop(void)
 
 #if defined(CONFIG_SOC_SERIES_NRF54H)
 	atomic_val_t refcnt;
+	int ret;
 
 	refcnt = atomic_get(&mram_refcnt);
 	if (refcnt > 0) {
@@ -358,7 +369,11 @@ void radio_stop(void)
 			 * if the callback hasn't fired within the timeout period.
 			 */
 
-			(void)mram_no_latency_cancel_or_release(&mram_cli);
+			ret = mram_no_latency_cancel_or_release(&mram_cli);
+			/* The return value is the current state or a negative error code.
+			 * Valid states are ONOFF_STATE_TO_ON or ONOFF_STATE_ON.
+			 */
+			LL_ASSERT_DBG(ret >= 0);
 		} else {
 			/* Nothing to do, reference count decremented. */
 		}
