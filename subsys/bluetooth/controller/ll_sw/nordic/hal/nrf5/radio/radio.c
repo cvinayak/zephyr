@@ -8,6 +8,7 @@
 #include <zephyr/toolchain.h>
 #include <zephyr/dt-bindings/gpio/gpio.h>
 #include <zephyr/sys/byteorder.h>
+#include <zephyr/arch/arch_interface.h>
 
 #include <soc.h>
 
@@ -332,10 +333,19 @@ void radio_stop(void)
 			/* Wait for the MRAM no latency request to complete before
 			 * attempting to cancel or release. This prevents race
 			 * conditions when requests and releases happen quickly.
+			 *
+			 * Use a timeout to prevent infinite waiting if something
+			 * goes wrong. The timeout is conservative - the callback
+			 * should typically fire within microseconds to milliseconds.
 			 */
-			while (!atomic_get(&mram_no_latency_complete)) {
-				/* Spin-wait for completion */
+			uint32_t timeout_iterations = 1000000; /* Conservative timeout */
+
+			while (!atomic_get(&mram_no_latency_complete) && timeout_iterations > 0) {
+				arch_spin_relax();
+				timeout_iterations--;
 			}
+
+			/* TODO: Consider adding error handling if timeout_iterations == 0 */
 
 			(void)mram_no_latency_cancel_or_release(&mram_cli);
 		} else {
