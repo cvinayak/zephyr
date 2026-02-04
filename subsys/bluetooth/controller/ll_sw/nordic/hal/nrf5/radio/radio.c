@@ -198,6 +198,15 @@ void radio_setup(void)
 #if defined(CONFIG_SOC_SERIES_NRF54H)
 static struct onoff_client mram_cli;
 static atomic_val_t mram_refcnt;
+static atomic_val_t mram_no_latency_complete;
+
+static void mram_no_latency_callback(struct onoff_manager *mgr,
+				     struct onoff_client *cli,
+				     uint32_t state, int res)
+{
+	/* Mark that the MRAM no latency request has completed */
+	atomic_set(&mram_no_latency_complete, 1);
+}
 #endif /* CONFIG_SOC_SERIES_NRF54H */
 
 void radio_reset(void)
@@ -246,7 +255,11 @@ void radio_reset(void)
 
 	refcnt = atomic_inc(&mram_refcnt);
 	if (refcnt == 0) {
-		sys_notify_init_spinwait(&mram_cli.notify);
+		/* Clear completion state before making the request */
+		atomic_clear(&mram_no_latency_complete);
+
+		/* Use callback-based notification instead of spinwait */
+		sys_notify_init_callback(&mram_cli.notify, mram_no_latency_callback);
 
 		(void)mram_no_latency_request(&mram_cli);
 	} else {
@@ -316,6 +329,14 @@ void radio_stop(void)
 	if (refcnt > 0) {
 		refcnt = atomic_dec(&mram_refcnt);
 		if (refcnt == 1) {
+			/* Wait for the MRAM no latency request to complete before
+			 * attempting to cancel or release. This prevents race
+			 * conditions when requests and releases happen quickly.
+			 */
+			while (!atomic_get(&mram_no_latency_complete)) {
+				/* Spin-wait for completion */
+			}
+
 			(void)mram_no_latency_cancel_or_release(&mram_cli);
 		} else {
 			/* Nothing to do, reference count decremented. */
