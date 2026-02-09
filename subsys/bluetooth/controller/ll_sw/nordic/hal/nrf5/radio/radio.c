@@ -183,35 +183,34 @@ static void mram_no_latency_callback(struct onoff_manager *mgr,
 	ARG_UNUSED(mgr);
 	ARG_UNUSED(cli);
 
-	if (res != 0) {
-		goto mram_no_latency_callback_error;
-	}
+	LL_ASSERT_ERR(res == 0);
+	LL_ASSERT_ERR(state == ONOFF_STATE_ON);
 
-	if (state == ONOFF_STATE_ON) {
-		LL_ASSERT_ERR(mram_no_latency_start_ack != mram_no_latency_start_req);
+	/* There shall be an outstanding request to acknowledge */
+	LL_ASSERT_ERR(mram_no_latency_start_ack != mram_no_latency_start_req);
+	mram_no_latency_start_ack++;
 
-		mram_no_latency_start_ack++;
+	/* There could be cancel or release */
+	if (mram_no_latency_stop_req != mram_no_latency_stop_ack) {
+		mram_no_latency_stop_ack++;
 
-		LL_ASSERT_ERR(mram_no_latency_start_ack == mram_no_latency_start_req);
+		/* There shall be no more than one cancel or release */
+		LL_ASSERT_ERR(mram_no_latency_stop_ack == mram_no_latency_stop_req);
 
-		if (mram_no_latency_stop_req != mram_no_latency_stop_ack) {
+		/* Handle cancel or release if was no request placed again */
+		if (mram_no_latency_start_ack == mram_no_latency_start_req) {
 			int ret;
-
-			mram_no_latency_stop_ack++;
-
-			LL_ASSERT_ERR(mram_no_latency_stop_ack == mram_no_latency_stop_req);
 
 			ret = mram_no_latency_cancel_or_release(&mram_cli);
 			LL_ASSERT_ERR(ret == ONOFF_STATE_ON);
+		} else {
+			/* Request placed after cancel or release */
+			mram_no_latency_start_ack++;
+			LL_ASSERT_ERR(mram_no_latency_start_ack == mram_no_latency_start_req);
 		}
 	} else {
-		goto mram_no_latency_callback_error;
+		/* No cancel or release before this callback */
 	}
-
-	return;
-
-mram_no_latency_callback_error:
-	LL_ASSERT_ERR(0);
 }
 #endif /* CONFIG_SOC_SERIES_NRF54H */
 
@@ -309,11 +308,9 @@ void radio_reset(void)
 			ret = mram_no_latency_request(&mram_cli);
 			LL_ASSERT_ERR(ret >= 0);
 		} else {
-			/* Revert marked request as a cancel or release is
-			 * pending.
+			/* We leave the request marked so that the callback will
+			 * retain the mram_no_latency.
 			 */
-			mram_no_latency_start_req = old;
-			(void)atomic_dec(&mram_refcnt);
 		}
 	} else {
 		/* Nothing to do, reference count increased. */
