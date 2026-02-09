@@ -63,6 +63,7 @@ static void mram_no_latency_callback(void)
 	LL_ASSERT_ERR(mram_no_latency_start_ack != mram_no_latency_start_req);
 	mram_no_latency_start_ack++;
 
+#if 0
 	/* There could be cancel or release */
 	if (mram_no_latency_stop_req != mram_no_latency_stop_ack) {
 		mram_no_latency_stop_ack++;
@@ -85,6 +86,24 @@ static void mram_no_latency_callback(void)
 	} else {
 		mram_no_latency_state = (pending_requests > 0);
 	}
+#else
+	/* Count the requests and releases */
+	uint8_t req = mram_no_latency_start_req - mram_no_latency_start_ack;
+	uint8_t rel = mram_no_latency_stop_req - mram_no_latency_stop_ack;
+
+	/* Reset requests and releases */
+	mram_no_latency_start_ack = mram_no_latency_start_req;
+	mram_no_latency_stop_ack = mram_no_latency_stop_req;
+
+	/* Handle cancel or release */
+	if (rel > req) {
+		mram_no_latency_cancel_or_release();
+	} else {
+		/* No cancel or release before this callback */
+	}
+
+	mram_no_latency_state = (pending_requests > 0);
+#endif
 }
 
 /**
