@@ -251,6 +251,39 @@ static void test_central_connect_vs_set_public_addr(void)
 	TEST_PASS("Passed");
 }
 
+static void test_central_connect_to_peripheral_public_addr(void)
+{
+	int err;
+
+	bt_conn_cb_register(&conn_cb);
+
+	/* Initialize Bluetooth */
+	err = bt_enable(NULL);
+	TEST_ASSERT(err == 0, "Can't enable Bluetooth (err %d)", err);
+
+	struct bt_conn *conn;
+
+	/* Connect to peripheral with public address */
+	bt_addr_le_t peer = {.type = BT_ADDR_LE_PUBLIC,
+			     .a.val = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66}};
+
+	const struct bt_conn_le_create_param create_param = {
+		.options = BT_CONN_LE_OPT_NONE,
+		.interval = BT_GAP_SCAN_FAST_INTERVAL,
+		.window = BT_GAP_SCAN_FAST_WINDOW,
+	};
+
+	k_sem_reset(&sem_connected);
+
+	err = bt_conn_le_create(&peer, &create_param, BT_LE_CONN_PARAM_DEFAULT, &conn);
+	TEST_ASSERT(err == 0, "Failed starting initiator (err %d)", err);
+
+	err = k_sem_take(&sem_connected, K_FOREVER);
+	TEST_ASSERT(err == 0, "Failed establishing connection", err);
+
+	TEST_PASS("Passed");
+}
+
 static const struct bst_test_instance test_def[] = {
 	{
 		.test_id = "central_connect_timeout",
@@ -276,6 +309,13 @@ static const struct bst_test_instance test_def[] = {
 			"Verifies that the VS write BD addr command is used to set public address"
 			" before connecting to a peripheral.",
 		.test_main_f = test_central_connect_vs_set_public_addr,
+	},
+	{
+		.test_id = "central_connect_to_peripheral_public_addr",
+		.test_descr =
+			"Verifies that a central can connect to a peripheral using a public address"
+			" set via VS write BD addr command.",
+		.test_main_f = test_central_connect_to_peripheral_public_addr,
 	},
 	BSTEST_END_MARKER,
 };

@@ -50,11 +50,44 @@ static void test_peripheral_dummy(void)
 	TEST_PASS("Passed");
 }
 
+static void test_peripheral_vs_set_public_addr(void)
+{
+	int err;
+	const struct bt_data ad[] = {
+		BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR))};
+
+	bt_conn_cb_register(&conn_cb);
+
+	/* Create a public address identity before bt_enable() */
+	bt_addr_le_t addr = {.type = BT_ADDR_LE_PUBLIC,
+			     .a.val = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66}};
+
+	err = bt_id_create(&addr, NULL);
+	TEST_ASSERT(err == 0, "Failed to create public identity (err %d)", err);
+
+	/* Initialize Bluetooth - this should trigger the VS write BD addr path */
+	err = bt_enable(NULL);
+	TEST_ASSERT(err == 0, "Can't enable Bluetooth (err %d)", err);
+
+	err = bt_le_adv_start(BT_LE_ADV_CONN_FAST_1, ad, ARRAY_SIZE(ad), NULL, 0);
+	TEST_ASSERT(err == 0, "Advertising failed to start (err %d)", err);
+
+	err = k_sem_take(&sem_connected, K_FOREVER);
+	TEST_ASSERT(err == 0, "Failed getting connected timeout", err);
+
+	TEST_PASS("Passed");
+}
+
 static const struct bst_test_instance test_def[] = {
 	{
 		.test_id = "peripheral_dummy",
 		.test_descr = "Connectable peripheral",
 		.test_main_f = test_peripheral_dummy,
+	},
+	{
+		.test_id = "peripheral_vs_set_public_addr",
+		.test_descr = "Connectable peripheral with public address set via VS command",
+		.test_main_f = test_peripheral_vs_set_public_addr,
 	},
 	BSTEST_END_MARKER,
 };
