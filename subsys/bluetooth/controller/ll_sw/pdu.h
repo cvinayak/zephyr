@@ -417,6 +417,13 @@ struct pdu_adv_connect_ind {
 	} __packed;
 } __packed;
 
+#if defined(CONFIG_BT_CTLR_DECISION_BASED_FILTERING)
+struct pdu_adv_decision_ind {
+	uint8_t addr[BDADDR_SIZE];
+	uint8_t data[PDU_AC_LEG_DATA_SIZE_MAX];
+} __packed;
+#endif /* CONFIG_BT_CTLR_DECISION_BASED_FILTERING */
+
 struct pdu_adv_ext_hdr {
 #ifdef CONFIG_LITTLE_ENDIAN
 	uint8_t adv_addr:1;
@@ -548,6 +555,9 @@ enum pdu_adv_type {
 	PDU_ADV_TYPE_AUX_SYNC_IND = PDU_ADV_TYPE_EXT_IND,
 	PDU_ADV_TYPE_AUX_CHAIN_IND = PDU_ADV_TYPE_EXT_IND,
 	PDU_ADV_TYPE_AUX_CONNECT_RSP = 0x08,
+#if defined(CONFIG_BT_CTLR_DECISION_BASED_FILTERING)
+	PDU_ADV_TYPE_ADV_DECISION_IND = 0x09,
+#endif /* CONFIG_BT_CTLR_DECISION_BASED_FILTERING */
 } __packed;
 
 struct pdu_adv {
@@ -578,6 +588,10 @@ struct pdu_adv {
 #if defined(CONFIG_BT_CTLR_ADV_EXT)
 		struct pdu_adv_com_ext_adv adv_ext_ind;
 #endif /* CONFIG_BT_CTLR_ADV_EXT */
+
+#if defined(CONFIG_BT_CTLR_DECISION_BASED_FILTERING)
+		struct pdu_adv_decision_ind decision_ind;
+#endif /* CONFIG_BT_CTLR_DECISION_BASED_FILTERING */
 	} __packed;
 } __packed;
 

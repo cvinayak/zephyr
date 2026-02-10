@@ -1478,6 +1478,28 @@ int bt_le_ext_adv_set_data(struct bt_le_ext_adv *adv,
 			   const struct bt_data *sd, size_t sd_len);
 
 /**
+ * @brief Set decision data for extended advertising.
+ *
+ * Set decision data that will be used for decision-based advertising filtering
+ * as specified in Bluetooth Core Specification v6.2, Vol 4, Part E, Section 7.8.144.
+ * This data is used by observers with decision-based filtering instructions to
+ * determine whether to accept advertising PDUs from this advertiser.
+ *
+ * The decision data is associated with the advertising set and remains valid
+ * until the advertising set is deleted or new decision data is set.
+ *
+ * @param adv        Advertising set object.
+ * @param data       Decision data buffer.
+ * @param data_len   Length of decision data (must be > 0).
+ *
+ * @return Zero on success or (negative) error code otherwise.
+ * @retval -EINVAL Invalid parameters.
+ * @retval -ENOTSUP Decision-based filtering not supported by controller.
+ */
+int bt_le_ext_adv_set_decision_data(struct bt_le_ext_adv *adv,
+				    const uint8_t *data, uint8_t data_len);
+
+/**
  * @brief Update advertising parameters.
  *
  * Update the advertising parameters. The function will return an error if the
@@ -2350,6 +2372,34 @@ enum bt_le_scan_opt {
 	 * @note Requires @ref BT_LE_SCAN_OPT_CODED.
 	 */
 	BT_LE_SCAN_OPT_NO_1M = BIT(3),
+
+	/**
+	 * @brief Enable extended scan filtering.
+	 *
+	 * Enables extended scan filtering mode which provides enhanced
+	 * filtering capabilities. Can be combined with
+	 * @ref BT_LE_SCAN_OPT_FILTER_ACCEPT_LIST.
+	 *
+	 * @note Requires controller support for extended scan filtering.
+	 */
+	BT_LE_SCAN_OPT_EXTENDED_FILTER = BIT(4),
+
+	/**
+	 * @brief Enable decision-based advertising filtering.
+	 *
+	 * Enables decision-based advertising filtering as specified in
+	 * Bluetooth Core Specification v6.2. This allows the controller to
+	 * filter advertising PDUs based on decision criteria. Can be combined
+	 * with @ref BT_LE_SCAN_OPT_FILTER_ACCEPT_LIST and/or
+	 * @ref BT_LE_SCAN_OPT_EXTENDED_FILTER.
+	 *
+	 * When this option is set, the controller will accept ADV_DECISION_IND
+	 * PDUs according to the filter policy.
+	 *
+	 * @note Requires controller support for decision-based advertising
+	 *       filtering (CONFIG_BT_CTLR_DECISION_BASED_FILTERING).
+	 */
+	BT_LE_SCAN_OPT_DECISION_BASED = BIT(5),
 };
 
 enum bt_le_scan_type {
@@ -2619,6 +2669,28 @@ BUILD_ASSERT(BT_GAP_SCAN_FAST_WINDOW == BT_GAP_SCAN_FAST_INTERVAL_MIN,
  * @retval -EBUSY if the scanner is already being started in a different thread.
  */
 int bt_le_scan_start(const struct bt_le_scan_param *param, bt_le_scan_cb_t cb);
+
+/**
+ * @brief Set decision instructions for scanning.
+ *
+ * Set decision instructions that will be used to filter advertising PDUs during
+ * scanning as specified in Bluetooth Core Specification v6.2, Vol 4, Part E,
+ * Section 7.8.145. These instructions define the criteria for accepting advertising
+ * PDUs based on the decision data included in the advertisements.
+ *
+ * The instructions remain active until new instructions are set or scanning is stopped.
+ * This function should be called before starting scanning with decision-based filtering
+ * enabled (BT_LE_SCAN_OPT_DECISION_BASED).
+ *
+ * @param instructions      Decision instructions buffer.
+ * @param instructions_len  Length of decision instructions (must be > 0).
+ *
+ * @return Zero on success or (negative) error code otherwise.
+ * @retval -EINVAL Invalid parameters.
+ * @retval -ENOTSUP Decision-based filtering not supported by controller.
+ */
+int bt_le_scan_set_decision_instructions(const uint8_t *instructions,
+					 uint8_t instructions_len);
 
 /**
  * @brief Stop (LE) scanning.

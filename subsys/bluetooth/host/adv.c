@@ -1606,6 +1606,58 @@ int bt_le_ext_adv_set_data(struct bt_le_ext_adv *adv,
 	return le_adv_update(adv, ad, ad_len, sd, sd_len, ext_adv, scannable);
 }
 
+int bt_le_ext_adv_set_decision_data(struct bt_le_ext_adv *adv,
+				    const uint8_t *data, uint8_t data_len)
+{
+#if defined(CONFIG_BT_CTLR_DECISION_BASED_FILTERING)
+	struct bt_hci_cp_le_set_decision_data *cp;
+	struct bt_hci_rp_le_set_decision_data *rp;
+	struct net_buf *buf, *rsp = NULL;
+	int err;
+
+	if (!BT_DEV_FEAT_LE_EXT_ADV(bt_dev.le.features)) {
+		return -ENOTSUP;
+	}
+
+	CHECKIF(adv == NULL) {
+		LOG_DBG("adv is NULL");
+		return -EINVAL;
+	}
+
+	CHECKIF(data == NULL || data_len == 0) {
+		LOG_DBG("Invalid decision data parameters");
+		return -EINVAL;
+	}
+
+	buf = bt_hci_cmd_alloc(K_FOREVER);
+	if (!buf) {
+		LOG_WRN("No HCI buffers");
+		return -ENOBUFS;
+	}
+
+	cp = net_buf_add(buf, sizeof(*cp));
+	cp->adv_handle = adv->handle;
+	cp->data_length = data_len;
+	net_buf_add_mem(buf, data, data_len);
+
+	err = bt_hci_cmd_send_sync(BT_HCI_OP_LE_SET_DECISION_DATA, buf, &rsp);
+	if (err) {
+		return err;
+	}
+
+	rp = (void *)rsp->data;
+	err = rp->status;
+	net_buf_unref(rsp);
+
+	return err;
+#else
+	ARG_UNUSED(adv);
+	ARG_UNUSED(data);
+	ARG_UNUSED(data_len);
+	return -ENOTSUP;
+#endif /* CONFIG_BT_CTLR_DECISION_BASED_FILTERING */
+}
+
 int bt_le_ext_adv_delete(struct bt_le_ext_adv *adv)
 {
 	struct bt_hci_cp_le_remove_adv_set *cp;

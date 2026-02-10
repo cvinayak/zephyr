@@ -199,6 +199,58 @@ int bt_le_scan_set_enable(uint8_t enable)
 						      BT_LE_SCAN_OPT_FILTER_DUPLICATE);
 }
 
+/**
+ * @brief Convert scan options to HCI filter policy value
+ *
+ * Maps the combination of scan options to the appropriate HCI filter policy
+ * value according to the following table:
+ *
+ * | Options | HCI Value | Description |
+ * |---------|-----------|-------------|
+ * | None | 0x00 | Basic, no filter |
+ * | FAL | 0x01 | Basic, use filter accept list |
+ * | EXT | 0x02 | Extended, no filter |
+ * | EXT + FAL | 0x03 | Extended, use filter accept list |
+ * | DEC | 0x04 | Decision, no filter |
+ * | DEC + FAL | 0x05 | Decision, use filter accept list |
+ * | DEC + EXT | 0x06 | Decision + Extended, no filter |
+ * | DEC + EXT + FAL | 0x07 | Decision + Extended, use filter accept list |
+ *
+ * Note: Bit 0 of the filter policy always indicates filter accept list usage.
+ *
+ * @param options Scan options bit field
+ * @return HCI filter policy value (0x00-0x07)
+ */
+static uint8_t scan_options_to_filter_policy(uint8_t options)
+{
+	uint8_t filter_policy = BT_HCI_LE_SCAN_FP_BASIC_NO_FILTER;
+
+#if defined(CONFIG_BT_CTLR_DECISION_BASED_FILTERING)
+	/* Check for decision-based filtering (bit 5) */
+	if (options & BT_LE_SCAN_OPT_DECISION_BASED) {
+		filter_policy = BT_HCI_LE_SCAN_FP_DECISION_NO_FILTER;
+
+		/* Add extended filter flag if requested (bit 4) */
+		if (options & BT_LE_SCAN_OPT_EXTENDED_FILTER) {
+			filter_policy = BT_HCI_LE_SCAN_FP_DECISION_EXT_NO_FILTER;
+		}
+	} else if (options & BT_LE_SCAN_OPT_EXTENDED_FILTER) {
+		/* Extended filtering without decision-based */
+		filter_policy = BT_HCI_LE_SCAN_FP_EXT_NO_FILTER;
+	}
+#endif /* CONFIG_BT_CTLR_DECISION_BASED_FILTERING */
+
+	/* Add filter accept list flag if requested.
+	 * Bit 0 indicates filter accept list usage in all filter policy modes.
+	 */
+	if (IS_ENABLED(CONFIG_BT_FILTER_ACCEPT_LIST) &&
+	    (options & BT_LE_SCAN_OPT_FILTER_ACCEPT_LIST)) {
+		filter_policy |= 0x01;
+	}
+
+	return filter_policy;
+}
+
 static int start_le_scan_ext(struct bt_le_scan_param *scan_param)
 {
 	struct bt_hci_ext_scan_phy param_1m;
@@ -260,9 +312,7 @@ static int start_le_scan_ext(struct bt_le_scan_param *scan_param)
 	set_param = net_buf_add(buf, sizeof(*set_param));
 	set_param->own_addr_type = own_addr_type;
 	set_param->phys = 0;
-	set_param->filter_policy = scan_param->options & BT_LE_SCAN_OPT_FILTER_ACCEPT_LIST
-					   ? BT_HCI_LE_SCAN_FP_BASIC_FILTER
-					   : BT_HCI_LE_SCAN_FP_BASIC_NO_FILTER;
+	set_param->filter_policy = scan_options_to_filter_policy(scan_param->options);
 
 	if (phy_1m) {
 		set_param->phys |= BT_HCI_LE_EXT_SCAN_PHY_1M;
@@ -306,12 +356,7 @@ static int start_le_scan_legacy(struct bt_le_scan_param *param)
 	set_param.interval = sys_cpu_to_le16(param->interval);
 	set_param.window = sys_cpu_to_le16(param->window);
 
-	if (IS_ENABLED(CONFIG_BT_FILTER_ACCEPT_LIST) &&
-	    param->options & BT_LE_SCAN_OPT_FILTER_ACCEPT_LIST) {
-		set_param.filter_policy = BT_HCI_LE_SCAN_FP_BASIC_FILTER;
-	} else {
-		set_param.filter_policy = BT_HCI_LE_SCAN_FP_BASIC_NO_FILTER;
-	}
+	set_param.filter_policy = scan_options_to_filter_policy(param->options);
 
 	active_scan = param->type == BT_HCI_LE_SCAN_ACTIVE;
 	err = bt_id_set_scan_own_addr(active_scan, &set_param.addr_type);
@@ -1742,6 +1787,51 @@ static bool valid_le_scan_param(const struct bt_le_scan_param *param)
 	}
 
 	return true;
+}
+
+int bt_le_scan_set_decision_instructions(const uint8_t *instructions,
+					 uint8_t instructions_len)
+{
+#if defined(CONFIG_BT_CTLR_DECISION_BASED_FILTERING)
+	struct bt_hci_cp_le_set_decision_instructions *cp;
+	struct bt_hci_rp_le_set_decision_instructions *rp;
+	struct net_buf *buf, *rsp = NULL;
+	int err;
+
+	if (!atomic_test_bit(bt_dev.flags, BT_DEV_READY)) {
+		return -EAGAIN;
+	}
+
+	CHECKIF(instructions == NULL || instructions_len == 0) {
+		LOG_DBG("Invalid decision instructions parameters");
+		return -EINVAL;
+	}
+
+	buf = bt_hci_cmd_alloc(K_FOREVER);
+	if (!buf) {
+		LOG_WRN("No HCI buffers");
+		return -ENOBUFS;
+	}
+
+	cp = net_buf_add(buf, sizeof(*cp));
+	cp->instructions_length = instructions_len;
+	net_buf_add_mem(buf, instructions, instructions_len);
+
+	err = bt_hci_cmd_send_sync(BT_HCI_OP_LE_SET_DECISION_INSTRUCTIONS, buf, &rsp);
+	if (err) {
+		return err;
+	}
+
+	rp = (void *)rsp->data;
+	err = rp->status;
+	net_buf_unref(rsp);
+
+	return err;
+#else
+	ARG_UNUSED(instructions);
+	ARG_UNUSED(instructions_len);
+	return -ENOTSUP;
+#endif /* CONFIG_BT_CTLR_DECISION_BASED_FILTERING */
 }
 
 int bt_le_scan_start(const struct bt_le_scan_param *param, bt_le_scan_cb_t cb)

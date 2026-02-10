@@ -1271,6 +1271,11 @@ struct bt_hci_cp_le_set_adv_enable {
 #define BT_HCI_LE_SCAN_FP_BASIC_FILTER          0x01
 #define BT_HCI_LE_SCAN_FP_EXT_NO_FILTER         0x02
 #define BT_HCI_LE_SCAN_FP_EXT_FILTER            0x03
+/* Decision-Based Advertising Filtering (BT Core Spec v6.2) */
+#define BT_HCI_LE_SCAN_FP_DECISION_NO_FILTER    0x04
+#define BT_HCI_LE_SCAN_FP_DECISION_FILTER       0x05
+#define BT_HCI_LE_SCAN_FP_DECISION_EXT_NO_FILTER 0x06
+#define BT_HCI_LE_SCAN_FP_DECISION_EXT_FILTER   0x07
 
 struct bt_hci_cp_le_set_scan_param {
 	uint8_t  scan_type;
@@ -2990,6 +2995,31 @@ struct bt_hci_op_le_connection_rate_request {
 } __packed;
 
 #define BT_HCI_OP_LE_CONNECTION_RATE_REQUEST BT_OP(BT_OGF_LE, 0x00A1) /* 0x20A1 */
+
+/* LE Set Decision Data command (BT Core Spec v6.2, Vol 4, Part E, Section 7.8.144) */
+#define BT_HCI_OP_LE_SET_DECISION_DATA BT_OP(BT_OGF_LE, 0x00A3) /* 0x20A3 */
+
+struct bt_hci_cp_le_set_decision_data {
+	uint8_t  adv_handle;
+	uint8_t  data_length;
+	uint8_t  data[0];
+} __packed;
+
+struct bt_hci_rp_le_set_decision_data {
+	uint8_t status;
+} __packed;
+
+/* LE Set Decision Instructions command (BT Core Spec v6.2, Vol 4, Part E, Section 7.8.145) */
+#define BT_HCI_OP_LE_SET_DECISION_INSTRUCTIONS BT_OP(BT_OGF_LE, 0x00A4) /* 0x20A4 */
+
+struct bt_hci_cp_le_set_decision_instructions {
+	uint8_t  instructions_length;
+	uint8_t  instructions[0];
+} __packed;
+
+struct bt_hci_rp_le_set_decision_instructions {
+	uint8_t status;
+} __packed;
 
 /* Event definitions */
 
