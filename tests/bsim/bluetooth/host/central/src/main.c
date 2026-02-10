@@ -279,7 +279,7 @@ static void test_central_connect_to_peripheral_public_addr(void)
 	TEST_ASSERT(err == 0, "Failed starting initiator (err %d)", err);
 
 	err = k_sem_take(&sem_connected, K_FOREVER);
-	TEST_ASSERT(err == 0, "Failed establishing connection", err);
+	TEST_ASSERT(err == 0, "Failed establishing connection (err %d)", err);
 
 	TEST_PASS("Passed");
 }

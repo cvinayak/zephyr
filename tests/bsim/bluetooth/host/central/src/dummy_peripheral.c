@@ -73,7 +73,7 @@ static void test_peripheral_vs_set_public_addr(void)
 	TEST_ASSERT(err == 0, "Advertising failed to start (err %d)", err);
 
 	err = k_sem_take(&sem_connected, K_FOREVER);
-	TEST_ASSERT(err == 0, "Failed getting connected timeout", err);
+	TEST_ASSERT(err == 0, "Failed to establish connection (err %d)", err);
 
 	TEST_PASS("Passed");
 }
