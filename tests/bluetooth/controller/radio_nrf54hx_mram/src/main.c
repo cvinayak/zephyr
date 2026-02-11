@@ -5,6 +5,7 @@
  */
 
 #include <zephyr/ztest.h>
+#include <zephyr/sys/atomic.h>
 #include <stdbool.h>
 
 /**
@@ -63,30 +64,6 @@ static void mram_no_latency_callback(void)
 	LL_ASSERT_ERR(mram_no_latency_start_ack != mram_no_latency_start_req);
 	mram_no_latency_start_ack++;
 
-#if 0
-	/* There could be cancel or release */
-	if (mram_no_latency_stop_req != mram_no_latency_stop_ack) {
-		mram_no_latency_stop_ack++;
-
-		/* There shall be no more than one cancel or release */
-		LL_ASSERT_ERR(mram_no_latency_stop_ack == mram_no_latency_stop_req);
-
-		/* Handle cancel or release if was no request placed again */
-		if (mram_no_latency_start_ack == mram_no_latency_start_req) {
-			mram_no_latency_cancel_or_release();
-
-			mram_no_latency_state = (pending_requests > 0);
-		} else {
-			/* Request placed after cancel or release */
-			mram_no_latency_start_ack++;
-			LL_ASSERT_ERR(mram_no_latency_start_ack == mram_no_latency_start_req);
-
-			mram_no_latency_state = (pending_requests > 0);
-		}
-	} else {
-		mram_no_latency_state = (pending_requests > 0);
-	}
-#else
 	/* Count the requests and releases */
 	uint8_t req = mram_no_latency_start_req - mram_no_latency_start_ack;
 	uint8_t rel = mram_no_latency_stop_req - mram_no_latency_stop_ack;
@@ -103,7 +80,6 @@ static void mram_no_latency_callback(void)
 	}
 
 	mram_no_latency_state = (pending_requests > 0);
-#endif
 }
 
 /**
