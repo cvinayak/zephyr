@@ -14,6 +14,38 @@
  *
  * This test validates the reference-counting behavior of MRAM no-latency
  * requests and releases through radio_reset() and radio_stop() operations.
+ *
+ * DESIGN OVERVIEW:
+ * ================
+ * The MRAM no-latency management handles asynchronous state changes where multiple
+ * radio_reset() and radio_stop() calls can occur before the async callback completes.
+ * This design prevents race conditions through:
+ *
+ * 1. ATOMIC REFERENCE COUNTING (mram_refcnt):
+ *    - Tracks number of active radio events
+ *    - First reset (0->1): Request MRAM no-latency
+ *    - Last stop (1->0): Release MRAM no-latency
+ *    - Prevents duplicate requests when multiple radio events are active
+ *
+ * 2. REQUEST/RELEASE TRACKING (start_req/stop_req):
+ *    - Volatile counters mark pending operations
+ *    - Callback processes accumulated requests/releases atomically
+ *    - Handles race: request->stop->callback or stop->request->callback
+ *
+ * 3. RACE CONDITION SCENARIOS:
+ *    a) Normal: reset -> callback_ack -> stop -> release
+ *    b) Stop before callback: reset -> stop(pending) -> callback -> release
+ *    c) Multiple ops: reset -> stop -> reset -> callback -> state_retained
+ *
+ * 4. CALLBACK BEHAVIOR:
+ *    - Acknowledges the first outstanding start request
+ *    - Counts accumulated requests and releases since last ack
+ *    - If releases > requests: Execute cancel_or_release()
+ *    - Updates final state based on pending_requests counter
+ *
+ * This mirrors the actual hal_radio_reset()/hal_radio_stop() implementation
+ * in radio_nrf54hx.h which will use mram_no_latency_request() and
+ * mram_no_latency_cancel_or_release() from soc/nordic/common/mram_latency.h
  */
 
 /* State tracking */
