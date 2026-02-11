@@ -2634,6 +2634,63 @@ static void le_conn_param_req_neg_reply(struct net_buf *buf,
 }
 #endif /* CONFIG_BT_CTLR_CONN_PARAM_REQ */
 
+#if defined(CONFIG_BT_CTLR_SUBRATING)
+/* Storage for default subrate parameters */
+static struct {
+	uint16_t subrate_min;
+	uint16_t subrate_max;
+	uint16_t max_latency;
+	uint16_t continuation_number;
+	uint16_t supervision_timeout;
+} default_subrate = {
+	.subrate_min = 0x0001,
+	.subrate_max = 0x0001,
+	.max_latency = 0x0000,
+	.continuation_number = 0x0000,
+	.supervision_timeout = 0x0C80,
+};
+
+static void le_set_default_subrate(struct net_buf *buf, struct net_buf **evt)
+{
+	struct bt_hci_cp_le_set_default_subrate *cmd = (void *)buf->data;
+	uint8_t *rp;
+
+	/* Store default subrate parameters */
+	default_subrate.subrate_min = sys_le16_to_cpu(cmd->subrate_min);
+	default_subrate.subrate_max = sys_le16_to_cpu(cmd->subrate_max);
+	default_subrate.max_latency = sys_le16_to_cpu(cmd->max_latency);
+	default_subrate.continuation_number = sys_le16_to_cpu(cmd->continuation_number);
+	default_subrate.supervision_timeout = sys_le16_to_cpu(cmd->supervision_timeout);
+
+	rp = hci_cmd_complete(evt, sizeof(*rp));
+	*rp = BT_HCI_ERR_SUCCESS;
+}
+
+static void le_subrate_request(struct net_buf *buf, struct net_buf **evt)
+{
+	struct bt_hci_cp_le_subrate_request *cmd = (void *)buf->data;
+	uint16_t handle;
+	uint16_t subrate_min;
+	uint16_t subrate_max;
+	uint16_t max_latency;
+	uint16_t continuation_number;
+	uint16_t supervision_timeout;
+	uint8_t status;
+
+	handle = sys_le16_to_cpu(cmd->handle);
+	subrate_min = sys_le16_to_cpu(cmd->subrate_min);
+	subrate_max = sys_le16_to_cpu(cmd->subrate_max);
+	max_latency = sys_le16_to_cpu(cmd->max_latency);
+	continuation_number = sys_le16_to_cpu(cmd->continuation_number);
+	supervision_timeout = sys_le16_to_cpu(cmd->supervision_timeout);
+
+	status = ll_subrate_req(handle, subrate_min, subrate_max, max_latency,
+			       continuation_number, supervision_timeout);
+
+	*evt = cmd_status(status);
+}
+#endif /* CONFIG_BT_CTLR_SUBRATING */
+
 #if defined(CONFIG_BT_CTLR_DATA_LENGTH)
 static void le_set_data_len(struct net_buf *buf, struct net_buf **evt)
 {
@@ -4785,6 +4842,16 @@ static int controller_cmd_handle(uint16_t  ocf, struct net_buf *cmd,
 		le_conn_param_req_neg_reply(cmd, evt);
 		break;
 #endif /* CONFIG_BT_CTLR_CONN_PARAM_REQ */
+
+#if defined(CONFIG_BT_CTLR_SUBRATING)
+	case BT_OCF(BT_HCI_OP_LE_SET_DEFAULT_SUBRATE):
+		le_set_default_subrate(cmd, evt);
+		break;
+
+	case BT_OCF(BT_HCI_OP_LE_SUBRATE_REQUEST):
+		le_subrate_request(cmd, evt);
+		break;
+#endif /* CONFIG_BT_CTLR_SUBRATING */
 
 #if defined(CONFIG_BT_CTLR_DATA_LENGTH)
 	case BT_OCF(BT_HCI_OP_LE_SET_DATA_LEN):
@@ -8605,6 +8672,37 @@ static void le_conn_update_complete(struct pdu_data *pdu_data, uint16_t handle,
 	sep->supv_timeout = sys_cpu_to_le16(cu->timeout);
 }
 
+#if defined(CONFIG_BT_CTLR_SUBRATING)
+static void le_subrate_change(struct pdu_data *pdu_data, uint16_t handle,
+			     struct net_buf *buf)
+{
+	struct bt_hci_evt_le_subrate_change *sep;
+	struct node_rx_subrate_change *sr;
+	void *node;
+
+	if (!(event_mask & BT_EVT_MASK_LE_META_EVENT) ||
+	    !(le_event_mask & BT_EVT_MASK_LE_SUBRATE_CHANGE)) {
+		return;
+	}
+
+	sep = meta_evt(buf, BT_HCI_EVT_LE_SUBRATE_CHANGE, sizeof(*sep));
+
+	/* Check for pdu field being aligned before accessing subrate
+	 * change event.
+	 */
+	node = pdu_data;
+	LL_ASSERT(IS_PTR_ALIGNED(node, struct node_rx_subrate_change));
+
+	sr = node;
+	sep->status = sr->status;
+	sep->handle = sys_cpu_to_le16(handle);
+	sep->subrate_factor = sys_cpu_to_le16(sr->subrate_factor);
+	sep->peripheral_latency = sys_cpu_to_le16(sr->peripheral_latency);
+	sep->continuation_number = sys_cpu_to_le16(sr->continuation_number);
+	sep->supervision_timeout = sys_cpu_to_le16(sr->supervision_timeout);
+}
+#endif /* CONFIG_BT_CTLR_SUBRATING */
+
 #if defined(CONFIG_BT_CTLR_LE_ENC)
 static void enc_refresh_complete(struct pdu_data *pdu_data, uint16_t handle,
 				 struct net_buf *buf)
@@ -8942,6 +9040,12 @@ static void encode_control(struct node_rx_pdu *node_rx,
 		le_path_loss_threshold(pdu_data, handle, buf);
 		return;
 #endif /* CONFIG_BT_CTLR_LE_PATH_LOSS_MONITORING */
+
+#if defined(CONFIG_BT_CTLR_SUBRATING)
+	case NODE_RX_TYPE_SUBRATE_CHANGE:
+		le_subrate_change(pdu_data, handle, buf);
+		return;
+#endif /* CONFIG_BT_CTLR_SUBRATING */
 #endif /* CONFIG_BT_CONN */
 
 #if defined(CONFIG_BT_CTLR_ADV_INDICATION)
