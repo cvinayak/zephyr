@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <string.h>
 #include <zephyr/kernel.h>
 #include <soc.h>
 #include <zephyr/bluetooth/hci_types.h>
@@ -46,14 +47,14 @@
 
 /**
  * @brief Set subevent data for periodic advertising with responses, function
- *        handle one subevent, caller can call multiple times for each subvent.
+ *        handles one subevent, caller can call multiple times for each subevent.
  *
  * @param handle         Advertising set handle
- * @param subevent       Array of subevent indices
- * @param response_slot_start Array of response slot start values
- * @param response_slot_count Array of response slot count values
- * @param subevent_data_len   Array of subevent data lengths
- * @param subevent_data       Array of pointers to subevent data
+ * @param subevent       Subevent index
+ * @param response_slot_start First response slot for this subevent
+ * @param response_slot_count Number of response slots for this subevent
+ * @param subevent_data_len   Length of subevent data
+ * @param subevent_data       Pointer to subevent data
  *
  * @return 0 on success, error code otherwise
  */
@@ -79,15 +80,34 @@ uint8_t ll_adv_sync_subevent_data_set(uint8_t handle,
 		return BT_HCI_ERR_CMD_DISALLOWED;
 	}
 
-	/* TODO: Store subevent data when data structures are extended
-	 * For now, we just validate and accept the command
-	 */
+	/* Validate subevent index */
+	if (subevent >= sync->num_subevents) {
+		return BT_HCI_ERR_INVALID_PARAM;
+	}
 
-	ARG_UNUSED(subevent);
-	ARG_UNUSED(response_slot_start);
-	ARG_UNUSED(response_slot_count);
-	ARG_UNUSED(subevent_data_len);
-	ARG_UNUSED(subevent_data);
+	/* Validate data length */
+	if (subevent_data_len > CONFIG_BT_CTLR_ADV_DATA_LEN_MAX) {
+		return BT_HCI_ERR_INVALID_PARAM;
+	}
+
+	/* Validate response slot parameters */
+	if (response_slot_count > 0) {
+		uint8_t slot_end = response_slot_start + response_slot_count;
+
+		if (slot_end > sync->num_response_slots) {
+			return BT_HCI_ERR_INVALID_PARAM;
+		}
+	}
+
+	/* Store subevent data */
+	sync->se_data[subevent].len = subevent_data_len;
+	sync->se_data[subevent].response_slot_start = response_slot_start;
+	sync->se_data[subevent].response_slot_count = response_slot_count;
+	sync->se_data[subevent].is_data_set = 1U;
+
+	if (subevent_data_len > 0 && subevent_data != NULL) {
+		memcpy(sync->se_data[subevent].data, subevent_data, subevent_data_len);
+	}
 
 	return BT_HCI_ERR_SUCCESS;
 }

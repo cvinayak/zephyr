@@ -129,20 +129,30 @@ uint8_t ll_sync_response_data_set(uint16_t handle, uint16_t request_event,
 		return BT_HCI_ERR_UNKNOWN_ADV_IDENTIFIER;
 	}
 
-	/* Validate parameters */
+	/* Validate data length */
+	if (response_data_len > CONFIG_BT_CTLR_ADV_DATA_LEN_MAX) {
+		return BT_HCI_ERR_INVALID_PARAM;
+	}
+
+	/* Validate that we have data if length is non-zero */
 	if (response_data_len > 0 && response_data == NULL) {
 		return BT_HCI_ERR_INVALID_PARAM;
 	}
 
-	/* TODO: Queue response data for transmission when data structures are extended
-	 * For now, we just validate and accept the command
+	/* Store response data for transmission
+	 * Note: In a complete implementation, we'd check timing constraints
+	 * to ensure the response can be sent in the specified subevent/slot
 	 */
+	sync->rsp_data.request_event = request_event;
+	sync->rsp_data.request_subevent = request_subevent;
+	sync->rsp_data.response_subevent = response_subevent;
+	sync->rsp_data.response_slot = response_slot;
+	sync->rsp_data.len = response_data_len;
+	sync->rsp_data.is_pending = 1U;
 
-	ARG_UNUSED(request_event);
-	ARG_UNUSED(request_subevent);
-	ARG_UNUSED(response_subevent);
-	ARG_UNUSED(response_slot);
-	ARG_UNUSED(response_data);
+	if (response_data_len > 0) {
+		memcpy(sync->rsp_data.data, response_data, response_data_len);
+	}
 
 	return BT_HCI_ERR_SUCCESS;
 }

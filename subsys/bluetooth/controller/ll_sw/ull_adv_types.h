@@ -116,6 +116,15 @@ struct ll_adv_sync_set {
 	uint8_t response_slot_delay;      /* N * 1.25ms */
 	uint8_t response_slot_spacing;    /* N * 0.125ms */
 	uint8_t num_response_slots;
+
+	/* PAwR subevent data storage */
+	struct {
+		uint8_t  data[CONFIG_BT_CTLR_ADV_DATA_LEN_MAX];
+		uint8_t  len;
+		uint8_t  response_slot_start;
+		uint8_t  response_slot_count;
+		uint8_t  is_data_set:1;
+	} se_data[BT_HCI_PAWR_SUBEVENT_MAX];
 #endif /* CONFIG_BT_CTLR_ADV_PERIODIC_RSP */
 };
 
