@@ -42,12 +42,21 @@
 #include "lll_prof_internal.h"
 #include "lll_df_internal.h"
 
+#if defined(CONFIG_BT_CTLR_ADV_PERIODIC_RSP)
+#include "ull_adv_types.h"
+#endif /* CONFIG_BT_CTLR_ADV_PERIODIC_RSP */
+
 #include "hal/debug.h"
 
 static int init_reset(void);
 static int prepare_cb(struct lll_prepare_param *p);
 static void abort_cb(struct lll_prepare_param *prepare_param, void *param);
 static void isr_done(void *param);
+
+#if defined(CONFIG_BT_CTLR_ADV_PERIODIC_RSP)
+static void isr_rx_response_slot(void *param);
+static void setup_response_slot_rx(struct lll_adv_sync *lll, uint8_t slot);
+#endif /* CONFIG_BT_CTLR_ADV_PERIODIC_RSP */
 
 #if defined(CONFIG_BT_CTLR_ADV_SYNC_PDU_BACK2BACK)
 static void isr_tx(void *param);
@@ -335,15 +344,25 @@ static void isr_done(void *param)
 #endif /* CONFIG_BT_CTLR_DF_ADV_CTE_TX */
 
 #if defined(CONFIG_BT_CTLR_ADV_PERIODIC_RSP)
-	/* PAwR: After transmitting subevent, need to handle response slots
-	 * TODO: Implement response slot reception:
-	 * - Schedule radio RX for response slots
-	 * - Receive and validate responses
-	 * - Generate HCI events (RESPONSE_REPORT) to ULL
-	 * This requires multi-event scheduling which is beyond Phase 3 scope
-	 */
+	/* PAwR: After transmitting subevent, schedule response slot reception */
 	if (lll->is_rsp) {
-		/* For now, PAwR subevent transmitted, no response handling */
+		struct ll_adv_sync_set *sync;
+		struct ull_hdr *ull;
+
+		/* Get ULL context to access response slot configuration */
+		ull = HDR_LLL2ULL(lll);
+		sync = CONTAINER_OF(ull, struct ll_adv_sync_set, ull);
+
+		/* Check if we have response slots configured for this subevent */
+		if (sync->num_response_slots > 0 && 
+		    lll->subevent_curr < sync->num_subevents &&
+		    sync->se_data[lll->subevent_curr].is_data_set &&
+		    sync->se_data[lll->subevent_curr].response_slot_count > 0) {
+			/* Schedule first response slot reception */
+			setup_response_slot_rx(lll, 0);
+			return;
+		}
+		/* If no response slots, continue with normal completion */
 	}
 #endif /* CONFIG_BT_CTLR_ADV_PERIODIC_RSP */
 
@@ -563,3 +582,99 @@ static void switch_radio_complete_and_b2b_tx(const struct lll_adv_sync *lll,
 	}
 }
 #endif /* CONFIG_BT_CTLR_ADV_SYNC_PDU_BACK2BACK */
+
+#if defined(CONFIG_BT_CTLR_ADV_PERIODIC_RSP)
+static void setup_response_slot_rx(struct lll_adv_sync *lll, uint8_t slot)
+{
+	struct ll_adv_sync_set *sync;
+	struct ull_hdr *ull;
+	struct node_rx_pdu *node_rx;
+	uint32_t delay_us;
+	uint8_t phy;
+
+	/* Get ULL context */
+	ull = HDR_LLL2ULL(lll);
+	sync = CONTAINER_OF(ull, struct ll_adv_sync_set, ull);
+
+	/* Calculate delay to response slot
+	 * response_slot_delay is in units of 1.25ms
+	 * response_slot_spacing is in units of 0.125ms
+	 */
+	delay_us = (uint32_t)sync->response_slot_delay * 1250U;
+	if (slot > 0) {
+		delay_us += (uint32_t)slot * (uint32_t)sync->response_slot_spacing * 125U;
+	}
+
+	/* Allocate RX node for response */
+	node_rx = ull_pdu_rx_alloc_peek(1);
+	LL_ASSERT_DBG(node_rx);
+
+	/* Setup radio for RX */
+	phy = lll->adv->phy_s;
+	radio_phy_set(phy, PHY_FLAGS_S8);
+	radio_pkt_configure(RADIO_PKT_CONF_LENGTH_8BIT, LL_EXT_OCTETS_RX_MAX,
+			    RADIO_PKT_CONF_PHY(phy));
+	radio_pkt_rx_set(node_rx->pdu);
+
+	/* Set ISR for response reception */
+	radio_isr_set(isr_rx_response_slot, lll);
+	radio_switch_complete_and_disable();
+
+	/* Schedule RX at calculated delay */
+	radio_tmr_tifs_set(delay_us);
+
+	/* Store current slot in LLL context for ISR */
+	lll->subevent_curr = slot;
+}
+
+static void isr_rx_response_slot(void *param)
+{
+	struct lll_adv_sync *lll = param;
+	struct ll_adv_sync_set *sync;
+	struct ull_hdr *ull;
+	struct node_rx_pdu *node_rx;
+	struct node_rx_ftr *ftr;
+	uint8_t crc_ok;
+	uint8_t slot;
+
+	/* Check CRC */
+	crc_ok = radio_crc_is_valid();
+
+	/* Get RX node */
+	node_rx = ull_pdu_rx_alloc_peek(1);
+	LL_ASSERT_DBG(node_rx);
+
+	/* Get ULL context */
+	ull = HDR_LLL2ULL(lll);
+	sync = CONTAINER_OF(ull, struct ll_adv_sync_set, ull);
+
+	slot = lll->subevent_curr;
+
+	if (crc_ok) {
+		/* Prepare RX footer */
+		ftr = &node_rx->rx_ftr;
+		ftr->param = lll;
+		ftr->rssi = radio_rssi_get();
+
+		/* Mark as PAwR response */
+		node_rx->hdr.type = NODE_RX_TYPE_PAWR_RESPONSE;
+
+		/* Store response metadata (subevent and slot) */
+		/* TODO: Add metadata structure for subevent/slot info */
+
+		/* Release RX node to ULL */
+		ull_rx_put(node_rx->hdr.link, node_rx);
+		ull_rx_sched();
+	}
+
+	/* Check if more response slots to process */
+	if ((slot + 1) < sync->se_data[0].response_slot_count) {
+		/* Schedule next response slot */
+		setup_response_slot_rx(lll, slot + 1);
+		return;
+	}
+
+	/* All response slots processed, complete the event */
+	lll_isr_done(lll);
+}
+#endif /* CONFIG_BT_CTLR_ADV_PERIODIC_RSP */
