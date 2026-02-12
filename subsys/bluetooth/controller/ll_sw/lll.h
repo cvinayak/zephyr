@@ -563,6 +563,19 @@ struct node_rx_event_done {
 	struct event_done_extra extra;
 };
 
+#if defined(CONFIG_BT_CTLR_ADV_PERIODIC_RSP)
+struct node_rx_pawr_response {
+	struct node_rx_hdr hdr;
+	struct node_rx_ftr rx_ftr;
+	int8_t  rssi;
+	uint8_t crc_ok:1;
+	uint8_t subevent;
+	uint8_t response_slot;
+	uint8_t data_len;
+	uint8_t data[/* variable */];
+};
+#endif /* CONFIG_BT_CTLR_ADV_PERIODIC_RSP */
+
 static inline void lll_hdr_init(void *lll, void *parent)
 {
 	struct lll_hdr *hdr = lll;

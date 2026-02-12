@@ -308,6 +308,11 @@ uint8_t ull_adv_sync_remove_cteinfo(struct lll_adv_sync *lll_sync,
 				    struct pdu_adv *pdu);
 #endif /* ull_adv_sync_add_cteinfo */
 
+#if defined(CONFIG_BT_CTLR_ADV_PERIODIC_RSP)
+/* handler function for PAwR response reception */
+void ull_adv_sync_pawr_response_rx(struct node_rx_pdu *node_rx);
+#endif /* CONFIG_BT_CTLR_ADV_PERIODIC_RSP */
+
 /* helper function to update extra_data field */
 void ull_adv_sync_extra_data_set_clear(void *extra_data_prev,
 				       void *extra_data_new,

@@ -1437,6 +1437,13 @@ void ll_rx_dequeue(void)
 	case NODE_RX_TYPE_APTO:
 #endif /* CONFIG_BT_CTLR_LE_PING */
 
+#if defined(CONFIG_BT_CTLR_ADV_PERIODIC_RSP)
+	case NODE_RX_TYPE_PAWR_RESPONSE:
+		/* PAwR Response received by advertiser */
+		ull_adv_sync_pawr_response_rx(rx);
+		break;
+#endif /* CONFIG_BT_CTLR_ADV_PERIODIC_RSP */
+
 	case NODE_RX_TYPE_CHAN_SEL_ALGO:
 
 #if defined(CONFIG_BT_CTLR_PHY)

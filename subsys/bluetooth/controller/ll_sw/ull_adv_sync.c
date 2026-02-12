@@ -2974,6 +2974,17 @@ static void ticker_cb(uint32_t ticks_at_expire, uint32_t ticks_drift,
 	DEBUG_RADIO_PREPARE_A(1);
 }
 
+#if defined(CONFIG_BT_CTLR_ADV_PERIODIC_RSP)
+void ull_adv_sync_pawr_response_rx(struct node_rx_pdu *node_rx)
+{
+	/* PAwR response processing
+	 * The HCI layer will encode this into a RESPONSE_REPORT event.
+	 * No additional processing needed at ULL layer.
+	 */
+	ARG_UNUSED(node_rx);
+}
+#endif /* CONFIG_BT_CTLR_ADV_PERIODIC_RSP */
+
 #if defined(CONFIG_BT_CTLR_ADV_ISO) && \
 	defined(CONFIG_BT_TICKER_EXT_EXPIRE_INFO)
 static void ticker_update_op_cb(uint32_t status, void *param)

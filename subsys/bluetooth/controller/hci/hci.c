@@ -8287,6 +8287,55 @@ static void le_per_adv_sync_lost(struct pdu_data *pdu_data,
 	sep->handle = sys_cpu_to_le16(node_rx->hdr.handle);
 }
 
+#if defined(CONFIG_BT_CTLR_ADV_PERIODIC_RSP)
+static void le_per_adv_response_report(struct pdu_data *pdu_data,
+				       struct node_rx_pdu *node_rx,
+				       struct net_buf *buf)
+{
+	struct bt_hci_evt_le_per_adv_response_report *evt;
+	struct bt_hci_evt_le_per_adv_response *rsp;
+	struct node_rx_pawr_response *pawr_rsp;
+	struct ll_adv_sync_set *sync;
+	size_t evt_size;
+
+	if (!(event_mask & BT_EVT_MASK_LE_META_EVENT) ||
+	    !(le_event_mask & BT_EVT_MASK_LE_PER_ADV_RESPONSE_REPORT)) {
+		return;
+	}
+
+	/* Get PAwR response node */
+	pawr_rsp = (struct node_rx_pawr_response *)node_rx;
+	
+	/* Get sync context to retrieve advertising handle */
+	sync = node_rx->rx_ftr.param;
+
+	/* Calculate event size: header + single response */
+	evt_size = sizeof(*evt) + sizeof(*rsp) + pawr_rsp->data_len;
+
+	evt = meta_evt(buf, BT_HCI_EVT_LE_PER_ADV_RESPONSE_REPORT, evt_size);
+	
+	/* Fill event header */
+	evt->adv_handle = sync->lll.adv->hci_handle;
+	evt->subevent = pawr_rsp->subevent;
+	evt->tx_status = 0x00;  /* Success - response received */
+	evt->num_responses = 1;  /* Single response */
+
+	/* Fill response data */
+	rsp = (struct bt_hci_evt_le_per_adv_response *)((uint8_t *)evt + sizeof(*evt));
+	rsp->tx_power = 0;  /* TODO: Get actual TX power */
+	rsp->rssi = pawr_rsp->rssi;
+	rsp->cte_type = 0xFF;  /* No CTE */
+	rsp->response_slot = pawr_rsp->response_slot;
+	rsp->data_status = pawr_rsp->crc_ok ? 0x00 : 0x02;  /* Complete or truncated */
+	rsp->data_length = pawr_rsp->data_len;
+	
+	/* Copy response data */
+	if (pawr_rsp->data_len > 0) {
+		memcpy(rsp->data, pawr_rsp->data, pawr_rsp->data_len);
+	}
+}
+#endif /* CONFIG_BT_CTLR_ADV_PERIODIC_RSP */
+
 #if defined(CONFIG_BT_CTLR_SYNC_ISO)
 static void le_big_sync_established(struct pdu_data *pdu,
 				    struct node_rx_pdu *node_rx,
@@ -8989,6 +9038,13 @@ static void encode_control(struct node_rx_pdu *node_rx,
 		le_big_sync_lost(pdu_data, node_rx, buf);
 		break;
 #endif /* CONFIG_BT_CTLR_SYNC_ISO */
+
+#if defined(CONFIG_BT_CTLR_ADV_PERIODIC_RSP)
+	case NODE_RX_TYPE_PAWR_RESPONSE:
+		le_per_adv_response_report(pdu_data, node_rx, buf);
+		break;
+#endif /* CONFIG_BT_CTLR_ADV_PERIODIC_RSP */
+
 #endif /* CONFIG_BT_CTLR_SYNC_PERIODIC */
 #endif /* CONFIG_BT_CTLR_ADV_EXT */
 #endif /* CONFIG_BT_OBSERVER */
