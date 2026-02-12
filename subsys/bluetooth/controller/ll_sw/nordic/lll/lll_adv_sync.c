@@ -142,6 +142,16 @@ static int prepare_cb(struct lll_prepare_param *p)
 	/* Reset accumulated latencies */
 	lll->latency_prepare = 0;
 
+#if defined(CONFIG_BT_CTLR_ADV_PERIODIC_RSP)
+	/* PAwR: Initialize subevent counter for this periodic advertising event
+	 * For now, we only support transmitting subevent 0
+	 * TODO: Implement multi-subevent scheduling and response slot handling
+	 */
+	if (lll->is_rsp) {
+		lll->subevent_curr = 0;
+	}
+#endif /* CONFIG_BT_CTLR_ADV_PERIODIC_RSP */
+
 	/* Process channel map update, if any */
 	if ((lll->chm_first != lll->chm_last) &&
 	    is_instant_or_past(event_counter, lll->chm_instant)) {
@@ -323,6 +333,19 @@ static void isr_done(void *param)
 		lll_df_cte_tx_disable();
 	}
 #endif /* CONFIG_BT_CTLR_DF_ADV_CTE_TX */
+
+#if defined(CONFIG_BT_CTLR_ADV_PERIODIC_RSP)
+	/* PAwR: After transmitting subevent, need to handle response slots
+	 * TODO: Implement response slot reception:
+	 * - Schedule radio RX for response slots
+	 * - Receive and validate responses
+	 * - Generate HCI events (RESPONSE_REPORT) to ULL
+	 * This requires multi-event scheduling which is beyond Phase 3 scope
+	 */
+	if (lll->is_rsp) {
+		/* For now, PAwR subevent transmitted, no response handling */
+	}
+#endif /* CONFIG_BT_CTLR_ADV_PERIODIC_RSP */
 
 	/* Signal thread mode to remove Channel Map Update Indication in the
 	 * ACAD.

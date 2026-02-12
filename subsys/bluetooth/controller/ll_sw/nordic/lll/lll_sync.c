@@ -440,6 +440,17 @@ static int prepare_cb_common(struct lll_prepare_param *p, uint8_t chan_idx)
 	/* Reset chain PDU being scheduled by lll_sync context */
 	lll->is_aux_sched = 0U;
 
+#if defined(CONFIG_BT_CTLR_SYNC_PERIODIC_RSP)
+	/* PAwR: Initialize subevent tracking for scanner
+	 * For now, we receive all subevents (no filtering)
+	 * TODO: Implement subevent filtering based on ll_sync_set.subevents[]
+	 * TODO: Implement response transmission in assigned slots
+	 */
+	if (lll->is_rsp) {
+		lll->subevent_curr = 0;
+	}
+#endif /* CONFIG_BT_CTLR_SYNC_PERIODIC_RSP */
+
 	/* Initialize Trx count */
 	trx_cnt = 0U;
 
