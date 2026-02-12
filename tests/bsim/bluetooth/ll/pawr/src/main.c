@@ -15,7 +15,6 @@
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/hci.h>
 #include <zephyr/bluetooth/hci_types.h>
-#include <zephyr/net/buf.h>
 
 #include "bs_types.h"
 #include "bs_tracing.h"
@@ -44,7 +43,7 @@ extern enum bst_result_t bst_result;
 #define SUBEVENT_INTERVAL       0x10    /* 20 ms in 1.25ms units */
 #define RESPONSE_SLOT_DELAY     0x02    /* 2.5 ms in 1.25ms units */
 #define RESPONSE_SLOT_SPACING   0x04    /* 0.5 ms in 0.125ms units */
-#define NUM_RESPONSE_SLOTS      3
+#define NUM_RESPONSE_SLOTS      1
 
 #define SCAN_INTERVAL           0x0040
 #define SCAN_WINDOW             0x0040

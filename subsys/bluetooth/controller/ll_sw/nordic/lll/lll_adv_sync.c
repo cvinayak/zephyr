@@ -42,6 +42,8 @@
 #include "lll_prof_internal.h"
 #include "lll_df_internal.h"
 
+#include "ll_feat.h"
+
 #if defined(CONFIG_BT_CTLR_ADV_PERIODIC_RSP)
 #include "ull_adv_types.h"
 #endif /* CONFIG_BT_CTLR_ADV_PERIODIC_RSP */

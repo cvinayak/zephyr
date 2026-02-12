@@ -124,7 +124,7 @@ struct ll_adv_sync_set {
 		uint8_t  response_slot_start;
 		uint8_t  response_slot_count;
 		uint8_t  is_data_set:1;
-	} se_data[BT_HCI_PAWR_SUBEVENT_MAX];
+	} se_data[CONFIG_BT_CTLR_ADV_PERIODIC_SUBEVENT_MAX];
 #endif /* CONFIG_BT_CTLR_ADV_PERIODIC_RSP */
 };
 

@@ -3912,19 +3912,18 @@ static void le_set_per_adv_subevent_data(struct net_buf *buf, struct net_buf **e
 				  cmd->num_subevents);
 	for (uint8_t i = 0U; i < cmd->num_subevents; i++) {
 		subevent = p;
-		p += offsetof(struct bt_hci_cp_le_set_pawr_subevent_data_element, subevent) +
-		     sizeof(*subevent);
-		response_slot_start = p;
-		p += offsetof(struct bt_hci_cp_le_set_pawr_subevent_data_element,
-			      response_slot_start) +
-		     sizeof(*response_slot_start);
-		response_slot_count = p;
-		p += offsetof(struct bt_hci_cp_le_set_pawr_subevent_data_element,
-			      response_slot_count) +
-		     sizeof(*response_slot_count);
-		subevent_data_len = p;
+		response_slot_start = p +
+			offsetof(struct bt_hci_cp_le_set_pawr_subevent_data_element, subevent) +
+			sizeof(*subevent);
+		response_slot_count = p +
+			offsetof(struct bt_hci_cp_le_set_pawr_subevent_data_element,
+				 response_slot_start) + sizeof(*response_slot_start);
+		subevent_data_len = p +
+			offsetof(struct bt_hci_cp_le_set_pawr_subevent_data_element,
+				 response_slot_count) + sizeof(*response_slot_count);
 		subevent_data = subevent_data_next;
 		subevent_data_next += *subevent_data_len;
+		p = subevent_data_next;
 
 		/* Call ULL function to set subevent data */
 		status = ll_adv_sync_subevent_data_set(handle,
@@ -8295,7 +8294,6 @@ static void le_per_adv_response_report(struct pdu_data *pdu_data,
 	struct bt_hci_evt_le_per_adv_response_report *evt;
 	struct bt_hci_evt_le_per_adv_response *rsp;
 	struct node_rx_pawr_response *pawr_rsp;
-	struct ll_adv_sync_set *sync;
 	size_t evt_size;
 
 	if (!(event_mask & BT_EVT_MASK_LE_META_EVENT) ||
@@ -8306,16 +8304,13 @@ static void le_per_adv_response_report(struct pdu_data *pdu_data,
 	/* Get PAwR response node */
 	pawr_rsp = (struct node_rx_pawr_response *)node_rx;
 	
-	/* Get sync context to retrieve advertising handle */
-	sync = node_rx->rx_ftr.param;
-
 	/* Calculate event size: header + single response */
 	evt_size = sizeof(*evt) + sizeof(*rsp) + pawr_rsp->data_len;
 
 	evt = meta_evt(buf, BT_HCI_EVT_LE_PER_ADV_RESPONSE_REPORT, evt_size);
 	
 	/* Fill event header */
-	evt->adv_handle = sync->lll.adv->hci_handle;
+	evt->adv_handle = ll_adv_set_hci_handle_get(node_rx->hdr.handle & 0xff);
 	evt->subevent = pawr_rsp->subevent;
 	evt->tx_status = 0x00;  /* Success - response received */
 	evt->num_responses = 1;  /* Single response */

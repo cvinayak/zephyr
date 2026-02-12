@@ -388,6 +388,13 @@ config BT_CTLR_ADV_SYNC_SET
 	help
 	  Maximum supported periodic advertising sets.
 
+config BT_CTLR_ADV_PERIODIC_SUBEVENT_MAX
+	int "Maximum Periodic Advertising with Responses Subevents"
+	depends on BT_CTLR_ADV_PERIODIC_RSP
+	default 1
+	help
+	  Maximum Periodic Advertising with Responses Subevents.
+
 config BT_CTLR_ADV_DATA_CHAIN
 	bool "Advertising Data chaining [EXPERIMENTAL]"
 	select EXPERIMENTAL
