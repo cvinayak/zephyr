@@ -3842,6 +3842,101 @@ static void le_set_per_adv_enable(struct net_buf *buf, struct net_buf **evt)
 
 	*evt = cmd_complete_status(status);
 }
+
+#if defined(CONFIG_BT_CTLR_ADV_PERIODIC_RSP)
+static void le_set_per_adv_param_v2(struct net_buf *buf, struct net_buf **evt)
+{
+	struct bt_hci_cp_le_set_per_adv_param_v2 *cmd = (void *)buf->data;
+	uint16_t min_interval;
+	uint16_t max_interval;
+	uint16_t props;
+	uint8_t status;
+	uint8_t handle;
+
+	if (adv_cmds_ext_check(evt)) {
+		return;
+	}
+
+	status = ll_adv_set_by_hci_handle_get(cmd->handle, &handle);
+	if (status) {
+		*evt = cmd_complete_status(status);
+		return;
+	}
+
+	min_interval = sys_le16_to_cpu(cmd->min_interval);
+	max_interval = sys_le16_to_cpu(cmd->max_interval);
+	props = sys_le16_to_cpu(cmd->props);
+
+	/* Call ULL function to set PAwR parameters */
+	status = ll_adv_sync_param_set_v2(handle, max_interval, props,
+					   cmd->num_subevents, cmd->subevent_interval,
+					   cmd->response_slot_delay, cmd->response_slot_spacing,
+					   cmd->num_response_slots);
+
+	*evt = cmd_complete_status(status);
+}
+
+static void le_set_per_adv_subevent_data(struct net_buf *buf, struct net_buf **evt)
+{
+	struct bt_hci_cp_le_set_pawr_subevent_data *cmd = (void *)buf->data;
+	uint8_t *response_slot_start;
+	uint8_t *response_slot_count;
+	uint8_t *subevent_data_next;
+	uint8_t *subevent_data_len;
+	uint8_t *subevent_data;
+	uint8_t *subevent;
+	uint8_t handle;
+	uint8_t status;
+	uint8_t *p;
+
+	if (adv_cmds_ext_check(evt)) {
+		return;
+	}
+
+	status = ll_adv_set_by_hci_handle_get(cmd->adv_handle, &handle);
+	if (status) {
+		*evt = cmd_complete_status(status);
+		return;
+	}
+
+	if (cmd->num_subevents == 0U) {
+		*evt = cmd_complete_status(BT_HCI_ERR_INVALID_PARAM);
+		return;
+	}
+
+	/* TODO: validate buf->len versus the amount of values to be parsed */
+
+	/* parse the cmd parameters */
+	p = (void *)&cmd->subevents[0];
+	subevent_data_next = p + (sizeof(struct bt_hci_cp_le_set_pawr_subevent_data_element) *
+				  cmd->num_subevents);
+	for (uint8_t i = 0U; i < cmd->num_subevents; i++) {
+		subevent = p;
+		response_slot_start = p +
+			offsetof(struct bt_hci_cp_le_set_pawr_subevent_data_element, subevent) +
+			sizeof(*subevent);
+		response_slot_count = p +
+			offsetof(struct bt_hci_cp_le_set_pawr_subevent_data_element,
+				 response_slot_start) + sizeof(*response_slot_start);
+		subevent_data_len = p +
+			offsetof(struct bt_hci_cp_le_set_pawr_subevent_data_element,
+				 response_slot_count) + sizeof(*response_slot_count);
+		subevent_data = subevent_data_next;
+		subevent_data_next += *subevent_data_len;
+		p = subevent_data_next;
+
+		/* Call ULL function to set subevent data */
+		status = ll_adv_sync_subevent_data_set(handle,
+						       *subevent,
+						       *response_slot_start,
+						       *response_slot_count,
+						       *subevent_data_len,
+						       subevent_data);
+	}
+
+	*evt = cmd_complete_status(status);
+}
+#endif /* CONFIG_BT_CTLR_ADV_PERIODIC_RSP */
 #endif /* CONFIG_BT_CTLR_ADV_PERIODIC */
 #endif /* CONFIG_BT_BROADCASTER */
 
@@ -4176,6 +4271,55 @@ static void le_read_pal_size(struct net_buf *buf, struct net_buf **evt)
 	rp->list_size = ll_pal_size_get();
 }
 #endif /* CONFIG_BT_CTLR_SYNC_PERIODIC_ADV_LIST */
+
+#if defined(CONFIG_BT_CTLR_SYNC_PERIODIC_RSP)
+static void le_set_per_adv_sync_subevent(struct net_buf *buf, struct net_buf **evt)
+{
+	struct bt_hci_cp_le_set_pawr_sync_subevent *cmd = (void *)buf->data;
+	struct bt_hci_evt_cc_status *ccst;
+	uint16_t handle;
+	uint16_t props;
+	uint8_t status;
+
+	if (adv_cmds_ext_check(evt)) {
+		return;
+	}
+
+	handle = sys_le16_to_cpu(cmd->sync_handle);
+	props = sys_le16_to_cpu(cmd->periodic_adv_properties);
+
+	/* Call ULL function to set subevent selection */
+	status = ll_sync_subevent_set(handle, props, cmd->num_subevents, cmd->subevents);
+
+	ccst = hci_cmd_complete(evt, sizeof(*ccst));
+	ccst->status = status;
+}
+
+static void le_set_per_adv_response_data(struct net_buf *buf, struct net_buf **evt)
+{
+	struct bt_hci_cp_le_set_pawr_response_data *cmd = (void *)buf->data;
+	struct bt_hci_evt_cc_status *ccst;
+	uint16_t handle;
+	uint16_t request_event;
+	uint8_t status;
+
+	if (adv_cmds_ext_check(evt)) {
+		return;
+	}
+
+	handle = sys_le16_to_cpu(cmd->sync_handle);
+	request_event = sys_le16_to_cpu(cmd->request_event);
+
+	/* Call ULL function to set response data */
+	status = ll_sync_response_data_set(handle, request_event,
+					    cmd->request_subevent, cmd->response_subevent,
+					    cmd->response_slot, cmd->response_data_length,
+					    cmd->response_data);
+
+	ccst = hci_cmd_complete(evt, sizeof(*ccst));
+	ccst->status = status;
+}
+#endif /* CONFIG_BT_CTLR_SYNC_PERIODIC_RSP */
 #endif /* CONFIG_BT_CTLR_SYNC_PERIODIC */
 #endif /* CONFIG_BT_OBSERVER */
 
@@ -4880,6 +5024,16 @@ static int controller_cmd_handle(uint16_t  ocf, struct net_buf *cmd,
 	case BT_OCF(BT_HCI_OP_LE_SET_PER_ADV_ENABLE):
 		le_set_per_adv_enable(cmd, evt);
 		break;
+
+#if defined(CONFIG_BT_CTLR_ADV_PERIODIC_RSP)
+	case BT_OCF(BT_HCI_OP_LE_SET_PER_ADV_PARAM_V2):
+		le_set_per_adv_param_v2(cmd, evt);
+		break;
+
+	case BT_OCF(BT_HCI_OP_LE_SET_PER_ADV_SUBEVENT_DATA):
+		le_set_per_adv_subevent_data(cmd, evt);
+		break;
+#endif /* CONFIG_BT_CTLR_ADV_PERIODIC_RSP */
 #endif /* CONFIG_BT_CTLR_ADV_PERIODIC */
 #endif /* CONFIG_BT_BROADCASTER */
 
@@ -4926,6 +5080,16 @@ static int controller_cmd_handle(uint16_t  ocf, struct net_buf *cmd,
 		le_read_pal_size(cmd, evt);
 		break;
 #endif /* CONFIG_BT_CTLR_SYNC_PERIODIC_ADV_LIST */
+
+#if defined(CONFIG_BT_CTLR_SYNC_PERIODIC_RSP)
+	case BT_OCF(BT_HCI_OP_LE_SET_PER_ADV_SYNC_SUBEVENT):
+		le_set_per_adv_sync_subevent(cmd, evt);
+		break;
+
+	case BT_OCF(BT_HCI_OP_LE_SET_PER_ADV_RESPONSE_DATA):
+		le_set_per_adv_response_data(cmd, evt);
+		break;
+#endif /* CONFIG_BT_CTLR_SYNC_PERIODIC_RSP */
 #endif /* CONFIG_BT_CTLR_SYNC_PERIODIC */
 #endif /* CONFIG_BT_OBSERVER */
 
@@ -8122,6 +8286,51 @@ static void le_per_adv_sync_lost(struct pdu_data *pdu_data,
 	sep->handle = sys_cpu_to_le16(node_rx->hdr.handle);
 }
 
+#if defined(CONFIG_BT_CTLR_ADV_PERIODIC_RSP)
+static void le_per_adv_response_report(struct pdu_data *pdu_data,
+				       struct node_rx_pdu *node_rx,
+				       struct net_buf *buf)
+{
+	struct bt_hci_evt_le_per_adv_response_report *evt;
+	struct bt_hci_evt_le_per_adv_response *rsp;
+	struct node_rx_pawr_response *pawr_rsp;
+	size_t evt_size;
+
+	if (!(event_mask & BT_EVT_MASK_LE_META_EVENT) ||
+	    !(le_event_mask & BT_EVT_MASK_LE_PER_ADV_RESPONSE_REPORT)) {
+		return;
+	}
+
+	/* Get PAwR response node */
+	pawr_rsp = (struct node_rx_pawr_response *)node_rx;
+	
+	/* Calculate event size: header + single response */
+	evt_size = sizeof(*evt) + sizeof(*rsp) + pawr_rsp->data_len;
+
+	evt = meta_evt(buf, BT_HCI_EVT_LE_PER_ADV_RESPONSE_REPORT, evt_size);
+	
+	/* Fill event header */
+	evt->adv_handle = ll_adv_set_hci_handle_get(node_rx->hdr.handle & 0xff);
+	evt->subevent = pawr_rsp->subevent;
+	evt->tx_status = 0x00;  /* Success - response received */
+	evt->num_responses = 1;  /* Single response */
+
+	/* Fill response data */
+	rsp = (struct bt_hci_evt_le_per_adv_response *)((uint8_t *)evt + sizeof(*evt));
+	rsp->tx_power = 0;  /* TODO: Get actual TX power */
+	rsp->rssi = pawr_rsp->rssi;
+	rsp->cte_type = 0xFF;  /* No CTE */
+	rsp->response_slot = pawr_rsp->response_slot;
+	rsp->data_status = pawr_rsp->crc_ok ? 0x00 : 0x02;  /* Complete or truncated */
+	rsp->data_length = pawr_rsp->data_len;
+	
+	/* Copy response data */
+	if (pawr_rsp->data_len > 0) {
+		memcpy(rsp->data, pawr_rsp->data, pawr_rsp->data_len);
+	}
+}
+#endif /* CONFIG_BT_CTLR_ADV_PERIODIC_RSP */
+
 #if defined(CONFIG_BT_CTLR_SYNC_ISO)
 static void le_big_sync_established(struct pdu_data *pdu,
 				    struct node_rx_pdu *node_rx,
@@ -8824,6 +9033,13 @@ static void encode_control(struct node_rx_pdu *node_rx,
 		le_big_sync_lost(pdu_data, node_rx, buf);
 		break;
 #endif /* CONFIG_BT_CTLR_SYNC_ISO */
+
+#if defined(CONFIG_BT_CTLR_ADV_PERIODIC_RSP)
+	case NODE_RX_TYPE_PAWR_RESPONSE:
+		le_per_adv_response_report(pdu_data, node_rx, buf);
+		break;
+#endif /* CONFIG_BT_CTLR_ADV_PERIODIC_RSP */
+
 #endif /* CONFIG_BT_CTLR_SYNC_PERIODIC */
 #endif /* CONFIG_BT_CTLR_ADV_EXT */
 #endif /* CONFIG_BT_OBSERVER */

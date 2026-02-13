@@ -38,6 +38,10 @@
 #include "lll_df.h"
 #include "lll_df_internal.h"
 
+#if defined(CONFIG_BT_CTLR_SYNC_PERIODIC_RSP)
+#include "ull_sync_types.h"
+#endif /* CONFIG_BT_CTLR_SYNC_PERIODIC_RSP */
+
 #include "ll_feat.h"
 
 #include <zephyr/bluetooth/hci_types.h>
@@ -59,6 +63,12 @@ static void isr_rx_adv_sync(void *param);
 static void isr_rx_aux_chain(void *param);
 static void isr_rx_done_cleanup(struct lll_sync *lll, uint8_t crc_ok, bool sync_term);
 static void isr_done(void *param);
+
+#if defined(CONFIG_BT_CTLR_SYNC_PERIODIC_RSP)
+static void isr_tx_response_slot(void *param);
+static void setup_response_slot_tx(struct lll_sync *lll);
+#endif /* CONFIG_BT_CTLR_SYNC_PERIODIC_RSP */
+
 #if defined(CONFIG_BT_CTLR_DF_SCAN_CTE_RX)
 static int iq_report_create_put(struct lll_sync *lll, uint8_t rssi_ready,
 				uint8_t packet_status);
@@ -439,6 +449,17 @@ static int prepare_cb_common(struct lll_prepare_param *p, uint8_t chan_idx)
 
 	/* Reset chain PDU being scheduled by lll_sync context */
 	lll->is_aux_sched = 0U;
+
+#if defined(CONFIG_BT_CTLR_SYNC_PERIODIC_RSP)
+	/* PAwR: Initialize subevent tracking for scanner
+	 * For now, we receive all subevents (no filtering)
+	 * TODO: Implement subevent filtering based on ll_sync_set.subevents[]
+	 * TODO: Implement response transmission in assigned slots
+	 */
+	if (lll->is_rsp) {
+		lll->subevent_curr = 0;
+	}
+#endif /* CONFIG_BT_CTLR_SYNC_PERIODIC_RSP */
 
 	/* Initialize Trx count */
 	trx_cnt = 0U;
@@ -1216,6 +1237,25 @@ static void isr_rx_done_cleanup(struct lll_sync *lll, uint8_t crc_ok, bool sync_
 #endif /* CONFIG_BT_CTLR_SCAN_AUX_SYNC_RESERVE_MIN */
 	}
 
+#if defined(CONFIG_BT_CTLR_SYNC_PERIODIC_RSP)
+	/* PAwR: Check if we need to transmit a response */
+	if (lll->is_rsp && crc_ok) {
+		struct ll_sync_set *sync;
+		struct ull_hdr *ull;
+
+		/* Get ULL context */
+		ull = HDR_LLL2ULL(lll);
+		sync = CONTAINER_OF(ull, struct ll_sync_set, ull);
+
+		/* Check if response is pending */
+		if (sync->rsp_data.is_pending) {
+			/* Schedule response transmission */
+			setup_response_slot_tx(lll);
+			return;
+		}
+	}
+#endif /* CONFIG_BT_CTLR_SYNC_PERIODIC_RSP */
+
 	lll_isr_cleanup(lll);
 }
 
@@ -1450,3 +1490,59 @@ static enum sync_status sync_filtrate_by_cte_type(uint8_t cte_type_mask, uint8_t
 #endif /* CONFIG_BT_CTLR_SYNC_PERIODIC_CTE_TYPE_FILTERING && CONFIG_BT_CTLR_CTEINLINE_SUPPORT */
 	return SYNC_STAT_ALLOWED;
 }
+
+#if defined(CONFIG_BT_CTLR_SYNC_PERIODIC_RSP)
+static void setup_response_slot_tx(struct lll_sync *lll)
+{
+	struct ll_sync_set *sync;
+	struct ull_hdr *ull;
+	struct pdu_adv *pdu_tx;
+	uint32_t delay_us;
+	uint8_t phy;
+
+	/* Get ULL context */
+	ull = HDR_LLL2ULL(lll);
+	sync = CONTAINER_OF(ull, struct ll_sync_set, ull);
+
+	/* Calculate delay to response slot
+	 * This is simplified - should use response_slot_delay and response_slot_spacing
+	 * from advertiser, and calculate based on assigned response_slot
+	 */
+	delay_us = 2500U; /* Placeholder: 2.5ms delay */
+
+	/* Allocate and prepare response PDU */
+	/* For now, use a simplified approach - real implementation needs proper PDU structure */
+	pdu_tx = (struct pdu_adv *)sync->rsp_data.data;
+
+	/* Setup radio for TX */
+	phy = lll->phy;
+	radio_phy_set(phy, PHY_FLAGS_S8);
+	radio_pkt_configure(RADIO_PKT_CONF_LENGTH_8BIT, sync->rsp_data.len,
+			    RADIO_PKT_CONF_PHY(phy));
+	radio_pkt_tx_set(pdu_tx);
+
+	/* Set ISR for TX completion */
+	radio_isr_set(isr_tx_response_slot, lll);
+	radio_switch_complete_and_disable();
+
+	/* Schedule TX at calculated delay */
+	radio_tmr_tifs_set(delay_us);
+}
+
+static void isr_tx_response_slot(void *param)
+{
+	struct lll_sync *lll = param;
+	struct ll_sync_set *sync;
+	struct ull_hdr *ull;
+
+	/* Get ULL context */
+	ull = HDR_LLL2ULL(lll);
+	sync = CONTAINER_OF(ull, struct ll_sync_set, ull);
+
+	/* Clear pending flag */
+	sync->rsp_data.is_pending = 0U;
+
+	/* Complete the event */
+	lll_isr_done(lll);
+}
+#endif /* CONFIG_BT_CTLR_SYNC_PERIODIC_RSP */

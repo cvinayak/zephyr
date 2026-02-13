@@ -94,7 +94,6 @@ static uint8_t ull_adv_sync_remove_adi(struct lll_adv_sync *lll_sync,
 				       struct pdu_adv *pdu);
 #endif /* CONFIG_BT_CTLR_ADV_PERIODIC_ADI_SUPPORT */
 static uint8_t adv_type_check(struct ll_adv_set *adv);
-static inline struct ll_adv_sync_set *sync_acquire(void);
 static inline void sync_release(struct ll_adv_sync_set *sync);
 static inline uint16_t sync_handle_get(const struct ll_adv_sync_set *sync);
 static uint32_t sync_time_get(const struct ll_adv_sync_set *sync,
@@ -131,13 +130,41 @@ static void *adv_sync_free;
 
 uint8_t ll_adv_sync_param_set(uint8_t handle, uint16_t interval, uint16_t flags)
 {
+	/* Call v2 with default parameters for non-PAwR periodic advertising */
+	return ll_adv_sync_param_set_v2(handle, interval, flags,
+					0U, 0U, 0U, 0U, 0U);
+}
+
+/**
+ * @brief Set periodic advertising parameters v2 (with PAwR support)
+ *
+ * @param handle      Advertising set handle
+ * @param interval    Periodic advertising interval
+ * @param flags       Periodic advertising properties flags
+ * @param num_subevents Number of subevents (0 for non-PAwR)
+ * @param subevent_interval Subevent interval (N * 1.25ms)
+ * @param response_slot_delay Response slot delay (N * 1.25ms)
+ * @param response_slot_spacing Response slot spacing (N * 0.125ms)
+ * @param num_response_slots Number of response slots per subevent
+ *
+ * @return 0 on success, error code otherwise
+ */
+uint8_t ll_adv_sync_param_set_v2(uint8_t handle, uint16_t interval, uint16_t flags,
+				  uint8_t num_subevents, uint8_t subevent_interval,
+				  uint8_t response_slot_delay, uint8_t response_slot_spacing,
+				  uint8_t num_response_slots)
+{
 	void *extra_data_prev, *extra_data;
 	struct pdu_adv *pdu_prev, *pdu;
 	struct lll_adv_sync *lll_sync;
 	struct ll_adv_sync_set *sync;
 	struct ll_adv_set *adv;
 	uint8_t err, ter_idx;
+#if defined(CONFIG_BT_CTLR_ADV_PERIODIC_RSP)
+	bool is_pawr;
+#endif
 
+	/* Get the advertising set */
 	adv = ull_adv_is_created_get(handle);
 	if (!adv) {
 		return BT_HCI_ERR_UNKNOWN_ADV_IDENTIFIER;
@@ -150,13 +177,36 @@ uint8_t ll_adv_sync_param_set(uint8_t handle, uint16_t interval, uint16_t flags)
 		}
 	}
 
+#if defined(CONFIG_BT_CTLR_ADV_PERIODIC_RSP)
+	/* Determine if this is PAwR mode */
+	is_pawr = (num_subevents > 0);
+
+	/* Validate PAwR parameters */
+	if (is_pawr) {
+		if (num_subevents > BT_HCI_PAWR_SUBEVENT_MAX) {
+			return BT_HCI_ERR_INVALID_PARAM;
+		}
+
+		if (num_response_slots == 0) {
+			return BT_HCI_ERR_INVALID_PARAM;
+		}
+	}
+#else
+	ARG_UNUSED(num_subevents);
+	ARG_UNUSED(subevent_interval);
+	ARG_UNUSED(response_slot_delay);
+	ARG_UNUSED(response_slot_spacing);
+	ARG_UNUSED(num_response_slots);
+#endif
+
 	lll_sync = adv->lll.sync;
 	if (!lll_sync) {
 		struct pdu_adv *ter_pdu;
 		struct lll_adv *lll;
 		uint8_t chm_last;
 
-		sync = sync_acquire();
+		/* Allocate a new sync set */
+		sync = ull_adv_sync_acquire();
 		if (!sync) {
 			return BT_HCI_ERR_MEM_CAPACITY_EXCEEDED;
 		}
@@ -208,7 +258,27 @@ uint8_t ll_adv_sync_param_set(uint8_t handle, uint16_t interval, uint16_t flags)
 		return BT_HCI_ERR_CMD_DISALLOWED;
 	}
 
+	/* Store interval */
 	sync->interval = interval;
+
+#if defined(CONFIG_BT_CTLR_ADV_PERIODIC_RSP)
+	/* Store PAwR parameters if enabled */
+	if (is_pawr) {
+		sync->num_subevents = num_subevents;
+		sync->subevent_interval = subevent_interval;
+		sync->response_slot_delay = response_slot_delay;
+		sync->response_slot_spacing = response_slot_spacing;
+		sync->num_response_slots = num_response_slots;
+
+		/* Mark LLL as PAwR mode */
+		lll_sync->is_rsp = 1;
+		lll_sync->subevent_curr = 0;
+	} else {
+		/* Non-PAwR mode */
+		sync->num_subevents = 0;
+		lll_sync->is_rsp = 0;
+	}
+#endif
 
 	err = ull_adv_sync_pdu_alloc(adv, ULL_ADV_PDU_EXTRA_DATA_ALLOC_IF_EXIST, &pdu_prev, &pdu,
 				     &extra_data_prev, &extra_data, &ter_idx);
@@ -233,7 +303,9 @@ uint8_t ll_adv_sync_param_set(uint8_t handle, uint16_t interval, uint16_t flags)
 
 	sync->is_data_cmplt = 1U;
 
-	return 0;
+	ARG_UNUSED(flags);
+
+	return BT_HCI_ERR_SUCCESS;
 }
 
 #if defined(CONFIG_BT_CTLR_ADV_ISO) && defined(CONFIG_BT_TICKER_EXT_EXPIRE_INFO)
@@ -734,6 +806,17 @@ int ull_adv_sync_reset_finalize(void)
 	return 0;
 }
 
+struct ll_adv_sync_set *ull_adv_sync_acquire(void)
+{
+	return mem_acquire(&adv_sync_free);
+}
+
+void ull_adv_sync_release(struct ll_adv_sync_set *sync)
+{
+	lll_adv_sync_data_release(&sync->lll);
+	sync_release(sync);
+}
+
 struct ll_adv_sync_set *ull_adv_sync_get(uint8_t handle)
 {
 	if (handle >= CONFIG_BT_CTLR_ADV_SYNC_SET) {
@@ -751,12 +834,6 @@ uint16_t ull_adv_sync_handle_get(const struct ll_adv_sync_set *sync)
 uint16_t ull_adv_sync_lll_handle_get(const struct lll_adv_sync *lll)
 {
 	return sync_handle_get((void *)lll->hdr.parent);
-}
-
-void ull_adv_sync_release(struct ll_adv_sync_set *sync)
-{
-	lll_adv_sync_data_release(&sync->lll);
-	sync_release(sync);
 }
 
 uint32_t ull_adv_sync_time_get(const struct ll_adv_sync_set *sync,
@@ -2441,11 +2518,6 @@ static uint8_t adv_type_check(struct ll_adv_set *adv)
 	return 0;
 }
 
-static inline struct ll_adv_sync_set *sync_acquire(void)
-{
-	return mem_acquire(&adv_sync_free);
-}
-
 static inline void sync_release(struct ll_adv_sync_set *sync)
 {
 	mem_release(sync, &adv_sync_free);
@@ -2901,6 +2973,17 @@ static void ticker_cb(uint32_t ticks_at_expire, uint32_t ticks_drift,
 
 	DEBUG_RADIO_PREPARE_A(1);
 }
+
+#if defined(CONFIG_BT_CTLR_ADV_PERIODIC_RSP)
+void ull_adv_sync_pawr_response_rx(struct node_rx_pdu *node_rx)
+{
+	/* PAwR response processing
+	 * The HCI layer will encode this into a RESPONSE_REPORT event.
+	 * No additional processing needed at ULL layer.
+	 */
+	ARG_UNUSED(node_rx);
+}
+#endif /* CONFIG_BT_CTLR_ADV_PERIODIC_RSP */
 
 #if defined(CONFIG_BT_CTLR_ADV_ISO) && \
 	defined(CONFIG_BT_TICKER_EXT_EXPIRE_INFO)

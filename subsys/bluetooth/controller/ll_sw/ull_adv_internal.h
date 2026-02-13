@@ -229,14 +229,17 @@ int ull_adv_sync_init(void);
 int ull_adv_sync_reset(void);
 int ull_adv_sync_reset_finalize(void);
 
+/* Helper function to acquire an advertising sync set */
+struct ll_adv_sync_set *ull_adv_sync_acquire(void);
+
+/* helper function to release periodic advertising instance */
+void ull_adv_sync_release(struct ll_adv_sync_set *sync);
+
 /* Return ll_adv_sync_set context (unconditional) */
 struct ll_adv_sync_set *ull_adv_sync_get(uint8_t handle);
 
 /* Return the aux set handle given the sync set instance */
 uint16_t ull_adv_sync_handle_get(const struct ll_adv_sync_set *sync);
-
-/* helper function to release periodic advertising instance */
-void ull_adv_sync_release(struct ll_adv_sync_set *sync);
 
 /* helper function to return event time reservation */
 uint32_t ull_adv_sync_time_get(const struct ll_adv_sync_set *sync,
@@ -304,6 +307,11 @@ uint8_t ull_adv_sync_remove_cteinfo(struct lll_adv_sync *lll_sync,
 				    struct pdu_adv *pdu_prev,
 				    struct pdu_adv *pdu);
 #endif /* ull_adv_sync_add_cteinfo */
+
+#if defined(CONFIG_BT_CTLR_ADV_PERIODIC_RSP)
+/* handler function for PAwR response reception */
+void ull_adv_sync_pawr_response_rx(struct node_rx_pdu *node_rx);
+#endif /* CONFIG_BT_CTLR_ADV_PERIODIC_RSP */
 
 /* helper function to update extra_data field */
 void ull_adv_sync_extra_data_set_clear(void *extra_data_prev,
