@@ -384,6 +384,10 @@ static int prepare_cb_common(struct lll_prepare_param *p)
 		radio_tmr_tifs_set(iss_us);
 		radio_switch_complete_and_b2b_tx(lll->phy, lll->phy_flags, lll->phy,
 						 lll->phy_flags);
+
+		/* ATTENTION: Needed for correct ISO Rx SDU timestamp */
+		/* Setup Access Address capture for subsequent subevents */
+		radio_tmr_aa_capture();
 	}
 
 	ticks_at_event = p->ticks_at_expire;
@@ -395,6 +399,8 @@ static int prepare_cb_common(struct lll_prepare_param *p)
 
 	remainder = p->remainder;
 	start_us = radio_tmr_start(1U, ticks_at_start, remainder);
+
+	printk("%s: PREPARE pc %u start_us %u\n", __func__, payload_count, start_us);
 
 	if (IS_ENABLED(CONFIG_BT_CTLR_PROFILE_ISR) || IS_ENABLED(HAL_RADIO_GPIO_HAVE_PA_PIN)) {
 		/* setup capture of PDU end timestamp */
@@ -484,7 +490,15 @@ static void isr_tx_common(void *param, radio_isr_cb_t isr_tx, radio_isr_cb_t isr
 		lll_prof_latency_capture();
 	}
 
+	/* ATTENTION: Need for nRF54L which is using single timer implementation */
+	/* Call to ensure packet/event timer accumulates the elapsed time
+	 * under single timer use.
+	 */
+	(void)radio_is_tx_done();
+
 	lll = param;
+
+	printk("%s: bis_curr %u\n", __func__, lll->bis_curr);
 
 	/* Sequential or Interleaved BIS subevents decision */
 	const bool is_sequential_packing = (lll->bis_spacing >= (lll->sub_interval * lll->nse));
@@ -517,13 +531,23 @@ static void isr_tx_common(void *param, radio_isr_cb_t isr_tx, radio_isr_cb_t isr
 		} else if (lll->bis_curr < lll->num_bis) {
 			/* Move to next BIS */
 			lll->bis_curr++;
+			lll->ptc_curr = 0U;
+			lll->irc_curr = 1U;
+			/* transmit the (bn_curr)th PDU of bis_curr */
+			lll->bn_curr = 1U;
 
 			/* TX on BIS 1, RX on BIS >= 2 */
 			if (lll->bis_curr >= 2U && !is_create) {
+				/* ATTENTION: Needed radio and tmr status reset */
+				lll_isr_tx_sub_status_reset();
+				/* ATTENTION: Needed for first subevent */
+				radio_tmr_ready_save(radio_tmr_ready_get());
+				/* ATTENTION: Needed access address save  */
+				radio_tmr_aa_save(radio_tmr_aa_get());
 				/* Setup RX mode for BIS >= 2 (switch from TX to RX) */
 				setup_rx_mode(lll, lll->bis_curr);
 				return; /* Exit TX flow, switch to RX */
-			} else if (lll->bis_curr >= 2U) {
+			} else if (lll->bis_curr >= 2U && 0) {
 				/* During BIG creation, skip BISes >= 2 */
 				is_ctrl = 1U;
 			} else {
@@ -543,10 +567,16 @@ static void isr_tx_common(void *param, radio_isr_cb_t isr_tx, radio_isr_cb_t isr
 
 			/* TX on BIS 1, RX on BIS >= 2 */
 			if (lll->bis_curr >= 2U && !is_create) {
+				/* ATTENTION: Needed radio and tmr status reset */
+				lll_isr_tx_sub_status_reset();
+				/* ATTENTION: Needed for first subevent */
+				radio_tmr_ready_save(radio_tmr_ready_get());
+				/* ATTENTION: Needed access address save  */
+				radio_tmr_aa_save(radio_tmr_aa_get());
 				/* Setup RX mode for BIS >= 2 (switch from TX to RX) */
 				setup_rx_mode(lll, lll->bis_curr);
 				return; /* Exit TX flow, switch to RX */
-			} else if (lll->bis_curr >= 2U) {
+			} else if (lll->bis_curr >= 2U && 0) {
 				/* During BIG creation, skip BISes >= 2 */
 				is_ctrl = 1U;
 			} else {
@@ -987,6 +1017,8 @@ static void setup_rx_mode(struct lll_adv_iso *lll, uint8_t bis)
 	uint32_t hcto;
 	uint32_t start_us;
 
+	printk("%s: bis %u\n", __func__, bis);
+
 	util_bis_aa_le32(bis, lll->seed_access_addr, access_addr);
 	data_chan_id = lll_chan_id(access_addr);
 
@@ -994,18 +1026,12 @@ static void setup_rx_mode(struct lll_adv_iso *lll, uint8_t bis)
 	crc_init[0] = bis;
 	memcpy(&crc_init[1], lll->base_crc_init, sizeof(uint16_t));
 
-	/* Ensure radio is disabled before reconfiguring */
-	radio_switch_complete_and_disable();
-
 	/* Setup radio for RX */
 	radio_aa_set(access_addr);
 	radio_crc_configure(PDU_CRC_POLYNOMIAL, sys_get_le24(crc_init));
 
-	/* Configure packet size and flags */
-	pkt_flags = RADIO_PKT_CONF_FLAGS(RADIO_PKT_CONF_PDU_TYPE_BIS, lll->phy,
-					 RADIO_PKT_CONF_CTE_DISABLED);
-
-	radio_pkt_configure(RADIO_PKT_CONF_LENGTH_8BIT, lll->max_pdu, pkt_flags);
+	/* Ensure radio disabled after rx completion */
+	radio_switch_complete_and_disable();
 
 	/* Get RX buffer */
 	node_rx = ull_iso_pdu_rx_alloc_peek(1U);
@@ -1025,6 +1051,14 @@ static void setup_rx_mode(struct lll_adv_iso *lll, uint8_t bis)
 						   &lll->data_chan.remap_idx);
 	lll_chan_set(data_chan_use);
 
+	/* ATTENTION: */
+	/* This is needed when using single timer tIFS switch design and DPPI in
+	 * use, to avoid Tx ramp up happening at tIFS by clearing the radio TXEN
+	 * subscribe. And then setting up the RXEN DPPI and radio RXEN DPPI.
+	 */
+	radio_tmr_tx_disable();
+	radio_tmr_rx_enable();
+
 	/* Calculate timing for this BIS */
 	const bool is_sequential_packing = (lll->bis_spacing >= (lll->sub_interval * lll->nse));
 	uint32_t bis_offset_us;
@@ -1035,14 +1069,48 @@ static void setup_rx_mode(struct lll_adv_iso *lll, uint8_t bis)
 		bis_offset_us = (bis - 1U) * lll->bis_spacing;
 	}
 
-	/* Calculate RX timeout */
-	hcto = bis_offset_us + lll->sub_interval;
-	hcto += radio_rx_ready_delay_get(lll->phy, lll->phy_flags);
-	hcto += addr_us_get(lll->phy);
-	hcto += radio_rx_chain_delay_get(lll->phy, lll->phy_flags);
+	printk("%s: subevent %u lat %u ready %u aa %u end %u\n", __func__,
+		bis_offset_us,
+		radio_tmr_start_latency_get(),
+		radio_tmr_ready_get(),
+		radio_tmr_aa_get(),
+		radio_tmr_end_get());
+
+	/* offset to the subevent */
+	hcto = bis_offset_us;
+
+	/* ATTENTION: */
+	/* anchor of the first subevent, single timer use has a ~80 us latency
+	 * to mitigate to have tIFS switching be disabled by ISR before it
+	 * would switch otherwise.
+	 */
+	hcto += radio_tmr_ready_restore();
+	hcto -= radio_rx_ready_delay_get(lll->phy, PHY_FLAGS_S8);
+
+	/* active clock jitter for reception */
+	hcto -= (EVENT_CLOCK_JITTER_US << 1U);
+
+	printk("%s: bis %u chnl %u start_us %u\n", __func__, bis, data_chan_use, hcto);
 
 	/* Setup timing without stopping main timer */
 	start_us = radio_tmr_start_us(0U, hcto);
+
+	printk("%s: actual start_us %u\n", __func__, start_us);
+
+	/* header complete timeout to consider the radio ready delay, chain
+	 * delay and access address duration.
+	 */
+	hcto += radio_rx_ready_delay_get(lll->phy, PHY_FLAGS_S8);
+	hcto += addr_us_get(lll->phy);
+	hcto += radio_rx_chain_delay_get(lll->phy, PHY_FLAGS_S8);
+	/* active clock jitter for reception, window is +/- 2 us * 2 */
+	hcto += (EVENT_CLOCK_JITTER_US << 2U);
+
+	/* setup absolute PDU header reception timeout */
+	radio_tmr_hcto_configure_abs(hcto);
+
+	/* setup capture of PDU end timestamp */
+	radio_tmr_end_capture();
 
 #if defined(HAL_RADIO_GPIO_HAVE_LNA_PIN)
 	radio_gpio_lna_setup();
@@ -1050,8 +1118,6 @@ static void setup_rx_mode(struct lll_adv_iso *lll, uint8_t bis)
 				 HAL_RADIO_GPIO_LNA_OFFSET);
 #endif
 
-	/* Enable RX and set ISR */
-	radio_switch_complete_and_rx(lll->phy);
 	radio_isr_set(isr_rx_grptlk, lll);
 }
 
@@ -1069,6 +1135,8 @@ static void isr_rx_grptlk(void *param)
 	} else {
 		crc_ok = 0U;
 	}
+
+	printk("%s: trx_done %u crc %u\n", __func__, trx_done, crc_ok);
 
 	/* Clear radio status */
 	lll_isr_rx_status_reset();
