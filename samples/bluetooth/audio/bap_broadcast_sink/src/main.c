@@ -43,9 +43,6 @@
 
 #include "lc3.h"
 
-#include <zephyr/drivers/gpio.h>
-static const struct device *gpio;
-
 #include "nrf54l15.h"
 #if defined(NRF54L15_XXAA)
 #include <hal/nrf_clock.h>
@@ -53,7 +50,6 @@ static const struct device *gpio;
 #include <zephyr/drivers/i2c.h>
 #define I2C_NODE DT_NODELABEL(tlv320)
 
-static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(DT_ALIAS(led0), gpios);
 static const struct gpio_dt_spec rst = GPIO_DT_SPEC_GET(DT_ALIAS(led3), gpios);
 
 #define I2S_NL DT_NODELABEL(i2s20)
@@ -324,6 +320,74 @@ void tlv320_setup(void)
 	dac_i2c_write(&dev_i2c, 0x00, 0x00);
 }
 
+#if defined(CONFIG_GPIO)
+/* The devicetree node identifier for the "led0" alias. */
+#define LED0_NODE DT_ALIAS(led0)
+#define LED1_NODE DT_ALIAS(led1)
+
+#if DT_NODE_HAS_STATUS_OKAY(LED0_NODE) || DT_NODE_HAS_STATUS_OKAY(LED1_NODE)
+#include <zephyr/drivers/gpio.h>
+#define HAS_LED     1
+static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
+static const struct gpio_dt_spec led1 = GPIO_DT_SPEC_GET(LED1_NODE, gpios);
+#define BLINK_ONOFF K_MSEC(500)
+
+static struct k_work_delayable blink_work;
+static bool                  led_is_on;
+
+static void blink_timeout(struct k_work *work)
+{
+	led_is_on = !led_is_on;
+	gpio_pin_set(led.port, led.pin, (int)led_is_on);
+
+	k_work_schedule(&blink_work, BLINK_ONOFF);
+}
+
+static int blink_setup(void)
+{
+	int err;
+
+	printk("Checking LED device...");
+	if (!gpio_is_ready_dt(&led)) {
+		printk("failed.\n");
+		return -EIO;
+	}
+	printk("done.\n");
+
+	printk("Configuring GPIO pin...");
+	err = gpio_pin_configure_dt(&led, GPIO_OUTPUT_INACTIVE);
+	if (err) {
+		printk("failed.\n");
+		return -EIO;
+	}
+	printk("done.\n");
+
+	k_work_init_delayable(&blink_work, blink_timeout);
+
+	return 0;
+}
+
+static void blink_start(void)
+{
+	printk("Start blinking LED...\n");
+	led_is_on = false;
+	gpio_pin_set(led.port, led.pin, (int)led_is_on);
+	k_work_schedule(&blink_work, BLINK_ONOFF);
+}
+
+static void blink_stop(void)
+{
+	struct k_work_sync work_sync;
+
+	printk("Stop blinking LED.\n");
+	k_work_cancel_delayable_sync(&blink_work, &work_sync);
+
+	/* Keep LED on */
+	led_is_on = true;
+	gpio_pin_set(led.port, led.pin, (int)led_is_on);
+}
+#endif /* LED0_NODE */
+#endif /* CONFIG_GPIO */
 
 uint8_t stream_num_get(struct bt_bap_stream * stream)
 {
@@ -745,8 +809,11 @@ static void broadcast_sink_started_cb(struct bt_bap_broadcast_sink *sink)
 	//bt_iso_chan_get_info(sink->bis[0].chan, &bt_iso_info_test);
 	//printk("latency = %d\n", bt_iso_info_test.sync_receiver.latency);
 
-
 	k_sem_give(&sem_big_synced);
+
+#if defined(HAS_LED)
+	blink_start();
+#endif /* HAS_LED */
 }
 
 static void broadcast_sink_stopped_cb(struct bt_bap_broadcast_sink *sink, uint8_t reason)
@@ -760,6 +827,10 @@ static void broadcast_sink_stopped_cb(struct bt_bap_broadcast_sink *sink, uint8_
 	k_msgq_purge(&recv_pkt_msgq_r);
 	big_synced = false;
 	k_sem_give(&sem_broadcast_sink_stopped);
+
+#if defined(HAS_LED)
+	blink_stop();
+#endif /* HAS_LED */
 }
 
 static struct bt_bap_broadcast_sink_cb broadcast_sink_cbs = {
@@ -1037,6 +1108,8 @@ static void connected(struct bt_conn *conn, uint8_t err)
 	broadcast_assistant_conn = bt_conn_ref(conn);
 
 	k_sem_give(&sem_connected);
+
+	gpio_pin_set(led1.port, led1.pin, 1);
 }
 
 static void disconnected(struct bt_conn *conn, uint8_t reason)
@@ -1051,6 +1124,8 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 	bt_conn_drop(&broadcast_assistant_conn);
 
 	k_sem_give(&sem_disconnected);
+
+	gpio_pin_set(led1.port, led1.pin, 0);
 }
 
 static void recycled(void)
@@ -1607,8 +1682,6 @@ int main(void)
 
 	clocks_start();
 
-	gpio = DEVICE_DT_GET(DT_NODELABEL(gpio0));
-	gpio_pin_configure_dt(&led, GPIO_OUTPUT);
 	gpio_pin_configure_dt(&rst, GPIO_OUTPUT);
 
 	gpio_pin_set_dt(&rst, 0); // Reset high
@@ -1635,6 +1708,28 @@ int main(void)
 			return 0;
 		}
 	}
+
+#if defined(HAS_LED)
+	err = blink_setup();
+	if (err) {
+		return 0;
+	}
+
+	printk("Checking LED1 device...");
+	if (!gpio_is_ready_dt(&led1)) {
+		printk("failed.\n");
+		return -EIO;
+	}
+	printk("done.\n");
+
+	printk("Configuring GPIO pin...");
+	err = gpio_pin_configure_dt(&led1, GPIO_OUTPUT_INACTIVE);
+	if (err) {
+		printk("failed.\n");
+		return -EIO;
+	}
+	printk("done.\n");
+#endif /* HAS_LED */
 
 	while (true) {
 		uint8_t stream_count;
