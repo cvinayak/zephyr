@@ -18,7 +18,7 @@
 
 #define BT_LE_SCAN_CUSTOM BT_LE_SCAN_PARAM(BT_LE_SCAN_TYPE_ACTIVE, \
 					   BT_LE_SCAN_OPT_NONE, \
-					   BT_GAP_SCAN_FAST_INTERVAL, \
+					   BT_GAP_SCAN_FAST_INTERVAL_MIN, \
 					   BT_GAP_SCAN_FAST_WINDOW)
 
 #define PA_RETRY_COUNT 6
@@ -361,6 +361,7 @@ int main(void)
 		}
 		printk("success.\n");
 
+wait_for_per_adv:
 #ifdef CONFIG_ISO_BLINK_LED0
 		printk("Start blinking LED...\n");
 		led_is_on = false;
@@ -377,14 +378,6 @@ int main(void)
 			return 0;
 		}
 		printk("Found periodic advertising.\n");
-
-		printk("Stop scanning...");
-		err = bt_le_scan_stop();
-		if (err) {
-			printk("failed (err %d)\n", err);
-			return 0;
-		}
-		printk("success.\n");
 
 		printk("Creating Periodic Advertising Sync...");
 		bt_addr_le_copy(&sync_create_param.addr, &per_addr);
@@ -413,9 +406,18 @@ int main(void)
 				printk("failed (err %d)\n", err);
 				return 0;
 			}
-			continue;
+
+			goto wait_for_per_adv;
 		}
 		printk("Periodic sync established.\n");
+
+		printk("Stop scanning...");
+		err = bt_le_scan_stop();
+		if (err) {
+			printk("failed (err %d)\n", err);
+			return 0;
+		}
+		printk("success.\n");
 
 		printk("Waiting for BIG info...\n");
 		err = k_sem_take(&sem_per_big_info, K_USEC(sem_timeout_us));

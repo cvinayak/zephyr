@@ -13,7 +13,7 @@
 #include <zephyr/sys/byteorder.h>
 
 #define BIG_SDU_INTERVAL_US      (10000)
-#define BUF_ALLOC_TIMEOUT_US     (BIG_SDU_INTERVAL_US * 2U) /* milliseconds */
+#define BUF_ALLOC_TIMEOUT_US     (BIG_SDU_INTERVAL_US * 3U) /* milliseconds */
 #define BIG_TERMINATE_TIMEOUT_US (60 * USEC_PER_SEC) /* microseconds */
 
 #define BIS_ISO_CHAN_COUNT 2
@@ -69,8 +69,8 @@ static struct bt_iso_chan_ops iso_ops = {
 };
 
 static struct bt_iso_chan_io_qos iso_tx_qos = {
-	.sdu = sizeof(uint32_t), /* bytes */
-	.rtn = 1,
+	.sdu = CONFIG_BT_ISO_TX_MTU,
+	.rtn = 7,
 	.phy = BT_GAP_LE_PHY_2M,
 };
 
@@ -125,7 +125,7 @@ int main(void)
 	int err;
 
 	uint32_t iso_send_count = 0;
-	uint8_t iso_data[sizeof(iso_send_count)] = { 0 };
+	uint8_t iso_data[CONFIG_BT_ISO_TX_MTU] = { 0 };
 
 	printk("Starting ISO Broadcast Demo\n");
 
