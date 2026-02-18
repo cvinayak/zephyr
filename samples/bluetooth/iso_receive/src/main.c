@@ -18,7 +18,7 @@
 
 #define BT_LE_SCAN_CUSTOM BT_LE_SCAN_PARAM(BT_LE_SCAN_TYPE_ACTIVE, \
 					   BT_LE_SCAN_OPT_NONE, \
-					   BT_GAP_SCAN_FAST_INTERVAL, \
+					   BT_GAP_SCAN_FAST_INTERVAL_MIN, \
 					   BT_GAP_SCAN_FAST_WINDOW)
 
 #define PA_RETRY_COUNT 6
@@ -113,10 +113,9 @@ static void scan_recv(const struct bt_le_scan_recv_info *info,
 	       phy2str(info->primary_phy), phy2str(info->secondary_phy),
 	       info->interval, BT_CONN_INTERVAL_TO_US(info->interval), info->sid);
 
-	if (!per_adv_found && info->interval) {
+	if (!per_adv_found && info->interval && info->sid == per_sid) {
 		per_adv_found = true;
 
-		per_sid = info->sid;
 		per_interval_us = BT_CONN_INTERVAL_TO_US(info->interval);
 		bt_addr_le_copy(&per_addr, info->addr);
 
@@ -250,11 +249,13 @@ static struct bt_iso_chan_ops iso_ops = {
 	.disconnected	= iso_disconnected,
 };
 
-static struct bt_iso_chan_io_qos iso_rx_qos[BIS_ISO_CHAN_COUNT];
+static struct bt_iso_chan_io_qos iso_rx_qos[BIS_ISO_CHAN_COUNT * 2];
 
 static struct bt_iso_chan_qos bis_iso_qos[] = {
 	{ .rx = &iso_rx_qos[0], },
 	{ .rx = &iso_rx_qos[1], },
+	{ .rx = &iso_rx_qos[2], },
+	{ .rx = &iso_rx_qos[3], },
 };
 
 static struct bt_iso_chan bis_iso_chan[] = {
@@ -262,19 +263,34 @@ static struct bt_iso_chan bis_iso_chan[] = {
 	  .qos = &bis_iso_qos[0], },
 	{ .ops = &iso_ops,
 	  .qos = &bis_iso_qos[1], },
+	{ .ops = &iso_ops,
+	  .qos = &bis_iso_qos[2], },
+	{ .ops = &iso_ops,
+	  .qos = &bis_iso_qos[2], },
 };
 
 static struct bt_iso_chan *bis[] = {
 	&bis_iso_chan[0],
 	&bis_iso_chan[1],
+	&bis_iso_chan[2],
+	&bis_iso_chan[3],
 };
 
-static struct bt_iso_big_sync_param big_sync_param = {
-	.bis_channels = bis,
+static struct bt_iso_big_sync_param big_sync_param[2] = {
+	{
+	.bis_channels = &bis[0],
 	.num_bis = BIS_ISO_CHAN_COUNT,
 	.bis_bitfield = (BIT_MASK(BIS_ISO_CHAN_COUNT)),
 	.mse = BT_ISO_SYNC_MSE_ANY, /* any number of subevents */
 	.sync_timeout = 100, /* in 10 ms units */
+	},
+	{
+	.bis_channels = &bis[2],
+	.num_bis = BIS_ISO_CHAN_COUNT,
+	.bis_bitfield = (BIT_MASK(BIS_ISO_CHAN_COUNT)),
+	.mse = BT_ISO_SYNC_MSE_ANY, /* any number of subevents */
+	.sync_timeout = 100, /* in 10 ms units */
+	},
 };
 
 static void reset_semaphores(void)
@@ -333,7 +349,10 @@ int main(void)
 	bt_le_per_adv_sync_cb_register(&sync_callbacks);
 	printk("Success.\n");
 
+	per_sid = 0U;
+
 	do {
+next_per_adv:
 		reset_semaphores();
 		per_adv_lost = false;
 
@@ -345,6 +364,7 @@ int main(void)
 		}
 		printk("success.\n");
 
+wait_for_per_adv:
 #ifdef CONFIG_ISO_BLINK_LED0
 		printk("Start blinking LED...\n");
 		led_is_on = false;
@@ -361,14 +381,6 @@ int main(void)
 			return 0;
 		}
 		printk("Found periodic advertising.\n");
-
-		printk("Stop scanning...");
-		err = bt_le_scan_stop();
-		if (err) {
-			printk("failed (err %d)\n", err);
-			return 0;
-		}
-		printk("success.\n");
 
 		printk("Creating Periodic Advertising Sync...");
 		bt_addr_le_copy(&sync_create_param.addr, &per_addr);
@@ -397,9 +409,18 @@ int main(void)
 				printk("failed (err %d)\n", err);
 				return 0;
 			}
-			continue;
+
+			goto wait_for_per_adv;
 		}
 		printk("Periodic sync established.\n");
+
+		printk("Stop scanning...");
+		err = bt_le_scan_stop();
+		if (err) {
+			printk("failed (err %d)\n", err);
+			return 0;
+		}
+		printk("success.\n");
 
 		printk("Waiting for BIG info...\n");
 		err = k_sem_take(&sem_per_big_info, K_USEC(sem_timeout_us));
@@ -422,7 +443,7 @@ int main(void)
 
 big_sync_create:
 		printk("Create BIG Sync...\n");
-		err = bt_iso_big_sync(sync, &big_sync_param, &big);
+		err = bt_iso_big_sync(sync, &big_sync_param[per_sid], &big);
 		if (err) {
 			printk("failed (err %d)\n", err);
 			return 0;
@@ -451,6 +472,13 @@ big_sync_create:
 			goto per_sync_lost_check;
 		}
 		printk("BIG sync established.\n");
+
+		per_sid++;
+		if (per_sid < CONFIG_BT_PER_ADV_SYNC_MAX) {
+			goto next_per_adv;
+		}
+
+		return 0;
 
 #ifdef CONFIG_ISO_BLINK_LED0
 		printk("Stop blinking LED.\n");
