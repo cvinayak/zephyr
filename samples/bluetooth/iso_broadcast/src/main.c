@@ -13,7 +13,7 @@
 #include <zephyr/sys/byteorder.h>
 
 #define BIG_SDU_INTERVAL_US      (10000)
-#define BUF_ALLOC_TIMEOUT_US     (BIG_SDU_INTERVAL_US * 2U) /* milliseconds */
+#define BUF_ALLOC_TIMEOUT_US     (BIG_SDU_INTERVAL_US * 3U) /* milliseconds */
 #define BIG_TERMINATE_TIMEOUT_US (60 * USEC_PER_SEC) /* microseconds */
 
 #define BIS_ISO_CHAN_COUNT 2
@@ -69,8 +69,8 @@ static struct bt_iso_chan_ops iso_ops = {
 };
 
 static struct bt_iso_chan_io_qos iso_tx_qos = {
-	.sdu = sizeof(uint32_t), /* bytes */
-	.rtn = 1,
+	.sdu = CONFIG_BT_ISO_TX_MTU,
+	.rtn = 4,
 	.phy = BT_GAP_LE_PHY_2M,
 };
 
@@ -113,7 +113,7 @@ int main(void)
 	 */
 	const uint16_t adv_interval_ms = 60U;
 	const uint16_t ext_adv_interval_ms = adv_interval_ms - 10U;
-	const struct bt_le_adv_param *ext_adv_param = BT_LE_ADV_PARAM(
+	struct bt_le_adv_param ext_adv_param = BT_LE_ADV_PARAM_INIT(
 		BT_LE_ADV_OPT_EXT_ADV, BT_GAP_MS_TO_ADV_INTERVAL(ext_adv_interval_ms),
 		BT_GAP_MS_TO_ADV_INTERVAL(ext_adv_interval_ms), NULL);
 	const struct bt_le_per_adv_param *per_adv_param = BT_LE_PER_ADV_PARAM(
@@ -125,7 +125,7 @@ int main(void)
 	int err;
 
 	uint32_t iso_send_count = 0;
-	uint8_t iso_data[sizeof(iso_send_count)] = { 0 };
+	uint8_t iso_data[CONFIG_BT_ISO_TX_MTU] = { 0 };
 
 	printk("Starting ISO Broadcast Demo\n");
 
@@ -136,8 +136,12 @@ int main(void)
 		return 0;
 	}
 
+	extern int get_device_nbr(void);
+
 	/* Create a non-connectable advertising set */
-	err = bt_le_ext_adv_create(ext_adv_param, NULL, &adv);
+	ext_adv_param.sid = 0U; /* Change this for each iso_broadcast device */
+	ext_adv_param.sid = get_device_nbr();
+	err = bt_le_ext_adv_create(&ext_adv_param, NULL, &adv);
 	if (err) {
 		printk("Failed to create advertising set (err %d)\n", err);
 		return 0;
