@@ -29,8 +29,8 @@
 #define EVENT_OVERHEAD_START_US       519 /* 17 RTC ticks equivalent */
 #define EVENT_OVERHEAD_RESUME_US      153
 #elif defined(CONFIG_SOC_COMPATIBLE_NRF54LX)
-#define EVENT_OVERHEAD_START_US       458 /* 15 RTC ticks equivalent */
-#define EVENT_OVERHEAD_RESUME_US      153
+#define EVENT_OVERHEAD_START_US       580 /* 19 RTC ticks equivalent */
+#define EVENT_OVERHEAD_RESUME_US      184
 #else /* nRF52x and nRF53x Series */
 #define EVENT_OVERHEAD_START_US       672 /* 22 RTC ticks */
 #define EVENT_OVERHEAD_RESUME_US      153

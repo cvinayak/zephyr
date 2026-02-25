@@ -1,0 +1,3 @@
+&hfpll {
+	clock-frequency = <DT_FREQ_M(64)>;
+};
