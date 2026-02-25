@@ -4,4 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+&uart0 {
+	compatible = "nordic,nrf-uarte";
+	current-speed = <1000000>;
+	status = "okay";
+};
+
 /* #include "../app.overlay" */
