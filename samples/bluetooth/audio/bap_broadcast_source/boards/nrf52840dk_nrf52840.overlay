@@ -5,3 +5,7 @@
  */
 
 #include "../app.overlay"
+
+&uart0 {
+	current-speed = <1000000>;
+};

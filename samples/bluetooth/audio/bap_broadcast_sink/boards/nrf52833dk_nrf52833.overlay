@@ -4,4 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+&uart0 {
+	current-speed = <1000000>;
+};
+
 /* #include "../app.overlay" */
