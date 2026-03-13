@@ -575,7 +575,10 @@ static int prepare_cb_common(struct lll_prepare_param *p)
 	       ((EVENT_JITTER_US + EVENT_TICKER_RES_MARGIN_US +
 		 lll->window_widening_event_us) << 1) +
 	       lll->window_size_event_us;
-	hcto += radio_rx_ready_delay_get(lll->phy, PHY_FLAGS_S8);
+
+	const uint32_t rx_ready_delay = radio_rx_ready_delay_get(lll->phy, PHY_FLAGS_S8);
+
+	hcto += rx_ready_delay;
 	hcto += addr_us_get(lll->phy);
 	hcto += radio_rx_chain_delay_get(lll->phy, PHY_FLAGS_S8);
 	radio_tmr_hcto_configure(hcto);
@@ -586,9 +589,7 @@ static int prepare_cb_common(struct lll_prepare_param *p)
 #if defined(HAL_RADIO_GPIO_HAVE_LNA_PIN)
 	radio_gpio_lna_setup();
 
-	radio_gpio_pa_lna_enable(remainder_us +
-				 radio_rx_ready_delay_get(lll->phy, PHY_FLAGS_S8) -
-				 HAL_RADIO_GPIO_LNA_OFFSET);
+	radio_gpio_pa_lna_enable(remainder_us + rx_ready_delay - HAL_RADIO_GPIO_LNA_OFFSET);
 #endif /* HAL_RADIO_GPIO_HAVE_LNA_PIN */
 
 #if defined(CONFIG_BT_CTLR_XTAL_ADVANCED) && \
@@ -1734,13 +1735,16 @@ isr_rx_next_subevent:
 		LL_ASSERT_DBG(false);
 	}
 
+	const uint32_t rx_ready_delay = radio_rx_ready_delay_get(lll->phy, PHY_FLAGS_S8);
+	const uint32_t rx_chain_delay = radio_rx_chain_delay_get(lll->phy, PHY_FLAGS_S8);
+
 	if (trx_cnt) {
 		/* Setup radio packet timer header complete timeout for
 		 * subsequent subevent PDU.
 		 */
 		hcto += lll->aa_se;
 		hcto -= addr_us_get(lll->phy);
-		hcto -= radio_rx_ready_delay_get(lll->phy, PHY_FLAGS_S8);
+		hcto -= rx_ready_delay;
 
 		/* Calculate the radio start with consideration of the drift
 		 * based on the access address capture timestamp.
@@ -1753,11 +1757,11 @@ isr_rx_next_subevent:
 
 		/* Overhead within EVENT_IFS_US to exclude from max. jitter */
 		/* Required radio ready duration, settling time */
-		overhead_us = radio_rx_ready_delay_get(lll->phy, PHY_FLAGS_S8);
+		overhead_us = rx_ready_delay;
 		/* If single timer used, then consider required max. latency */
 		overhead_us += HAL_RADIO_ISR_LATENCY_MAX_US;
 		/* Add chain delay overhead */
-		overhead_us += radio_rx_chain_delay_get(lll->phy, PHY_FLAGS_S8);
+		overhead_us += rx_chain_delay;
 		/* Add base clock jitter overhead */
 		overhead_us += (EVENT_CLOCK_JITTER_US << 1);
 		LL_ASSERT_DBG(EVENT_IFS_US > overhead_us);
@@ -1822,9 +1826,9 @@ isr_rx_next_subevent:
 	/* header complete timeout to consider the radio ready delay, chain
 	 * delay and access address duration.
 	 */
-	hcto += radio_rx_ready_delay_get(lll->phy, PHY_FLAGS_S8);
+	hcto += rx_ready_delay;
 	hcto += addr_us_get(lll->phy);
-	hcto += radio_rx_chain_delay_get(lll->phy, PHY_FLAGS_S8);
+	hcto += rx_chain_delay;
 
 	/* setup absolute PDU header reception timeout */
 	radio_tmr_hcto_configure_abs(hcto);
@@ -1835,10 +1839,7 @@ isr_rx_next_subevent:
 #if defined(HAL_RADIO_GPIO_HAVE_LNA_PIN)
 	radio_gpio_lna_setup();
 
-	radio_gpio_pa_lna_enable(start_us +
-				 radio_rx_ready_delay_get(lll->phy,
-							  PHY_FLAGS_S8) -
-				 HAL_RADIO_GPIO_LNA_OFFSET);
+	radio_gpio_pa_lna_enable(start_us + rx_ready_delay - HAL_RADIO_GPIO_LNA_OFFSET);
 #endif /* HAL_RADIO_GPIO_HAVE_LNA_PIN */
 
 	if (IS_ENABLED(CONFIG_BT_CTLR_PROFILE_ISR)) {
