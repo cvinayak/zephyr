@@ -1197,6 +1197,13 @@ isr_rx_find_subevent:
 #if defined(CONFIG_BT_CTLR_SYNC_ISO_SEQUENTIAL)
 	/* NOTE: below code is for Sequential Rx only */
 
+	/* Precompute the base payload offset (latency_event * bn). Hoisted
+	 * out of the subevent-search loop and the subsequent IRC/BIS checks
+	 * so that the multiply is performed once per subevent-search pass
+	 * rather than on every iteration of the while loop below.
+	 */
+	uint32_t latency_bn_offset = (uint32_t)lll->latency_event * lll->bn;
+
 	/* Find the next (bn_curr)th subevent to receive PDU */
 	while (lll->bn_curr < lll->bn) {
 		uint32_t payload_offset;
@@ -1209,7 +1216,7 @@ isr_rx_find_subevent:
 		 * Ensure we are not having offset values over 255 in payload_count_max, used to
 		 * allocate the buffers.
 		 */
-		payload_offset = (lll->latency_event * lll->bn) + (lll->bn_curr - 1U);
+		payload_offset = latency_bn_offset + (lll->bn_curr - 1U);
 		if (payload_offset >= lll->payload_count_max) {
 			/* (bn_curr)th Rx PDU skip subevent */
 			skipped++;
@@ -1253,7 +1260,7 @@ isr_rx_find_subevent:
 			 *        variable use. Alternatively, add implementation to correctly
 			 *        skip subevents as buffers at these high offset are unavailable.
 			 */
-			payload_offset = (lll->latency_event * lll->bn);
+			payload_offset = latency_bn_offset;
 			LL_ASSERT_ERR(payload_offset <= UINT8_MAX);
 
 			/* Find the index of the (irc_curr)th bn = 1 Rx PDU
@@ -1348,7 +1355,7 @@ isr_rx_find_subevent:
 				 *        implementation to correctly skip subevents as buffers at
 				 *        these high offsets are unavailable.
 				 */
-				payload_offset = (lll->latency_event * lll->bn);
+				payload_offset = latency_bn_offset;
 				LL_ASSERT_ERR(payload_offset <= UINT8_MAX);
 
 				/* Find the index of the (irc_curr)th bn = 1 Rx
