@@ -1595,6 +1595,13 @@ isr_rx_next_subevent:
 	util_bis_aa_le32(bis, lll->seed_access_addr, access_addr);
 	data_chan_id = lll_chan_id(access_addr);
 
+	/* Pre-compute the event counter used in channel selection and next
+	 * subevent channel calculation below. Hoisted here so the 64-bit
+	 * division is performed once per subevent setup instead of being
+	 * repeated in each conditional branch that needs it.
+	 */
+	const uint16_t event_counter = (lll->payload_count / lll->bn) - 1U;
+
 	/* Calculate the CRC init value for the BIS event,
 	 * preset with the BaseCRCInit value from the BIGInfo data the most
 	 * significant 2 octets and the BIS_Number for the specific BIS in the
@@ -1608,9 +1615,6 @@ isr_rx_next_subevent:
 
 	/* Set the channel to use */
 	if (!bis) {
-		const uint16_t event_counter =
-				(lll->payload_count / lll->bn) - 1U;
-
 		/* Calculate the radio channel to use for ISO event */
 		data_chan_use = lll_chan_iso_event(event_counter, data_chan_id,
 						   lll->data_chan_map,
@@ -1626,8 +1630,6 @@ isr_rx_next_subevent:
 
 		if (bis_idx_old != bis_idx_new) {
 			if (skipped != 0U) {
-				const uint16_t event_counter = (lll->payload_count / lll->bn) - 1U;
-
 				/* Calculate the radio channel to use for next BIS */
 				data_chan_use = lll_chan_iso_event(event_counter,
 								   data_chan_id,
@@ -1744,13 +1746,14 @@ isr_rx_next_subevent:
 
 	const uint32_t rx_ready_delay = radio_rx_ready_delay_get(lll->phy, PHY_FLAGS_S8);
 	const uint32_t rx_chain_delay = radio_rx_chain_delay_get(lll->phy, PHY_FLAGS_S8);
+	const uint32_t addr_us = addr_us_get(lll->phy);
 
 	if (trx_cnt) {
 		/* Setup radio packet timer header complete timeout for
 		 * subsequent subevent PDU.
 		 */
 		hcto += lll->aa_se;
-		hcto -= addr_us_get(lll->phy);
+		hcto -= addr_us;
 		hcto -= rx_ready_delay;
 
 		/* Calculate the radio start with consideration of the drift
@@ -1834,7 +1837,7 @@ isr_rx_next_subevent:
 	 * delay and access address duration.
 	 */
 	hcto += rx_ready_delay;
-	hcto += addr_us_get(lll->phy);
+	hcto += addr_us;
 	hcto += rx_chain_delay;
 
 	/* setup absolute PDU header reception timeout */
@@ -1854,8 +1857,6 @@ isr_rx_next_subevent:
 	}
 
 	/* Calculate ahead the next subevent channel index */
-	const uint16_t event_counter = (lll->payload_count / lll->bn) - 1U;
-
 	if (false) {
 
 #if defined(CONFIG_BT_CTLR_SYNC_ISO_SEQUENTIAL)
