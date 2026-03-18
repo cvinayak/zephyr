@@ -44,13 +44,13 @@
 #include "hal/debug.h"
 
 static int init_reset(void);
-static void isr_done(void *param);
+static LLL_ISR_CODE_RAM_ATTR void isr_done(void *param);
 static inline int isr_rx_pdu(struct lll_conn *lll, struct pdu_data *pdu_data_rx,
 			     uint8_t *is_rx_enqueue,
 			     struct node_tx **tx_release, uint8_t *is_done);
 
 #if defined(CONFIG_BT_CTLR_TX_DEFER)
-static void isr_tx_deferred_set(void *param);
+static LLL_ISR_CODE_RAM_ATTR void isr_tx_deferred_set(void *param);
 #endif /* CONFIG_BT_CTLR_TX_DEFER */
 
 static void empty_tx_init(void);
@@ -304,7 +304,7 @@ void lll_conn_abort_cb(struct lll_prepare_param *prepare_param, void *param)
 	lll_done(param);
 }
 
-void lll_conn_isr_rx(void *param)
+LLL_ISR_CODE_RAM_ATTR void lll_conn_isr_rx(void *param)
 {
 	uint8_t is_empty_pdu_tx_retry;
 	struct pdu_data *pdu_data_rx;
@@ -647,7 +647,7 @@ lll_conn_isr_rx_exit:
 #endif /* CONFIG_BT_CTLR_PROFILE_ISR */
 }
 
-void lll_conn_isr_tx(void *param)
+LLL_ISR_CODE_RAM_ATTR void lll_conn_isr_tx(void *param)
 {
 #if defined(CONFIG_BT_CTLR_DF_CONN_CTE_TX)
 	static struct pdu_data *pdu_tx;
@@ -1034,7 +1034,7 @@ static int init_reset(void)
 	return 0;
 }
 
-static void isr_done(void *param)
+static LLL_ISR_CODE_RAM_ATTR void isr_done(void *param)
 {
 	struct event_done_extra *e;
 
@@ -1261,7 +1261,7 @@ static inline int isr_rx_pdu(struct lll_conn *lll, struct pdu_data *pdu_data_rx,
 }
 
 #if defined(CONFIG_BT_CTLR_TX_DEFER)
-static void isr_tx_deferred_set(void *param)
+static LLL_ISR_CODE_RAM_ATTR void isr_tx_deferred_set(void *param)
 {
 	struct pdu_data *pdu_data_tx;
 	struct lll_conn *lll;
