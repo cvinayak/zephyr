@@ -51,9 +51,9 @@ static void prepare_bh(void *param);
 static int create_prepare_cb(struct lll_prepare_param *p);
 static int prepare_cb(struct lll_prepare_param *p);
 static int prepare_cb_common(struct lll_prepare_param *p);
-static void isr_tx_create(void *param);
-static void isr_tx_normal(void *param);
-static void isr_tx_common(void *param,
+static LLL_ISR_CODE_RAM_ATTR void isr_tx_create(void *param);
+static LLL_ISR_CODE_RAM_ATTR void isr_tx_normal(void *param);
+static LLL_ISR_CODE_RAM_ATTR void isr_tx_common(void *param,
 			  radio_isr_cb_t isr_tx,
 			  radio_isr_cb_t isr_done);
 #if defined(CONFIG_BT_CTLR_ADV_ISO_SEQUENTIAL)
@@ -63,8 +63,8 @@ static void next_chan_calc_seq(struct lll_adv_iso *lll, uint16_t event_counter,
 #if defined(CONFIG_BT_CTLR_ADV_ISO_INTERLEAVED)
 static void next_chan_calc_int(struct lll_adv_iso *lll, uint16_t event_counter);
 #endif /* CONFIG_BT_CTLR_ADV_ISO_INTERLEAVED */
-static void isr_done_create(void *param);
-static void isr_done_term(void *param);
+static LLL_ISR_CODE_RAM_ATTR void isr_done_create(void *param);
+static LLL_ISR_CODE_RAM_ATTR void isr_done_term(void *param);
 
 int lll_adv_iso_init(void)
 {
@@ -476,17 +476,17 @@ static int prepare_cb_common(struct lll_prepare_param *p)
 	return 0;
 }
 
-static void isr_tx_create(void *param)
+static LLL_ISR_CODE_RAM_ATTR void isr_tx_create(void *param)
 {
 	isr_tx_common(param, isr_tx_create, isr_done_create);
 }
 
-static void isr_tx_normal(void *param)
+static LLL_ISR_CODE_RAM_ATTR void isr_tx_normal(void *param)
 {
 	isr_tx_common(param, isr_tx_normal, lll_isr_done);
 }
 
-static void isr_tx_common(void *param,
+static LLL_ISR_CODE_RAM_ATTR void isr_tx_common(void *param,
 			  radio_isr_cb_t isr_tx,
 			  radio_isr_cb_t isr_done)
 {
@@ -1017,7 +1017,7 @@ static void next_chan_calc_int(struct lll_adv_iso *lll, uint16_t event_counter)
 }
 #endif  /* CONFIG_BT_CTLR_ADV_ISO_INTERLEAVED */
 
-static void isr_done_create(void *param)
+static LLL_ISR_CODE_RAM_ATTR void isr_done_create(void *param)
 {
 	lll_isr_status_reset();
 
@@ -1026,7 +1026,7 @@ static void isr_done_create(void *param)
 	lll_isr_cleanup(param);
 }
 
-static void isr_done_term(void *param)
+static LLL_ISR_CODE_RAM_ATTR void isr_done_term(void *param)
 {
 	struct lll_adv_iso *lll;
 	uint16_t elapsed_event;
