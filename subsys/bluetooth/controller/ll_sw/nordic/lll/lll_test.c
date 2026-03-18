@@ -177,7 +177,7 @@ static int create_iq_report(bool crc_ok)
 }
 #endif /* CONFIG_BT_CTLR_DTM_HCI_DF_IQ_REPORT */
 
-static void isr_tx(void *param)
+static LLL_ISR_CODE_RAM_ATTR void isr_tx(void *param)
 {
 	/* Clear radio status and events */
 	radio_status_reset();
@@ -209,7 +209,7 @@ static void isr_tx(void *param)
 #endif /* HAL_RADIO_GPIO_HAVE_PA_PIN */
 }
 
-static void isr_rx(void *param)
+static LLL_ISR_CODE_RAM_ATTR void isr_rx(void *param)
 {
 	uint8_t crc_ok = 0U;
 	uint8_t trx_done;
