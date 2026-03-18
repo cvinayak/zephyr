@@ -85,10 +85,10 @@ static uint32_t preempt_ticker_stop(void);
 static void preempt_ticker_cb(uint32_t ticks_at_expire, uint32_t ticks_drift,
 			      uint32_t remainder, uint16_t lazy, uint8_t force,
 			      void *param);
-static void preempt(void *param);
+static LLL_ISR_CODE_RAM_ATTR void preempt(void *param);
 #else /* CONFIG_BT_CTLR_LOW_LAT */
 #if (CONFIG_BT_CTLR_LLL_PRIO == CONFIG_BT_CTLR_ULL_LOW_PRIO)
-static void mfy_ticker_job_idle_get(void *param);
+static LLL_ISR_CODE_RAM_ATTR void mfy_ticker_job_idle_get(void *param);
 static void ticker_op_job_disable(uint32_t status, void *op_context);
 #endif
 #endif /* CONFIG_BT_CTLR_LOW_LAT */
@@ -479,7 +479,7 @@ int lll_reset(void)
 	return 0;
 }
 
-void lll_disable(void *param)
+LLL_ISR_CODE_RAM_ATTR void lll_disable(void *param)
 {
 	/* LLL disable of current event, done is generated */
 	if (!param || (param == event.curr.param)) {
@@ -1281,7 +1281,7 @@ static void preempt_ticker_cb(uint32_t ticks_at_expire, uint32_t ticks_drift,
 	LL_ASSERT_ERR(!ret);
 }
 
-static void preempt(void *param)
+static LLL_ISR_CODE_RAM_ATTR void preempt(void *param)
 {
 	lll_prepare_cb_t resume_cb;
 	struct lll_event *ready;
@@ -1510,7 +1510,7 @@ preempt_abort_resume:
 #else /* CONFIG_BT_CTLR_LOW_LAT */
 
 #if (CONFIG_BT_CTLR_LLL_PRIO == CONFIG_BT_CTLR_ULL_LOW_PRIO)
-static void mfy_ticker_job_idle_get(void *param)
+static LLL_ISR_CODE_RAM_ATTR void mfy_ticker_job_idle_get(void *param)
 {
 	uint32_t ret;
 

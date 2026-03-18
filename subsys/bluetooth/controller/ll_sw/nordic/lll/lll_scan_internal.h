@@ -6,7 +6,7 @@
 
 #include "lll_internal.h"
 
-void lll_scan_isr_resume(void *param);
+LLL_ISR_CODE_RAM_ATTR void lll_scan_isr_resume(void *param);
 bool lll_scan_isr_rx_check(const struct lll_scan *lll, uint8_t irkmatch_ok,
 			   uint8_t devmatch_ok, uint8_t rl_idx);
 bool lll_scan_adva_check(const struct lll_scan *lll, uint8_t addr_type,

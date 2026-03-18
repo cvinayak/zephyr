@@ -8,6 +8,14 @@
 #include "lll_meta.h"
 #endif /* CONFIG_BT_CTLR_RX_PDU_META */
 
+#ifndef LLL_ISR_CODE_RAM_ATTR
+#if defined(CONFIG_BT_CTLR_ISR_CODE_IN_RAM)
+#define LLL_ISR_CODE_RAM_ATTR __ramfunc
+#else
+#define LLL_ISR_CODE_RAM_ATTR
+#endif
+#endif /* LLL_ISR_CODE_RAM_ATTR */
+
 #define TICKER_INSTANCE_ID_CTLR 0
 #define TICKER_USER_ID_LLL      MAYFLY_CALL_ID_0
 #define TICKER_USER_ID_ULL_HIGH MAYFLY_CALL_ID_1
@@ -591,7 +599,7 @@ int lll_init(void);
 int lll_deinit(void);
 int lll_reset(void);
 void lll_resume(void *param);
-void lll_disable(void *param);
+LLL_ISR_CODE_RAM_ATTR void lll_disable(void *param);
 void lll_done_ull_inc(void);
 uint32_t lll_radio_is_idle(void);
 uint32_t lll_radio_tx_ready_delay_get(uint8_t phy, uint8_t flags);
