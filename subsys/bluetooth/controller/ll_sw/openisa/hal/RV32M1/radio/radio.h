@@ -10,32 +10,32 @@
 
 typedef void (*radio_isr_cb_t) (void *param);
 
-#ifndef LLL_ISR_CODE_RAM_ATTR
-#if defined(CONFIG_BT_CTLR_ISR_CODE_IN_RAM)
-#define LLL_ISR_CODE_RAM_ATTR __ramfunc
+#ifndef BT_CTLR_LLL_ISR_CODE_RAM_ATTR
+#if defined(CONFIG_BT_CTLR_LLL_ISR_CODE_IN_RAM)
+#define BT_CTLR_LLL_ISR_CODE_RAM_ATTR __ramfunc
 #else
-#define LLL_ISR_CODE_RAM_ATTR
+#define BT_CTLR_LLL_ISR_CODE_RAM_ATTR
 #endif
-#endif /* LLL_ISR_CODE_RAM_ATTR */
+#endif /* BT_CTLR_LLL_ISR_CODE_RAM_ATTR */
 
-#ifndef ULL_HIGH_CODE_RAM_ATTR
+#ifndef BT_CTLR_ULL_HIGH_CODE_RAM_ATTR
 #if defined(CONFIG_BT_CTLR_ULL_HIGH_CODE_IN_RAM)
-#define ULL_HIGH_CODE_RAM_ATTR __ramfunc
+#define BT_CTLR_ULL_HIGH_CODE_RAM_ATTR __ramfunc
 #else
-#define ULL_HIGH_CODE_RAM_ATTR
+#define BT_CTLR_ULL_HIGH_CODE_RAM_ATTR
 #endif
-#endif /* ULL_HIGH_CODE_RAM_ATTR */
+#endif /* BT_CTLR_ULL_HIGH_CODE_RAM_ATTR */
 
-#ifndef ULL_LOW_CODE_RAM_ATTR
+#ifndef BT_CTLR_ULL_LOW_CODE_RAM_ATTR
 #if defined(CONFIG_BT_CTLR_ULL_LOW_CODE_IN_RAM)
-#define ULL_LOW_CODE_RAM_ATTR __ramfunc
+#define BT_CTLR_ULL_LOW_CODE_RAM_ATTR __ramfunc
 #else
-#define ULL_LOW_CODE_RAM_ATTR
+#define BT_CTLR_ULL_LOW_CODE_RAM_ATTR
 #endif
-#endif /* ULL_LOW_CODE_RAM_ATTR */
+#endif /* BT_CTLR_ULL_LOW_CODE_RAM_ATTR */
 
-LLL_ISR_CODE_RAM_ATTR void isr_radio(void *arg);
-LLL_ISR_CODE_RAM_ATTR void radio_isr_set(radio_isr_cb_t cb, void *param);
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_radio(void *arg);
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void radio_isr_set(radio_isr_cb_t cb, void *param);
 
 void radio_setup(void);
 void radio_reset(void);

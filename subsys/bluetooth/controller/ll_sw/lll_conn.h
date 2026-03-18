@@ -7,29 +7,29 @@
 #include "lll_conn_meta.h"
 #endif /* CONFIG_BT_CTLR_CONN_META */
 
-#ifndef LLL_ISR_CODE_RAM_ATTR
-#if defined(CONFIG_BT_CTLR_ISR_CODE_IN_RAM)
-#define LLL_ISR_CODE_RAM_ATTR __ramfunc
+#ifndef BT_CTLR_LLL_ISR_CODE_RAM_ATTR
+#if defined(CONFIG_BT_CTLR_LLL_ISR_CODE_IN_RAM)
+#define BT_CTLR_LLL_ISR_CODE_RAM_ATTR __ramfunc
 #else
-#define LLL_ISR_CODE_RAM_ATTR
+#define BT_CTLR_LLL_ISR_CODE_RAM_ATTR
 #endif
-#endif /* LLL_ISR_CODE_RAM_ATTR */
+#endif /* BT_CTLR_LLL_ISR_CODE_RAM_ATTR */
 
-#ifndef ULL_HIGH_CODE_RAM_ATTR
+#ifndef BT_CTLR_ULL_HIGH_CODE_RAM_ATTR
 #if defined(CONFIG_BT_CTLR_ULL_HIGH_CODE_IN_RAM)
-#define ULL_HIGH_CODE_RAM_ATTR __ramfunc
+#define BT_CTLR_ULL_HIGH_CODE_RAM_ATTR __ramfunc
 #else
-#define ULL_HIGH_CODE_RAM_ATTR
+#define BT_CTLR_ULL_HIGH_CODE_RAM_ATTR
 #endif
-#endif /* ULL_HIGH_CODE_RAM_ATTR */
+#endif /* BT_CTLR_ULL_HIGH_CODE_RAM_ATTR */
 
-#ifndef ULL_LOW_CODE_RAM_ATTR
+#ifndef BT_CTLR_ULL_LOW_CODE_RAM_ATTR
 #if defined(CONFIG_BT_CTLR_ULL_LOW_CODE_IN_RAM)
-#define ULL_LOW_CODE_RAM_ATTR __ramfunc
+#define BT_CTLR_ULL_LOW_CODE_RAM_ATTR __ramfunc
 #else
-#define ULL_LOW_CODE_RAM_ATTR
+#define BT_CTLR_ULL_LOW_CODE_RAM_ATTR
 #endif
-#endif /* ULL_LOW_CODE_RAM_ATTR */
+#endif /* BT_CTLR_ULL_LOW_CODE_RAM_ATTR */
 
 #define LLL_CONN_RSSI_SAMPLE_COUNT 10
 #define LLL_CONN_RSSI_THRESHOLD    4
@@ -229,8 +229,8 @@ int lll_conn_central_is_abort_cb(void *next, void *curr,
 int lll_conn_peripheral_is_abort_cb(void *next, void *curr,
 				    lll_prepare_cb_t *resume_cb);
 void lll_conn_abort_cb(struct lll_prepare_param *prepare_param, void *param);
-LLL_ISR_CODE_RAM_ATTR void lll_conn_isr_rx(void *param);
-LLL_ISR_CODE_RAM_ATTR void lll_conn_isr_tx(void *param);
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_conn_isr_rx(void *param);
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_conn_isr_tx(void *param);
 void lll_conn_rx_pkt_set(struct lll_conn *lll);
 void lll_conn_tx_pkt_set(struct lll_conn *lll, struct pdu_data *pdu_data_tx);
 void lll_conn_pdu_tx_prep(struct lll_conn *lll, struct pdu_data **pdu_data_tx);

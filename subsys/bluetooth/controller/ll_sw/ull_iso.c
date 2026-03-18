@@ -144,7 +144,7 @@ static RXFIFO_DEFINE(iso_rx, ((NODE_RX_HEADER_SIZE) + (ISO_RX_BUFFER_SIZE)),
 static MEMQ_DECLARE(ll_iso_rx);
 #if defined(CONFIG_BT_CTLR_ISO_VENDOR_DATA_PATH)
 static MEMQ_DECLARE(ull_iso_rx);
-static ULL_HIGH_CODE_RAM_ATTR void iso_rx_demux(void *param);
+static BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void iso_rx_demux(void *param);
 #endif /* CONFIG_BT_CTLR_ISO_VENDOR_DATA_PATH */
 #endif /* CONFIG_BT_CTLR_SYNC_ISO) || CONFIG_BT_CTLR_CONN_ISO */
 
@@ -1656,7 +1656,7 @@ static void iso_rx_cig_ref_point_update(struct ll_conn_iso_group *cig,
 }
 #endif /* CONFIG_BT_CTLR_CONN_ISO */
 
-static ULL_HIGH_CODE_RAM_ATTR void iso_rx_demux(void *param)
+static BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void iso_rx_demux(void *param)
 {
 #if defined(CONFIG_BT_CTLR_CONN_ISO) || \
 	defined(CONFIG_BT_CTLR_SYNC_ISO)
@@ -1975,7 +1975,7 @@ static isoal_status_t ll_iso_pdu_release(struct node_tx_iso *node_tx,
  * @brief Process ISO TX acknowledgments independently
  * @details Processes iso_ack MFIFO without serialization with RX
  */
-static ULL_HIGH_CODE_RAM_ATTR void iso_tx_ack_demux(void *param)
+static BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void iso_tx_ack_demux(void *param)
 {
 	struct lll_tx *tx_buf;
 

@@ -68,17 +68,17 @@
 static int init_reset(void);
 #if !defined(CONFIG_BT_CTLR_JIT_SCHEDULING)
 static void cis_lazy_fill(struct ll_conn_iso_stream *cis);
-static ULL_LOW_CODE_RAM_ATTR void mfy_cis_lazy_fill(void *param);
+static BT_CTLR_ULL_LOW_CODE_RAM_ATTR void mfy_cis_lazy_fill(void *param);
 static void ticker_next_slot_get_op_cb(uint32_t status, void *param);
 #endif /* !CONFIG_BT_CTLR_JIT_SCHEDULING */
 static void ticker_start_op_cb(uint32_t status, void *param);
 static void ticker_update_cig_op_cb(uint32_t status, void *param);
-static ULL_HIGH_CODE_RAM_ATTR void cis_disabled_cb(void *param);
+static BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void cis_disabled_cb(void *param);
 static void ticker_stop_op_cb(uint32_t status, void *param);
-static ULL_HIGH_CODE_RAM_ATTR void cig_disable(void *param);
+static BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void cig_disable(void *param);
 static void cig_disabled_cb(void *param);
 static void disable(uint16_t handle);
-static LLL_ISR_CODE_RAM_ATTR void cis_tx_lll_flush(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void cis_tx_lll_flush(void *param);
 
 static struct ll_conn_iso_stream cis_pool[CONFIG_BT_CTLR_CONN_ISO_STREAMS];
 static void *cis_free;
@@ -1160,7 +1160,7 @@ static void cis_lazy_fill(struct ll_conn_iso_stream *cis)
 	LL_ASSERT_ERR(!ret);
 }
 
-static ULL_LOW_CODE_RAM_ATTR void mfy_cis_lazy_fill(void *param)
+static BT_CTLR_ULL_LOW_CODE_RAM_ATTR void mfy_cis_lazy_fill(void *param)
 {
 	struct ll_conn_iso_stream *cis;
 	struct ll_conn_iso_group *cig;
@@ -1260,7 +1260,7 @@ static void ticker_update_cig_op_cb(uint32_t status, void *param)
 		      (param == ull_disable_mark_get()));
 }
 
-static ULL_HIGH_CODE_RAM_ATTR void cis_disabled_cb(void *param)
+static BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void cis_disabled_cb(void *param)
 {
 	struct ll_conn_iso_group *cig;
 	struct ll_conn_iso_stream *cis;
@@ -1424,7 +1424,7 @@ static ULL_HIGH_CODE_RAM_ATTR void cis_disabled_cb(void *param)
 	}
 }
 
-static LLL_ISR_CODE_RAM_ATTR void cis_tx_lll_flush(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void cis_tx_lll_flush(void *param)
 {
 	DECLARE_MAYFLY_ARRAY(mfys, cis_disabled_cb, CONFIG_BT_CTLR_CONN_ISO_GROUPS);
 
@@ -1503,7 +1503,7 @@ static void ticker_stop_op_cb(uint32_t status, void *param)
 	LL_ASSERT_ERR(!ret);
 }
 
-static ULL_HIGH_CODE_RAM_ATTR void cig_disable(void *param)
+static BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void cig_disable(void *param)
 {
 	struct ll_conn_iso_group *cig;
 	struct ull_hdr *hdr;

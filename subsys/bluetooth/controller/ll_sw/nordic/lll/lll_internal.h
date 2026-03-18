@@ -4,29 +4,29 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef LLL_ISR_CODE_RAM_ATTR
-#if defined(CONFIG_BT_CTLR_ISR_CODE_IN_RAM)
-#define LLL_ISR_CODE_RAM_ATTR __ramfunc
+#ifndef BT_CTLR_LLL_ISR_CODE_RAM_ATTR
+#if defined(CONFIG_BT_CTLR_LLL_ISR_CODE_IN_RAM)
+#define BT_CTLR_LLL_ISR_CODE_RAM_ATTR __ramfunc
 #else
-#define LLL_ISR_CODE_RAM_ATTR
+#define BT_CTLR_LLL_ISR_CODE_RAM_ATTR
 #endif
-#endif /* LLL_ISR_CODE_RAM_ATTR */
+#endif /* BT_CTLR_LLL_ISR_CODE_RAM_ATTR */
 
-#ifndef ULL_HIGH_CODE_RAM_ATTR
+#ifndef BT_CTLR_ULL_HIGH_CODE_RAM_ATTR
 #if defined(CONFIG_BT_CTLR_ULL_HIGH_CODE_IN_RAM)
-#define ULL_HIGH_CODE_RAM_ATTR __ramfunc
+#define BT_CTLR_ULL_HIGH_CODE_RAM_ATTR __ramfunc
 #else
-#define ULL_HIGH_CODE_RAM_ATTR
+#define BT_CTLR_ULL_HIGH_CODE_RAM_ATTR
 #endif
-#endif /* ULL_HIGH_CODE_RAM_ATTR */
+#endif /* BT_CTLR_ULL_HIGH_CODE_RAM_ATTR */
 
-#ifndef ULL_LOW_CODE_RAM_ATTR
+#ifndef BT_CTLR_ULL_LOW_CODE_RAM_ATTR
 #if defined(CONFIG_BT_CTLR_ULL_LOW_CODE_IN_RAM)
-#define ULL_LOW_CODE_RAM_ATTR __ramfunc
+#define BT_CTLR_ULL_LOW_CODE_RAM_ATTR __ramfunc
 #else
-#define ULL_LOW_CODE_RAM_ATTR
+#define BT_CTLR_ULL_LOW_CODE_RAM_ATTR
 #endif
-#endif /* ULL_LOW_CODE_RAM_ATTR */
+#endif /* BT_CTLR_ULL_LOW_CODE_RAM_ATTR */
 
 int lll_prepare_done(void *param);
 int lll_done(void *param);
@@ -40,12 +40,12 @@ uint32_t lll_preempt_calc(struct ull_hdr *ull, uint8_t ticker_id,
 
 void lll_chan_set(uint32_t chan);
 
-LLL_ISR_CODE_RAM_ATTR void lll_isr_tx_status_reset(void);
-LLL_ISR_CODE_RAM_ATTR void lll_isr_rx_status_reset(void);
-LLL_ISR_CODE_RAM_ATTR void lll_isr_tx_sub_status_reset(void);
-LLL_ISR_CODE_RAM_ATTR void lll_isr_rx_sub_status_reset(void);
-LLL_ISR_CODE_RAM_ATTR void lll_isr_status_reset(void);
-LLL_ISR_CODE_RAM_ATTR void lll_isr_abort(void *param);
-LLL_ISR_CODE_RAM_ATTR void lll_isr_done(void *param);
-LLL_ISR_CODE_RAM_ATTR void lll_isr_cleanup(void *param);
-LLL_ISR_CODE_RAM_ATTR void lll_isr_early_abort(void *param);
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_isr_tx_status_reset(void);
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_isr_rx_status_reset(void);
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_isr_tx_sub_status_reset(void);
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_isr_rx_sub_status_reset(void);
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_isr_status_reset(void);
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_isr_abort(void *param);
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_isr_done(void *param);
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_isr_cleanup(void *param);
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_isr_early_abort(void *param);

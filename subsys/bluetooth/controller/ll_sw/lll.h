@@ -8,29 +8,29 @@
 #include "lll_meta.h"
 #endif /* CONFIG_BT_CTLR_RX_PDU_META */
 
-#ifndef LLL_ISR_CODE_RAM_ATTR
-#if defined(CONFIG_BT_CTLR_ISR_CODE_IN_RAM)
-#define LLL_ISR_CODE_RAM_ATTR __ramfunc
+#ifndef BT_CTLR_LLL_ISR_CODE_RAM_ATTR
+#if defined(CONFIG_BT_CTLR_LLL_ISR_CODE_IN_RAM)
+#define BT_CTLR_LLL_ISR_CODE_RAM_ATTR __ramfunc
 #else
-#define LLL_ISR_CODE_RAM_ATTR
+#define BT_CTLR_LLL_ISR_CODE_RAM_ATTR
 #endif
-#endif /* LLL_ISR_CODE_RAM_ATTR */
+#endif /* BT_CTLR_LLL_ISR_CODE_RAM_ATTR */
 
-#ifndef ULL_HIGH_CODE_RAM_ATTR
+#ifndef BT_CTLR_ULL_HIGH_CODE_RAM_ATTR
 #if defined(CONFIG_BT_CTLR_ULL_HIGH_CODE_IN_RAM)
-#define ULL_HIGH_CODE_RAM_ATTR __ramfunc
+#define BT_CTLR_ULL_HIGH_CODE_RAM_ATTR __ramfunc
 #else
-#define ULL_HIGH_CODE_RAM_ATTR
+#define BT_CTLR_ULL_HIGH_CODE_RAM_ATTR
 #endif
-#endif /* ULL_HIGH_CODE_RAM_ATTR */
+#endif /* BT_CTLR_ULL_HIGH_CODE_RAM_ATTR */
 
-#ifndef ULL_LOW_CODE_RAM_ATTR
+#ifndef BT_CTLR_ULL_LOW_CODE_RAM_ATTR
 #if defined(CONFIG_BT_CTLR_ULL_LOW_CODE_IN_RAM)
-#define ULL_LOW_CODE_RAM_ATTR __ramfunc
+#define BT_CTLR_ULL_LOW_CODE_RAM_ATTR __ramfunc
 #else
-#define ULL_LOW_CODE_RAM_ATTR
+#define BT_CTLR_ULL_LOW_CODE_RAM_ATTR
 #endif
-#endif /* ULL_LOW_CODE_RAM_ATTR */
+#endif /* BT_CTLR_ULL_LOW_CODE_RAM_ATTR */
 
 #define TICKER_INSTANCE_ID_CTLR 0
 #define TICKER_USER_ID_LLL      MAYFLY_CALL_ID_0
@@ -614,8 +614,8 @@ void lll_done_score(void *param, uint8_t result);
 int lll_init(void);
 int lll_deinit(void);
 int lll_reset(void);
-LLL_ISR_CODE_RAM_ATTR void lll_resume(void *param);
-LLL_ISR_CODE_RAM_ATTR void lll_disable(void *param);
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_resume(void *param);
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_disable(void *param);
 void lll_done_ull_inc(void);
 uint32_t lll_radio_is_idle(void);
 uint32_t lll_radio_tx_ready_delay_get(uint8_t phy, uint8_t flags);

@@ -75,9 +75,9 @@
 
 #if (CONFIG_BT_CTLR_CENTRAL_SPACING == 0)
 static void cig_offset_get(struct ll_conn_iso_stream *cis);
-static ULL_LOW_CODE_RAM_ATTR void mfy_cig_offset_get(void *param);
+static BT_CTLR_ULL_LOW_CODE_RAM_ATTR void mfy_cig_offset_get(void *param);
 static void cis_offset_get(struct ll_conn_iso_stream *cis);
-static ULL_LOW_CODE_RAM_ATTR void mfy_cis_offset_get(void *param);
+static BT_CTLR_ULL_LOW_CODE_RAM_ATTR void mfy_cis_offset_get(void *param);
 static void ticker_op_cb(uint32_t status, void *param);
 #endif /* CONFIG_BT_CTLR_CENTRAL_SPACING  == 0 */
 
@@ -1069,7 +1069,7 @@ static void cig_offset_get(struct ll_conn_iso_stream *cis)
 	LL_ASSERT_ERR(!ret);
 }
 
-static ULL_LOW_CODE_RAM_ATTR void mfy_cig_offset_get(void *param)
+static BT_CTLR_ULL_LOW_CODE_RAM_ATTR void mfy_cig_offset_get(void *param)
 {
 	struct ll_conn_iso_stream *cis;
 	struct ll_conn_iso_group *cig;
@@ -1125,7 +1125,7 @@ static void cis_offset_get(struct ll_conn_iso_stream *cis)
 	LL_ASSERT_ERR(!ret);
 }
 
-static ULL_LOW_CODE_RAM_ATTR void mfy_cis_offset_get(void *param)
+static BT_CTLR_ULL_LOW_CODE_RAM_ATTR void mfy_cis_offset_get(void *param)
 {
 	uint32_t elapsed_acl_us, elapsed_cig_us;
 	struct ll_conn_iso_stream *cis;

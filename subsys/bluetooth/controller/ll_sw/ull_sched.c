@@ -169,7 +169,7 @@ int ull_sched_after_cen_slot_get(uint8_t user_id, uint32_t ticks_slot_abs,
 	return -ECHILD;
 }
 
-ULL_LOW_CODE_RAM_ATTR void ull_sched_mfy_after_cen_offset_get(void *param)
+BT_CTLR_ULL_LOW_CODE_RAM_ATTR void ull_sched_mfy_after_cen_offset_get(void *param)
 {
 	struct lll_prepare_param *p = param;
 	struct lll_scan *lll = p->param;

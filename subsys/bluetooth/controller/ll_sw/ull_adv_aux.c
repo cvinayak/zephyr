@@ -60,7 +60,7 @@ static uint8_t aux_time_update(struct ll_adv_aux_set *aux, struct pdu_adv *pdu,
 			       struct pdu_adv *pdu_scan);
 
 #if !defined(CONFIG_BT_TICKER_EXT_EXPIRE_INFO)
-static ULL_LOW_CODE_RAM_ATTR void mfy_aux_offset_get(void *param);
+static BT_CTLR_ULL_LOW_CODE_RAM_ATTR void mfy_aux_offset_get(void *param);
 static void ticker_op_cb(uint32_t status, void *param);
 #endif /* !CONFIG_BT_TICKER_EXT_EXPIRE_INFO */
 
@@ -3195,7 +3195,7 @@ void ull_adv_aux_lll_auxptr_fill(struct pdu_adv *pdu, struct lll_adv *adv)
  */
 #define MAX_RETRY_TICKS_CURRENT_CHANGE (CONFIG_BT_CTLR_ADV_AUX_SET + 2U)
 
-static ULL_LOW_CODE_RAM_ATTR void mfy_aux_offset_get(void *param)
+static BT_CTLR_ULL_LOW_CODE_RAM_ATTR void mfy_aux_offset_get(void *param)
 {
 	struct pdu_adv_aux_ptr *aux_ptr;
 	struct lll_adv_aux *lll_aux;

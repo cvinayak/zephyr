@@ -43,13 +43,13 @@
 static int init_reset(void);
 static int prepare_cb(struct lll_prepare_param *p);
 static void abort_cb(struct lll_prepare_param *prepare_param, void *param);
-static LLL_ISR_CODE_RAM_ATTR void isr_rx(void *param);
-static LLL_ISR_CODE_RAM_ATTR void isr_tx(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_rx(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_tx(void *param);
 static void next_cis_prepare(void *param);
-static LLL_ISR_CODE_RAM_ATTR void isr_prepare_subevent(void *param);
-static LLL_ISR_CODE_RAM_ATTR void isr_prepare_subevent_next_cis(void *param);
-static LLL_ISR_CODE_RAM_ATTR void isr_prepare_subevent_common(void *param);
-static LLL_ISR_CODE_RAM_ATTR void isr_done(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_prepare_subevent(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_prepare_subevent_next_cis(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_prepare_subevent_common(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_done(void *param);
 static void payload_count_flush(struct lll_conn_iso_stream *cis_lll);
 static void payload_count_rx_flush_or_txrx_inc(struct lll_conn_iso_stream *cis_lll);
 static void payload_count_lazy(struct lll_conn_iso_stream *cis_lll, uint16_t lazy);
@@ -92,7 +92,7 @@ int lll_peripheral_iso_reset(void)
 	return 0;
 }
 
-LLL_ISR_CODE_RAM_ATTR void lll_peripheral_iso_prepare(void *param)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_peripheral_iso_prepare(void *param)
 {
 	struct lll_conn_iso_group *cig_lll;
 	struct lll_prepare_param *p;
@@ -486,7 +486,7 @@ static void abort_cb(struct lll_prepare_param *prepare_param, void *param)
 	lll_done(param);
 }
 
-static LLL_ISR_CODE_RAM_ATTR void isr_rx(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_rx(void *param)
 {
 	struct lll_conn_iso_stream *cis_lll;
 	const struct lll_conn *conn_lll;
@@ -892,7 +892,7 @@ static LLL_ISR_CODE_RAM_ATTR void isr_rx(void *param)
 	}
 }
 
-static LLL_ISR_CODE_RAM_ATTR void isr_tx(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_tx(void *param)
 {
 	struct lll_conn_iso_stream *cis_lll;
 	struct lll_conn_iso_group *cig_lll;
@@ -1079,7 +1079,7 @@ static void next_cis_prepare(void *param)
 	radio_isr_set(isr_prepare_subevent_next_cis, next_cis_lll);
 }
 
-static LLL_ISR_CODE_RAM_ATTR void isr_prepare_subevent(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_prepare_subevent(void *param)
 {
 	struct lll_conn_iso_stream *cis_lll;
 	const struct lll_conn *conn_lll;
@@ -1104,7 +1104,7 @@ static LLL_ISR_CODE_RAM_ATTR void isr_prepare_subevent(void *param)
 	isr_prepare_subevent_common(param);
 }
 
-static LLL_ISR_CODE_RAM_ATTR void isr_prepare_subevent_next_cis(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_prepare_subevent_next_cis(void *param)
 {
 	struct lll_conn_iso_stream *cis_lll;
 	const struct lll_conn *conn_lll;
@@ -1136,7 +1136,7 @@ static LLL_ISR_CODE_RAM_ATTR void isr_prepare_subevent_next_cis(void *param)
 	isr_prepare_subevent_common(param);
 }
 
-static LLL_ISR_CODE_RAM_ATTR void isr_prepare_subevent_common(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_prepare_subevent_common(void *param)
 {
 	struct lll_conn_iso_stream *cis_lll;
 	struct lll_conn_iso_group *cig_lll;
@@ -1284,7 +1284,7 @@ static LLL_ISR_CODE_RAM_ATTR void isr_prepare_subevent_common(void *param)
 	se_curr++;
 }
 
-static LLL_ISR_CODE_RAM_ATTR void isr_done(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_done(void *param)
 {
 	struct lll_conn_iso_stream *cis_lll;
 	struct event_done_extra *e;

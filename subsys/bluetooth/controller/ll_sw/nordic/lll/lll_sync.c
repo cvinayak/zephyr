@@ -54,11 +54,11 @@ static void abort_cb(struct lll_prepare_param *prepare_param, void *param);
 static int isr_rx(struct lll_sync *lll, uint8_t node_type, uint8_t crc_ok,
 		  uint8_t phy_flags_rx, uint8_t cte_ready, uint8_t rssi_ready,
 		  enum sync_status status);
-static LLL_ISR_CODE_RAM_ATTR void isr_rx_adv_sync_estab(void *param);
-static LLL_ISR_CODE_RAM_ATTR void isr_rx_adv_sync(void *param);
-static LLL_ISR_CODE_RAM_ATTR void isr_rx_aux_chain(void *param);
-static LLL_ISR_CODE_RAM_ATTR void isr_rx_done_cleanup(struct lll_sync *lll, uint8_t crc_ok, bool sync_term);
-static LLL_ISR_CODE_RAM_ATTR void isr_done(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_rx_adv_sync_estab(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_rx_adv_sync(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_rx_aux_chain(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_rx_done_cleanup(struct lll_sync *lll, uint8_t crc_ok, bool sync_term);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_done(void *param);
 #if defined(CONFIG_BT_CTLR_DF_SCAN_CTE_RX)
 static int iq_report_create_put(struct lll_sync *lll, uint8_t rssi_ready,
 				uint8_t packet_status);
@@ -95,7 +95,7 @@ int lll_sync_reset(void)
 	return 0;
 }
 
-LLL_ISR_CODE_RAM_ATTR void lll_sync_create_prepare(void *param)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_sync_create_prepare(void *param)
 {
 	int err;
 
@@ -108,7 +108,7 @@ LLL_ISR_CODE_RAM_ATTR void lll_sync_create_prepare(void *param)
 	LL_ASSERT_ERR(!err || err == -EINPROGRESS);
 }
 
-LLL_ISR_CODE_RAM_ATTR void lll_sync_prepare(void *param)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_sync_prepare(void *param)
 {
 	int err;
 
@@ -650,7 +650,7 @@ static void abort_cb(struct lll_prepare_param *prepare_param, void *param)
 	lll_done(param);
 }
 
-static LLL_ISR_CODE_RAM_ATTR void isr_aux_setup(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_aux_setup(void *param)
 {
 	struct pdu_adv_aux_ptr *aux_ptr;
 	struct node_rx_pdu *node_rx;
@@ -908,7 +908,7 @@ static int isr_rx(struct lll_sync *lll, uint8_t node_type, uint8_t crc_ok,
 	return err;
 }
 
-static LLL_ISR_CODE_RAM_ATTR void isr_rx_adv_sync_estab(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_rx_adv_sync_estab(void *param)
 {
 	enum sync_status sync_ok;
 	struct lll_sync *lll;
@@ -1003,7 +1003,7 @@ isr_rx_done:
 #endif /* CONFIG_BT_CTLR_SYNC_PERIODIC_CTE_TYPE_FILTERING && CONFIG_BT_CTLR_CTEINLINE_SUPPORT */
 }
 
-static LLL_ISR_CODE_RAM_ATTR void isr_rx_adv_sync(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_rx_adv_sync(void *param)
 {
 	struct lll_sync *lll;
 	uint8_t phy_flags_rx;
@@ -1062,7 +1062,7 @@ isr_rx_done:
 	isr_rx_done_cleanup(lll, crc_ok, false);
 }
 
-static LLL_ISR_CODE_RAM_ATTR void isr_rx_aux_chain(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_rx_aux_chain(void *param)
 {
 	struct lll_scan_aux *lll_aux;
 	struct lll_sync *lll;
@@ -1175,7 +1175,7 @@ isr_rx_aux_chain_done:
 	}
 }
 
-static LLL_ISR_CODE_RAM_ATTR void isr_rx_done_cleanup(struct lll_sync *lll, uint8_t crc_ok, bool sync_term)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_rx_done_cleanup(struct lll_sync *lll, uint8_t crc_ok, bool sync_term)
 {
 	struct event_done_extra *e;
 
@@ -1219,7 +1219,7 @@ static LLL_ISR_CODE_RAM_ATTR void isr_rx_done_cleanup(struct lll_sync *lll, uint
 	lll_isr_cleanup(lll);
 }
 
-static LLL_ISR_CODE_RAM_ATTR void isr_done(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_done(void *param)
 {
 	struct lll_sync *lll;
 

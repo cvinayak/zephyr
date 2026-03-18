@@ -692,7 +692,7 @@ config BT_CTLR_ZLI
 	  shall not use Zero Latency IRQ themselves when this option is selected,
 	  else will impact controller stability.
 
-config BT_CTLR_ISR_CODE_IN_RAM
+config BT_CTLR_LLL_ISR_CODE_IN_RAM
 	bool "Execute ISR code path from RAM"
 	depends on ARCH_HAS_RAMFUNC_SUPPORT && XIP
 	help

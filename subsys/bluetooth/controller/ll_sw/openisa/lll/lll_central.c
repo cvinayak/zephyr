@@ -60,7 +60,7 @@ int lll_central_reset(void)
 	return 0;
 }
 
-LLL_ISR_CODE_RAM_ATTR void lll_central_prepare(void *param)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_central_prepare(void *param)
 {
 	int err;
 

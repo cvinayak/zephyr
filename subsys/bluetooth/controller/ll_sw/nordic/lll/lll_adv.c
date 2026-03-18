@@ -66,10 +66,10 @@ static int prepare_cb(struct lll_prepare_param *p);
 static int is_abort_cb(void *next, void *curr,
 		       lll_prepare_cb_t *resume_cb);
 static void abort_cb(struct lll_prepare_param *prepare_param, void *param);
-static LLL_ISR_CODE_RAM_ATTR void isr_tx(void *param);
-static LLL_ISR_CODE_RAM_ATTR void isr_rx(void *param);
-static LLL_ISR_CODE_RAM_ATTR void isr_done(void *param);
-static LLL_ISR_CODE_RAM_ATTR void isr_abort(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_tx(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_rx(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_done(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_abort(void *param);
 static struct pdu_adv *chan_prepare(struct lll_adv *lll);
 
 static inline int isr_rx_pdu(struct lll_adv *lll,
@@ -676,7 +676,7 @@ struct pdu_adv *lll_adv_pdu_and_extra_data_latest_get(struct lll_adv_pdu *pdu,
 }
 #endif /* CONFIG_BT_CTLR_ADV_EXT_PDU_EXTRA_DATA_MEMORY */
 
-LLL_ISR_CODE_RAM_ATTR void lll_adv_prepare(void *param)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_adv_prepare(void *param)
 {
 	int err;
 
@@ -798,7 +798,7 @@ static int init_reset(void)
 }
 
 #if defined(CONFIG_BT_CTLR_ZLI)
-static ULL_HIGH_CODE_RAM_ATTR void mfy_pdu_free_sem_give(void *param)
+static BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void mfy_pdu_free_sem_give(void *param)
 {
 	ARG_UNUSED(param);
 
@@ -897,7 +897,7 @@ static inline void adv_extra_data_release(struct lll_adv_pdu *pdu, int idx)
 }
 
 #if defined(CONFIG_BT_CTLR_ZLI)
-static ULL_HIGH_CODE_RAM_ATTR void mfy_extra_data_free_sem_give(void *param)
+static BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void mfy_extra_data_free_sem_give(void *param)
 {
 	ARG_UNUSED(param);
 
@@ -1145,7 +1145,7 @@ static void abort_cb(struct lll_prepare_param *prepare_param, void *param)
 	lll_done(param);
 }
 
-static LLL_ISR_CODE_RAM_ATTR void isr_tx(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_tx(void *param)
 {
 	struct node_rx_pdu *node_rx_prof;
 	struct node_rx_pdu *node_rx;
@@ -1241,7 +1241,7 @@ static LLL_ISR_CODE_RAM_ATTR void isr_tx(void *param)
 	}
 }
 
-static LLL_ISR_CODE_RAM_ATTR void isr_rx(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_rx(void *param)
 {
 	uint8_t devmatch_ok;
 	uint8_t devmatch_id;
@@ -1301,7 +1301,7 @@ isr_rx_do_close:
 	radio_disable();
 }
 
-static LLL_ISR_CODE_RAM_ATTR void isr_done(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_done(void *param)
 {
 	struct lll_adv *lll;
 
@@ -1435,7 +1435,7 @@ static LLL_ISR_CODE_RAM_ATTR void isr_done(void *param)
 	lll_isr_cleanup(param);
 }
 
-static LLL_ISR_CODE_RAM_ATTR void isr_tx_done(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_tx_done(void *param)
 {
 	/* Call to ensure packet/event timer accumulates the elapsed time
 	 * under single timer use.
@@ -1445,7 +1445,7 @@ static LLL_ISR_CODE_RAM_ATTR void isr_tx_done(void *param)
 	isr_done(param);
 }
 
-static LLL_ISR_CODE_RAM_ATTR void isr_abort(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_abort(void *param)
 {
 	/* Clear radio status and events */
 	lll_isr_status_reset();
@@ -1458,7 +1458,7 @@ static LLL_ISR_CODE_RAM_ATTR void isr_abort(void *param)
 }
 
 #if defined(CONFIG_BT_PERIPHERAL)
-static LLL_ISR_CODE_RAM_ATTR void isr_abort_all(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_abort_all(void *param)
 {
 	static memq_link_t link;
 	static struct mayfly mfy = {0, 0, &link, NULL, lll_disable};

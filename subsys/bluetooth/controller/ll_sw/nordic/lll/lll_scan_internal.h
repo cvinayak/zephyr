@@ -6,7 +6,7 @@
 
 #include "lll_internal.h"
 
-LLL_ISR_CODE_RAM_ATTR void lll_scan_isr_resume(void *param);
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_scan_isr_resume(void *param);
 bool lll_scan_isr_rx_check(const struct lll_scan *lll, uint8_t irkmatch_ok,
 			   uint8_t devmatch_ok, uint8_t rl_idx);
 bool lll_scan_adva_check(const struct lll_scan *lll, uint8_t addr_type,
@@ -22,7 +22,7 @@ void lll_scan_prepare_connect_req(struct lll_scan *lll, struct pdu_adv *pdu_tx,
 uint8_t lll_scan_aux_setup(struct pdu_adv *pdu, uint8_t pdu_phy,
 			   uint8_t pdu_phy_flags_rx, radio_isr_cb_t setup_cb,
 			   void *param);
-LLL_ISR_CODE_RAM_ATTR void lll_scan_aux_isr_aux_setup(void *param);
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_scan_aux_isr_aux_setup(void *param);
 bool lll_scan_aux_addr_match_get(const struct lll_scan *lll,
 				 const struct pdu_adv *pdu,
 				 uint8_t *const devmatch_ok,

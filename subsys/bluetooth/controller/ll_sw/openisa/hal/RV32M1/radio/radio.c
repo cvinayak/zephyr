@@ -310,7 +310,7 @@ static void pkt_rx(void)
 		   GENFSK_IRQ_CTRL_RX_WATERMARK_IRQ_MASK | \
 		   GENFSK_IRQ_CTRL_TX_IRQ_MASK | \
 		   GENFSK_IRQ_CTRL_WAKE_IRQ_MASK)
-LLL_ISR_CODE_RAM_ATTR void isr_radio(void *arg)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_radio(void *arg)
 {
 	ARG_UNUSED(arg);
 
@@ -399,7 +399,7 @@ LLL_ISR_CODE_RAM_ATTR void isr_radio(void *arg)
 	}
 }
 
-LLL_ISR_CODE_RAM_ATTR void radio_isr_set(radio_isr_cb_t cb, void *param)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void radio_isr_set(radio_isr_cb_t cb, void *param)
 {
 	irq_disable(LL_RADIO_IRQn_2nd_lvl);
 	irq_disable(LL_RADIO_IRQn);

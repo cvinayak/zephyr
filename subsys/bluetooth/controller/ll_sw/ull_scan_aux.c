@@ -65,7 +65,7 @@ static void ticker_cb(uint32_t ticks_at_expire, uint32_t ticks_drift,
 		      uint32_t remainder, uint16_t lazy, uint8_t force,
 		      void *param);
 static void ticker_op_cb(uint32_t status, void *param);
-static ULL_HIGH_CODE_RAM_ATTR void flush_safe(void *param);
+static BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void flush_safe(void *param);
 static void done_disabled_cb(void *param);
 
 #if !defined(CONFIG_BT_CTLR_SCAN_AUX_USE_CHAINS)
@@ -73,8 +73,8 @@ static void done_disabled_cb(void *param);
 static inline struct ll_scan_aux_set *aux_acquire(void);
 static inline void aux_release(struct ll_scan_aux_set *aux);
 static inline uint8_t aux_handle_get(struct ll_scan_aux_set *aux);
-static ULL_HIGH_CODE_RAM_ATTR void flush(void *param);
-static ULL_HIGH_CODE_RAM_ATTR void aux_sync_incomplete(void *param);
+static BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void flush(void *param);
+static BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void aux_sync_incomplete(void *param);
 
 /* Auxiliary context pool used for reception of PDUs at aux offsets, common for
  * both Extended Advertising and Periodic Advertising.
@@ -1359,7 +1359,7 @@ static void done_disabled_cb(void *param)
 	flush(aux);
 }
 
-static ULL_HIGH_CODE_RAM_ATTR void flush_safe(void *param)
+static BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void flush_safe(void *param)
 {
 	struct ll_scan_aux_set *aux;
 	struct ull_hdr *hdr;
@@ -1398,7 +1398,7 @@ static ULL_HIGH_CODE_RAM_ATTR void flush_safe(void *param)
 	}
 }
 
-static ULL_HIGH_CODE_RAM_ATTR void flush(void *param)
+static BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void flush(void *param)
 {
 	struct ll_scan_aux_set *aux;
 	struct ll_scan_set *scan;
@@ -1451,7 +1451,7 @@ static ULL_HIGH_CODE_RAM_ATTR void flush(void *param)
 	aux_release(aux);
 }
 
-static ULL_HIGH_CODE_RAM_ATTR void aux_sync_partial(void *param)
+static BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void aux_sync_partial(void *param)
 {
 	struct ll_scan_aux_set *aux;
 	struct node_rx_pdu *rx;
@@ -1466,7 +1466,7 @@ static ULL_HIGH_CODE_RAM_ATTR void aux_sync_partial(void *param)
 	ll_rx_put_sched(rx->hdr.link, rx);
 }
 
-static ULL_HIGH_CODE_RAM_ATTR void aux_sync_incomplete(void *param)
+static BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void aux_sync_incomplete(void *param)
 {
 #if defined(CONFIG_BT_CTLR_SYNC_PERIODIC)
 	struct ll_scan_aux_set *aux;
@@ -2466,7 +2466,7 @@ void ull_scan_aux_release(memq_link_t *link, struct node_rx_pdu *rx)
 	ll_rx_sched();
 }
 
-static ULL_HIGH_CODE_RAM_ATTR void scan_aux_stop_all_chains_for_parent(void *parent)
+static BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void scan_aux_stop_all_chains_for_parent(void *parent)
 {
 	static memq_link_t link;
 	static struct mayfly mfy = {0, 0, &link, NULL, lll_disable};
@@ -2904,7 +2904,7 @@ static void ticker_cb(uint32_t ticks_at_expire, uint32_t ticks_drift,
 }
 
 #if !defined(CONFIG_BT_TICKER_SLOT_AGNOSTIC)
-static ULL_HIGH_CODE_RAM_ATTR void ticker_start_failed(void *param)
+static BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ticker_start_failed(void *param)
 {
 	struct ll_scan_aux_chain *chain;
 

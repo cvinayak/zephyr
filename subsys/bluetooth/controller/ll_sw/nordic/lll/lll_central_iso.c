@@ -43,10 +43,10 @@
 static int init_reset(void);
 static int prepare_cb(struct lll_prepare_param *p);
 static void abort_cb(struct lll_prepare_param *prepare_param, void *param);
-static LLL_ISR_CODE_RAM_ATTR void isr_tx(void *param);
-static LLL_ISR_CODE_RAM_ATTR void isr_rx(void *param);
-static LLL_ISR_CODE_RAM_ATTR void isr_prepare_subevent(void *param);
-static LLL_ISR_CODE_RAM_ATTR void isr_done(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_tx(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_rx(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_prepare_subevent(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_done(void *param);
 static void payload_count_flush(struct lll_conn_iso_stream *cis_lll);
 static void payload_count_flush_or_inc_on_close(struct lll_conn_iso_stream *cis_lll);
 static void payload_count_lazy_update(struct lll_conn_iso_stream *cis_lll, uint16_t lazy);
@@ -91,7 +91,7 @@ int lll_central_iso_reset(void)
 	return 0;
 }
 
-LLL_ISR_CODE_RAM_ATTR void lll_central_iso_prepare(void *param)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_central_iso_prepare(void *param)
 {
 	int err;
 
@@ -461,7 +461,7 @@ static void abort_cb(struct lll_prepare_param *prepare_param, void *param)
 	lll_done(param);
 }
 
-static LLL_ISR_CODE_RAM_ATTR void isr_tx(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_tx(void *param)
 {
 	struct lll_conn_iso_stream *cis_lll;
 	struct node_rx_pdu *node_rx;
@@ -707,7 +707,7 @@ static LLL_ISR_CODE_RAM_ATTR void isr_tx(void *param)
 	}
 }
 
-static LLL_ISR_CODE_RAM_ATTR void isr_rx(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_rx(void *param)
 {
 	struct lll_conn_iso_stream *cis_lll;
 	uint8_t ack_pending;
@@ -1000,7 +1000,7 @@ isr_rx_done:
 	radio_disable();
 }
 
-static LLL_ISR_CODE_RAM_ATTR void isr_prepare_subevent(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_prepare_subevent(void *param)
 {
 	struct lll_conn_iso_stream *cis_lll;
 	struct pdu_cis *pdu_tx;
@@ -1190,7 +1190,7 @@ static LLL_ISR_CODE_RAM_ATTR void isr_prepare_subevent(void *param)
 	se_curr++;
 }
 
-static LLL_ISR_CODE_RAM_ATTR void isr_done(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_done(void *param)
 {
 	struct lll_conn_iso_stream *cis_lll;
 	struct event_done_extra *e;

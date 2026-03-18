@@ -56,23 +56,23 @@ static int aux_ptr_get(struct pdu_adv *pdu, struct pdu_adv_aux_ptr **aux_ptr);
 	* CONFIG_BT_CTLR_ADV_AUX_PDU_BACK2BACK
 	*/
 #if !defined(CONFIG_BT_TICKER_EXT_EXPIRE_INFO)
-static LLL_ISR_CODE_RAM_ATTR void isr_early_abort(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_early_abort(void *param);
 #endif /* !CONFIG_BT_TICKER_EXT_EXPIRE_INFO */
-static LLL_ISR_CODE_RAM_ATTR void isr_done(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_done(void *param);
 #if defined(CONFIG_BT_CTLR_ADV_AUX_PDU_BACK2BACK)
-static LLL_ISR_CODE_RAM_ATTR void isr_tx_chain(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_tx_chain(void *param);
 static void chain_pdu_aux_ptr_chan_idx_set(struct lll_adv_aux *lll);
 static void aux_ptr_chan_idx_set(struct lll_adv_aux *lll, struct pdu_adv *pdu);
 #endif /* CONFIG_BT_CTLR_ADV_AUX_PDU_BACK2BACK */
-static LLL_ISR_CODE_RAM_ATTR void isr_tx_rx(void *param);
-static LLL_ISR_CODE_RAM_ATTR void isr_rx(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_tx_rx(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_rx(void *param);
 static inline int isr_rx_pdu(struct lll_adv_aux *lll_aux, uint8_t phy_flags_rx,
 			     uint8_t devmatch_ok, uint8_t devmatch_id,
 			     uint8_t irkmatch_ok, uint8_t irkmatch_id,
 			     uint8_t rssi_ready);
 #if defined(CONFIG_BT_PERIPHERAL)
 static struct pdu_adv *init_connect_rsp_pdu(struct pdu_adv *pdu_ci);
-static LLL_ISR_CODE_RAM_ATTR void isr_tx_connect_rsp(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_tx_connect_rsp(void *param);
 #endif /* CONFIG_BT_PERIPHERAL */
 
 int lll_adv_aux_init(void)
@@ -99,7 +99,7 @@ int lll_adv_aux_reset(void)
 	return 0;
 }
 
-LLL_ISR_CODE_RAM_ATTR void lll_adv_aux_prepare(void *param)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_adv_aux_prepare(void *param)
 {
 	int err;
 
@@ -399,12 +399,12 @@ static int aux_ptr_get(struct pdu_adv *pdu, struct pdu_adv_aux_ptr **aux_ptr)
 	*/
 
 #if !defined(CONFIG_BT_TICKER_EXT_EXPIRE_INFO)
-static LLL_ISR_CODE_RAM_ATTR void isr_race(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_race(void *param)
 {
 	radio_status_reset();
 }
 
-static LLL_ISR_CODE_RAM_ATTR void isr_early_abort(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_early_abort(void *param)
 {
 	struct event_done_extra *extra;
 	int err;
@@ -425,7 +425,7 @@ static LLL_ISR_CODE_RAM_ATTR void isr_early_abort(void *param)
 }
 #endif /* !CONFIG_BT_TICKER_EXT_EXPIRE_INFO */
 
-static LLL_ISR_CODE_RAM_ATTR void isr_done(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_done(void *param)
 {
 	struct event_done_extra *extra;
 
@@ -441,7 +441,7 @@ static LLL_ISR_CODE_RAM_ATTR void isr_done(void *param)
 }
 
 #if defined(CONFIG_BT_CTLR_ADV_AUX_PDU_BACK2BACK)
-static LLL_ISR_CODE_RAM_ATTR void isr_tx_chain(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_tx_chain(void *param)
 {
 	struct pdu_adv_aux_ptr *aux_ptr;
 	struct lll_adv_aux *lll_aux;
@@ -573,7 +573,7 @@ static void aux_ptr_chan_idx_set(struct lll_adv_aux *lll, struct pdu_adv *pdu)
 }
 #endif /* CONFIG_BT_CTLR_ADV_AUX_PDU_BACK2BACK */
 
-static LLL_ISR_CODE_RAM_ATTR void isr_tx_rx(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_tx_rx(void *param)
 {
 	struct node_rx_pdu *node_rx_prof;
 	struct node_rx_pdu *node_rx;
@@ -668,7 +668,7 @@ static LLL_ISR_CODE_RAM_ATTR void isr_tx_rx(void *param)
 	}
 }
 
-static LLL_ISR_CODE_RAM_ATTR void isr_rx(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_rx(void *param)
 {
 	uint8_t phy_flags_rx;
 	uint8_t devmatch_ok;
@@ -990,7 +990,7 @@ static struct pdu_adv *init_connect_rsp_pdu(struct pdu_adv *pdu_ci)
 	return pdu_cr;
 }
 
-static LLL_ISR_CODE_RAM_ATTR void isr_tx_connect_rsp(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_tx_connect_rsp(void *param)
 {
 	struct node_rx_ftr *ftr;
 	struct node_rx_pdu *rx;
