@@ -69,7 +69,7 @@ int lll_prepare(lll_is_abort_cb_t is_abort_cb, lll_abort_cb_t abort_cb,
 	return err;
 }
 
-void lll_resume(void *param)
+LLL_ISR_CODE_RAM_ATTR void lll_resume(void *param)
 {
 	struct lll_event *next;
 	int err;

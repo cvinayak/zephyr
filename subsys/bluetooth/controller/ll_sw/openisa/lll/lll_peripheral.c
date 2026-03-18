@@ -60,7 +60,7 @@ int lll_periph_reset(void)
 	return 0;
 }
 
-void lll_periph_prepare(void *param)
+LLL_ISR_CODE_RAM_ATTR void lll_periph_prepare(void *param)
 {
 	struct lll_prepare_param *p;
 	struct lll_conn *lll;

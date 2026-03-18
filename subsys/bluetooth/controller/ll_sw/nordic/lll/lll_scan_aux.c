@@ -103,7 +103,7 @@ int lll_scan_aux_reset(void)
 	return 0;
 }
 
-void lll_scan_aux_prepare(void *param)
+LLL_ISR_CODE_RAM_ATTR void lll_scan_aux_prepare(void *param)
 {
 	int err;
 

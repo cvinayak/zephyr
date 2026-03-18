@@ -74,7 +74,7 @@ static void ticker_update_op_cb(uint32_t status, void *param);
 static void ticker_stop_op_cb(uint32_t status, void *param);
 static ULL_HIGH_CODE_RAM_ATTR void sync_iso_disable(void *param);
 static void disabled_cb(void *param);
-static void lll_flush(void *param);
+static LLL_ISR_CODE_RAM_ATTR void lll_flush(void *param);
 static void stop_ticker(struct ll_sync_iso_set *sync_iso, ticker_op_func fp_op_func);
 
 static memq_link_t link_lll_prepare;
@@ -1064,7 +1064,7 @@ static ULL_HIGH_CODE_RAM_ATTR void sync_iso_disable(void *param)
 	}
 }
 
-static void lll_flush(void *param)
+static LLL_ISR_CODE_RAM_ATTR void lll_flush(void *param)
 {
 	struct ll_sync_iso_set *sync_iso;
 	uint8_t handle;

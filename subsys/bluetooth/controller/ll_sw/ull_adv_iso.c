@@ -73,7 +73,7 @@ static uint32_t adv_iso_start(struct ll_adv_iso_set *adv_iso,
 			      uint32_t iso_interval_us);
 static uint8_t adv_iso_chm_update(uint8_t big_handle);
 static void adv_iso_chm_complete_commit(struct lll_adv_iso *lll_iso);
-static void mfy_iso_offset_get(void *param);
+static ULL_LOW_CODE_RAM_ATTR void mfy_iso_offset_get(void *param);
 static void pdu_big_info_chan_map_phy_set(uint8_t *chm_phy, uint8_t *chan_map,
 					  uint8_t phy);
 static inline struct pdu_big_info *big_info_get(struct pdu_adv *pdu);
@@ -85,9 +85,9 @@ static void ticker_cb(uint32_t ticks_at_expire, uint32_t ticks_drift,
 		      void *param);
 static void ticker_op_cb(uint32_t status, void *param);
 static void ticker_stop_op_cb(uint32_t status, void *param);
-static void adv_iso_disable(void *param);
+static ULL_HIGH_CODE_RAM_ATTR void adv_iso_disable(void *param);
 static void disabled_cb(void *param);
-static void tx_lll_flush(void *param);
+static LLL_ISR_CODE_RAM_ATTR void tx_lll_flush(void *param);
 
 static memq_link_t link_lll_prepare;
 static struct mayfly mfy_lll_prepare = {0U, 0U, &link_lll_prepare, NULL, NULL};
@@ -1423,7 +1423,7 @@ static void adv_iso_chm_complete_commit(struct lll_adv_iso *lll_iso)
 	lll_adv_sync_data_enqueue(lll_sync, ter_idx);
 }
 
-static void mfy_iso_offset_get(void *param)
+static ULL_LOW_CODE_RAM_ATTR void mfy_iso_offset_get(void *param)
 {
 	struct lll_adv_sync *lll_sync;
 	struct ll_adv_sync_set *sync;
@@ -1640,7 +1640,7 @@ static void ticker_stop_op_cb(uint32_t status, void *param)
 	LL_ASSERT_ERR(!ret);
 }
 
-static void adv_iso_disable(void *param)
+static ULL_HIGH_CODE_RAM_ATTR void adv_iso_disable(void *param)
 {
 	struct ll_adv_iso_set *adv_iso;
 	struct ull_hdr *hdr;
@@ -1684,7 +1684,7 @@ static void disabled_cb(void *param)
 	LL_ASSERT_ERR(!ret);
 }
 
-static void tx_lll_flush(void *param)
+static LLL_ISR_CODE_RAM_ATTR void tx_lll_flush(void *param)
 {
 	struct ll_adv_iso_set *adv_iso;
 	struct lll_adv_iso *lll;

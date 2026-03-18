@@ -614,7 +614,7 @@ void lll_done_score(void *param, uint8_t result);
 int lll_init(void);
 int lll_deinit(void);
 int lll_reset(void);
-void lll_resume(void *param);
+LLL_ISR_CODE_RAM_ATTR void lll_resume(void *param);
 LLL_ISR_CODE_RAM_ATTR void lll_disable(void *param);
 void lll_done_ull_inc(void);
 uint32_t lll_radio_is_idle(void);

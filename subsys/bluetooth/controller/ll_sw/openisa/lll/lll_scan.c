@@ -104,7 +104,7 @@ int lll_scan_reset(void)
 	return 0;
 }
 
-void lll_scan_prepare(void *param)
+LLL_ISR_CODE_RAM_ATTR void lll_scan_prepare(void *param)
 {
 	struct lll_prepare_param *p = param;
 	int err;

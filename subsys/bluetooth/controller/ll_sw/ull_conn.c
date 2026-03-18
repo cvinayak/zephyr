@@ -104,7 +104,7 @@ static void tx_ull_flush(struct ll_conn *conn);
 static void ticker_stop_op_cb(uint32_t status, void *param);
 static ULL_HIGH_CODE_RAM_ATTR void conn_disable(void *param);
 static void disabled_cb(void *param);
-static ULL_HIGH_CODE_RAM_ATTR void tx_lll_flush(void *param);
+static LLL_ISR_CODE_RAM_ATTR void tx_lll_flush(void *param);
 
 #if defined(CONFIG_BT_CTLR_LLID_DATA_START_EMPTY)
 static int empty_data_start_release(struct ll_conn *conn, struct node_tx *tx);
@@ -2095,7 +2095,7 @@ static void disabled_cb(void *param)
 	LL_ASSERT_ERR(!ret);
 }
 
-static ULL_HIGH_CODE_RAM_ATTR void tx_lll_flush(void *param)
+static LLL_ISR_CODE_RAM_ATTR void tx_lll_flush(void *param)
 {
 	struct node_rx_pdu *rx;
 	struct lll_conn *lll;
@@ -2896,7 +2896,7 @@ static uint32_t get_ticker_offset(const struct ll_conn *conn, uint8_t ticker_id,
 					(sync_remainder_us - start_us));
 }
 
-static void mfy_past_sender_offset_get(void *param)
+static ULL_LOW_CODE_RAM_ATTR void mfy_past_sender_offset_get(void *param)
 {
 	uint16_t last_pa_event_counter;
 	uint32_t ticker_offset_us;

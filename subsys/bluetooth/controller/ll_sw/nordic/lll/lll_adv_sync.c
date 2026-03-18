@@ -81,7 +81,7 @@ int lll_adv_sync_reset(void)
 	return 0;
 }
 
-void lll_adv_sync_prepare(void *param)
+LLL_ISR_CODE_RAM_ATTR void lll_adv_sync_prepare(void *param)
 {
 	int err;
 

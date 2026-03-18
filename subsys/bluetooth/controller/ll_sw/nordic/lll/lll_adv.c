@@ -676,7 +676,7 @@ struct pdu_adv *lll_adv_pdu_and_extra_data_latest_get(struct lll_adv_pdu *pdu,
 }
 #endif /* CONFIG_BT_CTLR_ADV_EXT_PDU_EXTRA_DATA_MEMORY */
 
-void lll_adv_prepare(void *param)
+LLL_ISR_CODE_RAM_ATTR void lll_adv_prepare(void *param)
 {
 	int err;
 
