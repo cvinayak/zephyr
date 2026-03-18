@@ -75,7 +75,7 @@ static inline struct lll_event *prepare_dequeue_iter_ready_get(uint8_t *idx);
 static inline struct lll_event *resume_enqueue(lll_is_abort_cb_t is_abort_cb,
 					       lll_abort_cb_t abort_cb, lll_prepare_cb_t resume_cb,
 					       void *param);
-static void isr_race(void *param);
+static LLL_ISR_CODE_RAM_ATTR void isr_race(void *param);
 
 #if !defined(CONFIG_BT_CTLR_LOW_LAT)
 static uint32_t preempt_ticker_start(struct lll_event *first,
@@ -745,7 +745,7 @@ int8_t lll_radio_tx_pwr_floor(int8_t tx_pwr_lvl)
 	return radio_tx_power_floor(tx_pwr_lvl);
 }
 
-void lll_isr_tx_status_reset(void)
+LLL_ISR_CODE_RAM_ATTR void lll_isr_tx_status_reset(void)
 {
 	radio_status_reset();
 	radio_tmr_status_reset();
@@ -756,7 +756,7 @@ void lll_isr_tx_status_reset(void)
 	}
 }
 
-void lll_isr_rx_status_reset(void)
+LLL_ISR_CODE_RAM_ATTR void lll_isr_rx_status_reset(void)
 {
 	radio_status_reset();
 	radio_tmr_status_reset();
@@ -768,7 +768,7 @@ void lll_isr_rx_status_reset(void)
 	}
 }
 
-void lll_isr_tx_sub_status_reset(void)
+LLL_ISR_CODE_RAM_ATTR void lll_isr_tx_sub_status_reset(void)
 {
 	radio_status_reset();
 	radio_tmr_tx_status_reset();
@@ -779,7 +779,7 @@ void lll_isr_tx_sub_status_reset(void)
 	}
 }
 
-void lll_isr_rx_sub_status_reset(void)
+LLL_ISR_CODE_RAM_ATTR void lll_isr_rx_sub_status_reset(void)
 {
 	radio_status_reset();
 	radio_tmr_rx_status_reset();
@@ -790,7 +790,7 @@ void lll_isr_rx_sub_status_reset(void)
 	}
 }
 
-void lll_isr_status_reset(void)
+LLL_ISR_CODE_RAM_ATTR void lll_isr_status_reset(void)
 {
 	radio_status_reset();
 	radio_tmr_status_reset();
@@ -806,18 +806,18 @@ void lll_isr_status_reset(void)
 	}
 }
 
-inline void lll_isr_abort(void *param)
+LLL_ISR_CODE_RAM_ATTR void lll_isr_abort(void *param)
 {
 	lll_isr_status_reset();
 	lll_isr_cleanup(param);
 }
 
-void lll_isr_done(void *param)
+LLL_ISR_CODE_RAM_ATTR void lll_isr_done(void *param)
 {
 	lll_isr_abort(param);
 }
 
-void lll_isr_cleanup(void *param)
+LLL_ISR_CODE_RAM_ATTR void lll_isr_cleanup(void *param)
 {
 	int err;
 
@@ -835,7 +835,7 @@ void lll_isr_cleanup(void *param)
 	lll_done(NULL);
 }
 
-void lll_isr_early_abort(void *param)
+LLL_ISR_CODE_RAM_ATTR void lll_isr_early_abort(void *param)
 {
 	int err;
 
@@ -1106,7 +1106,7 @@ static inline struct lll_event *resume_enqueue(lll_is_abort_cb_t is_abort_cb,
 	return ull_prepare_enqueue(is_abort_cb, abort_cb, &prepare_param, resume_cb, 1U);
 }
 
-static void isr_race(void *param)
+static LLL_ISR_CODE_RAM_ATTR void isr_race(void *param)
 {
 	/* NOTE: lll_disable could have a race with ... */
 	radio_status_reset();

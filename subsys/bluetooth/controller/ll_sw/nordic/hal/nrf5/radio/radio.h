@@ -56,8 +56,16 @@ enum radio_end_evt_delay_state { END_EVT_DELAY_DISABLED, END_EVT_DELAY_ENABLED }
 
 typedef void (*radio_isr_cb_t) (void *param);
 
-void isr_radio(void);
-void radio_isr_set(radio_isr_cb_t cb, void *param);
+#ifndef LLL_ISR_CODE_RAM_ATTR
+#if defined(CONFIG_BT_CTLR_ISR_CODE_IN_RAM)
+#define LLL_ISR_CODE_RAM_ATTR __ramfunc
+#else
+#define LLL_ISR_CODE_RAM_ATTR
+#endif
+#endif /* LLL_ISR_CODE_RAM_ATTR */
+
+LLL_ISR_CODE_RAM_ATTR void isr_radio(void);
+LLL_ISR_CODE_RAM_ATTR void radio_isr_set(radio_isr_cb_t cb, void *param);
 
 void radio_setup(void);
 void radio_reset(void);
@@ -131,7 +139,7 @@ void radio_bc_configure(uint32_t n);
 void radio_bc_status_reset(void);
 uint32_t radio_bc_has_match(void);
 
-void isr_radio_tmr(void);
+LLL_ISR_CODE_RAM_ATTR void isr_radio_tmr(void);
 uint32_t radio_tmr_isr_set(uint32_t start_us, radio_isr_cb_t cb, void *param);
 
 void radio_tmr_status_reset(void);

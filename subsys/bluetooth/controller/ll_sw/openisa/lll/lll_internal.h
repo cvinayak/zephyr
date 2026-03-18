@@ -4,6 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#ifndef LLL_ISR_CODE_RAM_ATTR
+#if defined(CONFIG_BT_CTLR_ISR_CODE_IN_RAM)
+#define LLL_ISR_CODE_RAM_ATTR __ramfunc
+#else
+#define LLL_ISR_CODE_RAM_ATTR
+#endif
+#endif /* LLL_ISR_CODE_RAM_ATTR */
+
 int lll_prepare_done(void *param);
 int lll_done(void *param);
 bool lll_is_done(void *param);
@@ -17,4 +25,4 @@ uint32_t lll_event_offset_get(struct ull_hdr *ull);
 uint32_t lll_preempt_calc(struct ull_hdr *ull, uint8_t ticker_id,
 			  uint32_t ticks_at_event);
 void lll_chan_set(uint32_t chan);
-void lll_isr_status_reset(void);
+LLL_ISR_CODE_RAM_ATTR void lll_isr_status_reset(void);

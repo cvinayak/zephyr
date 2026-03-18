@@ -692,6 +692,19 @@ config BT_CTLR_ZLI
 	  shall not use Zero Latency IRQ themselves when this option is selected,
 	  else will impact controller stability.
 
+config BT_CTLR_ISR_CODE_IN_RAM
+	bool "Execute ISR code path from RAM"
+	depends on ARCH_HAS_RAMFUNC_SUPPORT && XIP
+	help
+	  Place the ISR entry functions and their complete code path into the
+	  RAM section for faster execution. This includes the radio, timer,
+	  RTC, and software interrupt handlers, as well as the common ISR
+	  helper functions (status reset, abort, done, cleanup) used in the
+	  Lower Link Layer (LLL).
+
+	  Enabling this option reduces ISR latency by avoiding flash fetch
+	  delays at the cost of additional RAM usage.
+
 config BT_CTLR_DYNAMIC_INTERRUPTS
 	bool "Use Dynamic Interrupts allocation only"
 	depends on DYNAMIC_INTERRUPTS
