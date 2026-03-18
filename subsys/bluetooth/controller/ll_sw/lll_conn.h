@@ -15,6 +15,22 @@
 #endif
 #endif /* LLL_ISR_CODE_RAM_ATTR */
 
+#ifndef ULL_HIGH_CODE_RAM_ATTR
+#if defined(CONFIG_BT_CTLR_ULL_HIGH_CODE_IN_RAM)
+#define ULL_HIGH_CODE_RAM_ATTR __ramfunc
+#else
+#define ULL_HIGH_CODE_RAM_ATTR
+#endif
+#endif /* ULL_HIGH_CODE_RAM_ATTR */
+
+#ifndef ULL_LOW_CODE_RAM_ATTR
+#if defined(CONFIG_BT_CTLR_ULL_LOW_CODE_IN_RAM)
+#define ULL_LOW_CODE_RAM_ATTR __ramfunc
+#else
+#define ULL_LOW_CODE_RAM_ATTR
+#endif
+#endif /* ULL_LOW_CODE_RAM_ATTR */
+
 #define LLL_CONN_RSSI_SAMPLE_COUNT 10
 #define LLL_CONN_RSSI_THRESHOLD    4
 

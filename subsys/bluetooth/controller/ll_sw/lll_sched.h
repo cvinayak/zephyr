@@ -5,5 +5,5 @@
  */
 
 #if defined(CONFIG_BT_CENTRAL)
-extern void ull_sched_mfy_after_cen_offset_get(void *param);
+extern ULL_LOW_CODE_RAM_ATTR void ull_sched_mfy_after_cen_offset_get(void *param);
 #endif

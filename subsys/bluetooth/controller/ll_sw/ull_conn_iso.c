@@ -68,7 +68,7 @@
 static int init_reset(void);
 #if !defined(CONFIG_BT_CTLR_JIT_SCHEDULING)
 static void cis_lazy_fill(struct ll_conn_iso_stream *cis);
-static void mfy_cis_lazy_fill(void *param);
+static ULL_LOW_CODE_RAM_ATTR void mfy_cis_lazy_fill(void *param);
 static void ticker_next_slot_get_op_cb(uint32_t status, void *param);
 #endif /* !CONFIG_BT_CTLR_JIT_SCHEDULING */
 static void ticker_start_op_cb(uint32_t status, void *param);
@@ -1160,7 +1160,7 @@ static void cis_lazy_fill(struct ll_conn_iso_stream *cis)
 	LL_ASSERT_ERR(!ret);
 }
 
-static void mfy_cis_lazy_fill(void *param)
+static ULL_LOW_CODE_RAM_ATTR void mfy_cis_lazy_fill(void *param)
 {
 	struct ll_conn_iso_stream *cis;
 	struct ll_conn_iso_group *cig;

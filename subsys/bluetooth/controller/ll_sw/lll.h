@@ -16,6 +16,22 @@
 #endif
 #endif /* LLL_ISR_CODE_RAM_ATTR */
 
+#ifndef ULL_HIGH_CODE_RAM_ATTR
+#if defined(CONFIG_BT_CTLR_ULL_HIGH_CODE_IN_RAM)
+#define ULL_HIGH_CODE_RAM_ATTR __ramfunc
+#else
+#define ULL_HIGH_CODE_RAM_ATTR
+#endif
+#endif /* ULL_HIGH_CODE_RAM_ATTR */
+
+#ifndef ULL_LOW_CODE_RAM_ATTR
+#if defined(CONFIG_BT_CTLR_ULL_LOW_CODE_IN_RAM)
+#define ULL_LOW_CODE_RAM_ATTR __ramfunc
+#else
+#define ULL_LOW_CODE_RAM_ATTR
+#endif
+#endif /* ULL_LOW_CODE_RAM_ATTR */
+
 #define TICKER_INSTANCE_ID_CTLR 0
 #define TICKER_USER_ID_LLL      MAYFLY_CALL_ID_0
 #define TICKER_USER_ID_ULL_HIGH MAYFLY_CALL_ID_1

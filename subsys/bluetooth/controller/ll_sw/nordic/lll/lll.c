@@ -88,7 +88,7 @@ static void preempt_ticker_cb(uint32_t ticks_at_expire, uint32_t ticks_drift,
 static LLL_ISR_CODE_RAM_ATTR void preempt(void *param);
 #else /* CONFIG_BT_CTLR_LOW_LAT */
 #if (CONFIG_BT_CTLR_LLL_PRIO == CONFIG_BT_CTLR_ULL_LOW_PRIO)
-static LLL_ISR_CODE_RAM_ATTR void mfy_ticker_job_idle_get(void *param);
+static ULL_LOW_CODE_RAM_ATTR void mfy_ticker_job_idle_get(void *param);
 static void ticker_op_job_disable(uint32_t status, void *op_context);
 #endif
 #endif /* CONFIG_BT_CTLR_LOW_LAT */
@@ -1510,7 +1510,7 @@ preempt_abort_resume:
 #else /* CONFIG_BT_CTLR_LOW_LAT */
 
 #if (CONFIG_BT_CTLR_LLL_PRIO == CONFIG_BT_CTLR_ULL_LOW_PRIO)
-static LLL_ISR_CODE_RAM_ATTR void mfy_ticker_job_idle_get(void *param)
+static ULL_LOW_CODE_RAM_ATTR void mfy_ticker_job_idle_get(void *param)
 {
 	uint32_t ret;
 

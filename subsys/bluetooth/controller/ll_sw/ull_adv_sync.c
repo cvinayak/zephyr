@@ -107,7 +107,7 @@ static uint8_t sync_chm_update(uint8_t handle);
 static void sync_info_offset_fill(struct pdu_adv_sync_info *si, uint32_t offs);
 
 #else /* !CONFIG_BT_TICKER_EXT_EXPIRE_INFO */
-static void mfy_sync_offset_get(void *param);
+static ULL_LOW_CODE_RAM_ATTR void mfy_sync_offset_get(void *param);
 static void sync_info_offset_fill(struct pdu_adv_sync_info *si,
 				  uint32_t ticks_offset,
 				  uint32_t remainder_us,
@@ -2674,7 +2674,7 @@ static void sync_info_offset_fill(struct pdu_adv_sync_info *si, uint32_t offs)
 }
 
 #else /* !CONFIG_BT_TICKER_EXT_EXPIRE_INFO */
-static void mfy_sync_offset_get(void *param)
+static ULL_LOW_CODE_RAM_ATTR void mfy_sync_offset_get(void *param)
 {
 	struct ll_adv_set *adv = param;
 	struct lll_adv_sync *lll_sync;

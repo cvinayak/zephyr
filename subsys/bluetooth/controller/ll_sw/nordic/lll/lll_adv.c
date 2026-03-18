@@ -798,7 +798,7 @@ static int init_reset(void)
 }
 
 #if defined(CONFIG_BT_CTLR_ZLI)
-static LLL_ISR_CODE_RAM_ATTR void mfy_pdu_free_sem_give(void *param)
+static ULL_HIGH_CODE_RAM_ATTR void mfy_pdu_free_sem_give(void *param)
 {
 	ARG_UNUSED(param);
 
@@ -897,7 +897,7 @@ static inline void adv_extra_data_release(struct lll_adv_pdu *pdu, int idx)
 }
 
 #if defined(CONFIG_BT_CTLR_ZLI)
-static LLL_ISR_CODE_RAM_ATTR void mfy_extra_data_free_sem_give(void *param)
+static ULL_HIGH_CODE_RAM_ATTR void mfy_extra_data_free_sem_give(void *param)
 {
 	ARG_UNUSED(param);
 
