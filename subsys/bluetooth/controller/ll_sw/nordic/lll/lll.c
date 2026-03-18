@@ -806,7 +806,11 @@ LLL_ISR_CODE_RAM_ATTR void lll_isr_status_reset(void)
 	}
 }
 
+#if defined(CONFIG_BT_CTLR_ISR_CODE_IN_RAM)
 LLL_ISR_CODE_RAM_ATTR void lll_isr_abort(void *param)
+#else
+inline void lll_isr_abort(void *param)
+#endif
 {
 	lll_isr_status_reset();
 	lll_isr_cleanup(param);
