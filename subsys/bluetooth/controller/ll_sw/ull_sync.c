@@ -86,9 +86,9 @@ static void ticker_cb(uint32_t ticks_at_expire, uint32_t ticks_drift,
 static void ticker_start_op_cb(uint32_t status, void *param);
 static void ticker_update_op_cb(uint32_t status, void *param);
 static void ticker_stop_sync_expire_op_cb(uint32_t status, void *param);
-static void sync_expire(void *param);
+static ULL_HIGH_CODE_RAM_ATTR void sync_expire(void *param);
 static void ticker_stop_sync_lost_op_cb(uint32_t status, void *param);
-static void sync_lost(void *param);
+static ULL_HIGH_CODE_RAM_ATTR void sync_lost(void *param);
 #if defined(CONFIG_BT_CTLR_CHECK_SAME_PEER_SYNC)
 static bool peer_sid_sync_exists(uint8_t const peer_id_addr_type,
 				 uint8_t const *const peer_id_addr,
@@ -1749,7 +1749,7 @@ static void ticker_stop_sync_expire_op_cb(uint32_t status, void *param)
 	LL_ASSERT_ERR(!retval);
 }
 
-static void sync_expire(void *param)
+static ULL_HIGH_CODE_RAM_ATTR void sync_expire(void *param)
 {
 	struct ll_sync_set *sync = param;
 	struct node_rx_sync *se;
@@ -1798,7 +1798,7 @@ static void ticker_stop_sync_lost_op_cb(uint32_t status, void *param)
 	LL_ASSERT_ERR(!retval);
 }
 
-static void sync_lost(void *param)
+static ULL_HIGH_CODE_RAM_ATTR void sync_lost(void *param)
 {
 	struct ll_sync_set *sync;
 	struct node_rx_pdu *rx;

@@ -574,7 +574,7 @@ static struct ticker_ext test_ticker_ext[TEST_TICKER_NODES];
 #endif /* CONFIG_BT_CTLR_TEST */
 
 static inline int init_reset(void);
-static void perform_lll_reset(void *param);
+static ULL_HIGH_CODE_RAM_ATTR void perform_lll_reset(void *param);
 static inline void *mark_set(void **m, void *param);
 static inline void *mark_unset(void **m, void *param);
 static inline void *mark_get(void *m);
@@ -590,7 +590,7 @@ static void rx_link_dequeue_release_quota_inc(memq_link_t *link);
 	* CONFIG_BT_CTLR_ADV_PERIODIC ||
 	* CONFIG_BT_CTLR_ADV_ISO
 	*/
-static void rx_demux(void *param);
+static ULL_HIGH_CODE_RAM_ATTR void rx_demux(void *param);
 #if defined(CONFIG_BT_CTLR_LOW_LAT_ULL)
 static void rx_demux_yield(void);
 #endif /* CONFIG_BT_CTLR_LOW_LAT_ULL */
@@ -2539,7 +2539,7 @@ static inline int init_reset(void)
 	return 0;
 }
 
-static void perform_lll_reset(void *param)
+static ULL_HIGH_CODE_RAM_ATTR void perform_lll_reset(void *param)
 {
 	int err;
 
@@ -2700,7 +2700,7 @@ static void rx_link_dequeue_release_quota_inc(memq_link_t *link)
 	* CONFIG_BT_CTLR_ADV_ISO
 	*/
 
-static void rx_demux(void *param)
+static ULL_HIGH_CODE_RAM_ATTR void rx_demux(void *param)
 {
 	memq_link_t *link;
 

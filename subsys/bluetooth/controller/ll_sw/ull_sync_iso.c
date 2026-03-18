@@ -72,7 +72,7 @@ static void ticker_cb(uint32_t ticks_at_expire, uint32_t ticks_drift,
 static void ticker_start_op_cb(uint32_t status, void *param);
 static void ticker_update_op_cb(uint32_t status, void *param);
 static void ticker_stop_op_cb(uint32_t status, void *param);
-static void sync_iso_disable(void *param);
+static ULL_HIGH_CODE_RAM_ATTR void sync_iso_disable(void *param);
 static void disabled_cb(void *param);
 static void lll_flush(void *param);
 static void stop_ticker(struct ll_sync_iso_set *sync_iso, ticker_op_func fp_op_func);
@@ -1032,7 +1032,7 @@ static void ticker_stop_op_cb(uint32_t status, void *param)
 	LL_ASSERT_ERR(!ret);
 }
 
-static void sync_iso_disable(void *param)
+static ULL_HIGH_CODE_RAM_ATTR void sync_iso_disable(void *param)
 {
 	struct ll_sync_iso_set *sync_iso;
 	struct ull_hdr *hdr;

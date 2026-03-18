@@ -70,7 +70,7 @@ static uint8_t duration_period_setup(struct ll_scan_set *scan,
 static uint8_t duration_period_update(struct ll_scan_set *scan,
 				      uint8_t is_update);
 static void ticker_stop_ext_op_cb(uint32_t status, void *param);
-static void ext_disable(void *param);
+static ULL_HIGH_CODE_RAM_ATTR void ext_disable(void *param);
 static void ext_disabled_cb(void *param);
 #endif /* CONFIG_BT_CTLR_ADV_EXT */
 
@@ -1108,7 +1108,7 @@ static void ticker_stop_ext_op_cb(uint32_t status, void *param)
 	LL_ASSERT_ERR(!ret);
 }
 
-static void ext_disable(void *param)
+static ULL_HIGH_CODE_RAM_ATTR void ext_disable(void *param)
 {
 	struct ll_scan_set *scan;
 	struct ull_hdr *hdr;

@@ -75,7 +75,7 @@ static void ticker_start_op_cb(uint32_t status, void *param);
 static void ticker_update_cig_op_cb(uint32_t status, void *param);
 static void cis_disabled_cb(void *param);
 static void ticker_stop_op_cb(uint32_t status, void *param);
-static void cig_disable(void *param);
+static ULL_HIGH_CODE_RAM_ATTR void cig_disable(void *param);
 static void cig_disabled_cb(void *param);
 static void disable(uint16_t handle);
 static void cis_tx_lll_flush(void *param);
@@ -1503,7 +1503,7 @@ static void ticker_stop_op_cb(uint32_t status, void *param)
 	LL_ASSERT_ERR(!ret);
 }
 
-static void cig_disable(void *param)
+static ULL_HIGH_CODE_RAM_ATTR void cig_disable(void *param)
 {
 	struct ll_conn_iso_group *cig;
 	struct ull_hdr *hdr;

@@ -89,7 +89,7 @@ static int init_reset(void);
 #if !defined(CONFIG_BT_CTLR_LOW_LAT)
 static void tx_demux_sched(struct ll_conn *conn);
 #endif /* CONFIG_BT_CTLR_LOW_LAT */
-static void tx_demux(void *param);
+static ULL_HIGH_CODE_RAM_ATTR void tx_demux(void *param);
 static struct node_tx *tx_ull_dequeue(struct ll_conn *conn, struct node_tx *tx);
 
 static void ticker_update_conn_op_cb(uint32_t status, void *param);
@@ -102,9 +102,9 @@ static void conn_cleanup(struct ll_conn *conn, uint8_t reason);
 static void conn_cleanup_finalize(struct ll_conn *conn);
 static void tx_ull_flush(struct ll_conn *conn);
 static void ticker_stop_op_cb(uint32_t status, void *param);
-static void conn_disable(void *param);
+static ULL_HIGH_CODE_RAM_ATTR void conn_disable(void *param);
 static void disabled_cb(void *param);
-static void tx_lll_flush(void *param);
+static ULL_HIGH_CODE_RAM_ATTR void tx_lll_flush(void *param);
 
 #if defined(CONFIG_BT_CTLR_LLID_DATA_START_EMPTY)
 static int empty_data_start_release(struct ll_conn *conn, struct node_tx *tx);
@@ -1753,7 +1753,7 @@ static void tx_demux_sched(struct ll_conn *conn)
 }
 #endif /* !CONFIG_BT_CTLR_LOW_LAT */
 
-static void tx_demux(void *param)
+static ULL_HIGH_CODE_RAM_ATTR void tx_demux(void *param)
 {
 	ull_conn_tx_demux(1);
 
@@ -2051,7 +2051,7 @@ static void ticker_stop_op_cb(uint32_t status, void *param)
 	LL_ASSERT_ERR(!ret);
 }
 
-static void conn_disable(void *param)
+static ULL_HIGH_CODE_RAM_ATTR void conn_disable(void *param)
 {
 	struct ll_conn *conn;
 	struct ull_hdr *hdr;
@@ -2095,7 +2095,7 @@ static void disabled_cb(void *param)
 	LL_ASSERT_ERR(!ret);
 }
 
-static void tx_lll_flush(void *param)
+static ULL_HIGH_CODE_RAM_ATTR void tx_lll_flush(void *param)
 {
 	struct node_rx_pdu *rx;
 	struct lll_conn *lll;
