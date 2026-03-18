@@ -90,13 +90,13 @@ int lll_adv_iso_reset(void)
 	return 0;
 }
 
-void lll_adv_iso_create_prepare(void *param)
+LLL_ISR_CODE_RAM_ATTR void lll_adv_iso_create_prepare(void *param)
 {
 	prepare(param);
 	create_prepare_bh(param);
 }
 
-void lll_adv_iso_prepare(void *param)
+LLL_ISR_CODE_RAM_ATTR void lll_adv_iso_prepare(void *param)
 {
 	prepare(param);
 	prepare_bh(param);

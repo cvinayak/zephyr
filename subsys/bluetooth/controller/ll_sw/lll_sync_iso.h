@@ -4,6 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#ifndef LLL_ISR_CODE_RAM_ATTR
+#if defined(CONFIG_BT_CTLR_ISR_CODE_IN_RAM)
+#define LLL_ISR_CODE_RAM_ATTR __ramfunc
+#else
+#define LLL_ISR_CODE_RAM_ATTR
+#endif
+#endif /* LLL_ISR_CODE_RAM_ATTR */
+
 struct lll_sync_iso_stream {
 	uint8_t big_handle;
 	uint8_t bis_index;
@@ -105,8 +113,8 @@ struct lll_sync_iso {
 
 int lll_sync_iso_init(void);
 int lll_sync_iso_reset(void);
-void lll_sync_iso_create_prepare(void *param);
-void lll_sync_iso_prepare(void *param);
+LLL_ISR_CODE_RAM_ATTR void lll_sync_iso_create_prepare(void *param);
+LLL_ISR_CODE_RAM_ATTR void lll_sync_iso_prepare(void *param);
 void lll_sync_iso_flush(uint8_t handle, struct lll_sync_iso *lll);
 
 extern uint8_t ull_sync_iso_lll_index_get(struct lll_sync_iso *lll);

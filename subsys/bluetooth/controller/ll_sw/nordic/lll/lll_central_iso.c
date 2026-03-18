@@ -91,7 +91,7 @@ int lll_central_iso_reset(void)
 	return 0;
 }
 
-void lll_central_iso_prepare(void *param)
+LLL_ISR_CODE_RAM_ATTR void lll_central_iso_prepare(void *param)
 {
 	int err;
 

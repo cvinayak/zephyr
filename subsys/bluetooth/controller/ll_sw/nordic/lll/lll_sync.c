@@ -95,7 +95,7 @@ int lll_sync_reset(void)
 	return 0;
 }
 
-void lll_sync_create_prepare(void *param)
+LLL_ISR_CODE_RAM_ATTR void lll_sync_create_prepare(void *param)
 {
 	int err;
 
@@ -108,7 +108,7 @@ void lll_sync_create_prepare(void *param)
 	LL_ASSERT_ERR(!err || err == -EINPROGRESS);
 }
 
-void lll_sync_prepare(void *param)
+LLL_ISR_CODE_RAM_ATTR void lll_sync_prepare(void *param)
 {
 	int err;
 

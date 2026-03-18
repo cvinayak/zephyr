@@ -92,7 +92,7 @@ int lll_peripheral_iso_reset(void)
 	return 0;
 }
 
-void lll_peripheral_iso_prepare(void *param)
+LLL_ISR_CODE_RAM_ATTR void lll_peripheral_iso_prepare(void *param)
 {
 	struct lll_conn_iso_group *cig_lll;
 	struct lll_prepare_param *p;

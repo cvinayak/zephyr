@@ -96,7 +96,7 @@ int lll_sync_iso_reset(void)
 	return 0;
 }
 
-void lll_sync_iso_create_prepare(void *param)
+LLL_ISR_CODE_RAM_ATTR void lll_sync_iso_create_prepare(void *param)
 {
 	int err;
 
@@ -108,7 +108,7 @@ void lll_sync_iso_create_prepare(void *param)
 	LL_ASSERT_ERR(err == 0 || err == -EINPROGRESS);
 }
 
-void lll_sync_iso_prepare(void *param)
+LLL_ISR_CODE_RAM_ATTR void lll_sync_iso_prepare(void *param)
 {
 	int err;
 
