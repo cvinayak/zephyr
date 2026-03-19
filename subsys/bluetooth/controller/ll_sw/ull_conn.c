@@ -1430,7 +1430,7 @@ void ull_conn_lll_tx_demux_sched(struct lll_conn *lll)
 }
 #endif /* CONFIG_BT_CTLR_LOW_LAT */
 
-void ull_conn_tx_demux(uint8_t count)
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ull_conn_tx_demux(uint8_t count)
 {
 	do {
 		struct lll_tx *lll_tx;
@@ -1468,7 +1468,7 @@ ull_conn_tx_demux_release:
 	} while (--count);
 }
 
-void ull_conn_tx_lll_enqueue(struct ll_conn *conn, uint8_t count)
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ull_conn_tx_lll_enqueue(struct ll_conn *conn, uint8_t count)
 {
 	while (count--) {
 		struct node_tx *tx;

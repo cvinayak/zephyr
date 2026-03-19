@@ -4,12 +4,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#ifndef BT_CTLR_LLL_ISR_CODE_RAM_ATTR
+#if defined(CONFIG_BT_CTLR_LLL_ISR_CODE_IN_RAM)
+#define BT_CTLR_LLL_ISR_CODE_RAM_ATTR __ramfunc
+#else
+#define BT_CTLR_LLL_ISR_CODE_RAM_ATTR
+#endif
+#endif /* BT_CTLR_LLL_ISR_CODE_RAM_ATTR */
+
 int lll_clock_init(void);
 int lll_clock_deinit(void);
 int lll_clock_wait(void);
-int lll_hfclock_on(void);
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR int lll_hfclock_on(void);
 int lll_hfclock_on_wait(void);
-int lll_hfclock_off(void);
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR int lll_hfclock_off(void);
 uint8_t lll_clock_sca_local_get(void);
 uint32_t lll_clock_ppm_local_get(void);
 uint32_t lll_clock_ppm_get(uint8_t sca);

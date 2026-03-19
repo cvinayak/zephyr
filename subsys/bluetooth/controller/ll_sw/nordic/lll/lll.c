@@ -536,7 +536,7 @@ int lll_prepare_done(void *param)
 #endif /* CONFIG_BT_CTLR_LOW_LAT */
 }
 
-int lll_done(void *param)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR int lll_done(void *param)
 {
 	struct lll_event *next;
 	struct ull_hdr *ull;

@@ -4,6 +4,22 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#ifndef BT_CTLR_ULL_HIGH_CODE_RAM_ATTR
+#if defined(CONFIG_BT_CTLR_ULL_HIGH_CODE_IN_RAM)
+#define BT_CTLR_ULL_HIGH_CODE_RAM_ATTR __ramfunc
+#else
+#define BT_CTLR_ULL_HIGH_CODE_RAM_ATTR
+#endif
+#endif /* BT_CTLR_ULL_HIGH_CODE_RAM_ATTR */
+
+#ifndef BT_CTLR_ULL_LOW_CODE_RAM_ATTR
+#if defined(CONFIG_BT_CTLR_ULL_LOW_CODE_IN_RAM)
+#define BT_CTLR_ULL_LOW_CODE_RAM_ATTR __ramfunc
+#else
+#define BT_CTLR_ULL_LOW_CODE_RAM_ATTR
+#endif
+#endif /* BT_CTLR_ULL_LOW_CODE_RAM_ATTR */
+
 /**
  *  User CPR Interval
  */
@@ -79,9 +95,9 @@ void *ll_rx_alloc(void);
 void ll_rx_release(void *node_rx);
 void *ll_pdu_rx_alloc_peek(uint8_t count);
 void *ll_pdu_rx_alloc(void);
-void ll_rx_put_sched(memq_link_t *link, void *rx);
-void ll_rx_put(memq_link_t *link, void *rx);
-void ll_rx_sched(void);
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ll_rx_put_sched(memq_link_t *link, void *rx);
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ll_rx_put(memq_link_t *link, void *rx);
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ll_rx_sched(void);
 void ull_ticker_status_give(uint32_t status, void *param);
 uint32_t ull_ticker_status_take(uint32_t ret, uint32_t volatile *ret_cb);
 void *ull_disable_mark(void *param);

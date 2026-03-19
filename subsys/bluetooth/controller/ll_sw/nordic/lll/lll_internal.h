@@ -29,7 +29,7 @@
 #endif /* BT_CTLR_ULL_LOW_CODE_RAM_ATTR */
 
 int lll_prepare_done(void *param);
-int lll_done(void *param);
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR int lll_done(void *param);
 bool lll_is_done(void *param, bool *is_resume);
 int lll_is_abort_cb(void *next, void *curr, lll_prepare_cb_t *resume_cb);
 void lll_abort_cb(struct lll_prepare_param *prepare_param, void *param);

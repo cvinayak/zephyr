@@ -10,6 +10,7 @@
 #include <zephyr/drivers/clock_control.h>
 #include <zephyr/drivers/clock_control/nrf_clock_control.h>
 
+#include "lll.h"
 #include "lll_clock.h"
 
 #include "hal/debug.h"
@@ -84,7 +85,7 @@ const static struct nrf_clock_spec clock_req_spec_hfxo = {
 static struct onoff_client clock_cli_hfxo;
 #endif
 
-int lll_hfclock_on(void)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR int lll_hfclock_on(void)
 {
 	if (atomic_inc(&hf_refcnt) > 0) {
 		return 0;
@@ -112,7 +113,7 @@ int lll_hfclock_on_wait(void)
 	return 0;
 }
 
-int lll_hfclock_off(void)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR int lll_hfclock_off(void)
 {
 	if (atomic_get(&hf_refcnt) < 1) {
 		return -EALREADY;
@@ -214,7 +215,7 @@ int lll_clock_wait(void)
 	return 0;
 }
 
-int lll_hfclock_on(void)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR int lll_hfclock_on(void)
 {
 	if (atomic_inc(&hf_refcnt) > 0) {
 		return 0;
@@ -242,7 +243,7 @@ int lll_hfclock_on_wait(void)
 	return err;
 }
 
-int lll_hfclock_off(void)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR int lll_hfclock_off(void)
 {
 	if (atomic_get(&hf_refcnt) < 1) {
 		return -EALREADY;

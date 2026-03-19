@@ -34,7 +34,7 @@
  *	   2: TICKER_STATUS_BUSY: Preemption ticker stop error
  *	   -EINPROGRESS: Event already in progress and prepare was queued
  */
-int lll_prepare(lll_is_abort_cb_t is_abort_cb, lll_abort_cb_t abort_cb,
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR int lll_prepare(lll_is_abort_cb_t is_abort_cb, lll_abort_cb_t abort_cb,
 		lll_prepare_cb_t prepare_cb, int8_t event_prio,
 		struct lll_prepare_param *prepare_param)
 {
