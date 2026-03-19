@@ -12,6 +12,14 @@
 #endif
 #endif /* BT_CTLR_LLL_ISR_CODE_RAM_ATTR */
 
+#ifndef BT_CTLR_ULL_HIGH_CODE_RAM_ATTR
+#if defined(CONFIG_BT_CTLR_ULL_HIGH_CODE_IN_RAM)
+#define BT_CTLR_ULL_HIGH_CODE_RAM_ATTR __ramfunc
+#else
+#define BT_CTLR_ULL_HIGH_CODE_RAM_ATTR
+#endif
+#endif /* BT_CTLR_ULL_HIGH_CODE_RAM_ATTR */
+
 struct lll_sync_iso_stream {
 	uint8_t big_handle;
 	uint8_t bis_index;
@@ -119,5 +127,5 @@ void lll_sync_iso_flush(uint8_t handle, struct lll_sync_iso *lll);
 
 extern uint8_t ull_sync_iso_lll_index_get(struct lll_sync_iso *lll);
 extern struct lll_sync_iso_stream *ull_sync_iso_lll_stream_get(uint16_t handle);
-extern void ll_iso_rx_put(memq_link_t *link, void *rx);
-extern void ll_rx_sched(void);
+extern BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ll_iso_rx_put(memq_link_t *link, void *rx);
+extern BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ll_rx_sched(void);

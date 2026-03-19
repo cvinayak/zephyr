@@ -4,10 +4,26 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#ifndef BT_CTLR_ULL_HIGH_CODE_RAM_ATTR
+#if defined(CONFIG_BT_CTLR_ULL_HIGH_CODE_IN_RAM)
+#define BT_CTLR_ULL_HIGH_CODE_RAM_ATTR __ramfunc
+#else
+#define BT_CTLR_ULL_HIGH_CODE_RAM_ATTR
+#endif
+#endif /* BT_CTLR_ULL_HIGH_CODE_RAM_ATTR */
+
+#ifndef BT_CTLR_ULL_LOW_CODE_RAM_ATTR
+#if defined(CONFIG_BT_CTLR_ULL_LOW_CODE_IN_RAM)
+#define BT_CTLR_ULL_LOW_CODE_RAM_ATTR __ramfunc
+#else
+#define BT_CTLR_ULL_LOW_CODE_RAM_ATTR
+#endif
+#endif /* BT_CTLR_ULL_LOW_CODE_RAM_ATTR */
+
 int ull_sync_init(void);
 int ull_sync_reset(void);
-uint16_t ull_sync_handle_get(struct ll_sync_set *sync);
-struct ll_sync_set *ull_sync_is_enabled_get(uint16_t handle);
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR uint16_t ull_sync_handle_get(struct ll_sync_set *sync);
+BT_CTLR_ULL_LOW_CODE_RAM_ATTR struct ll_sync_set *ull_sync_is_enabled_get(uint16_t handle);
 void ull_sync_release(struct ll_sync_set *sync);
 bool ull_sync_setup_addr_check(struct ll_sync_set *sync, uint8_t filter_policy,
 			       uint8_t addr_type, uint8_t *addr, uint8_t rl_idx);

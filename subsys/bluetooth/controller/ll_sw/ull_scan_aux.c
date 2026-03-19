@@ -138,7 +138,7 @@ int ull_scan_aux_reset(void)
 	return 0;
 }
 
-static void rx_release_put(struct node_rx_pdu *rx)
+static BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void rx_release_put(struct node_rx_pdu *rx)
 {
 	rx->hdr.type = NODE_RX_TYPE_RELEASE;
 
@@ -1122,7 +1122,7 @@ struct lll_scan_aux *ull_scan_aux_lll_is_valid_get(struct lll_scan_aux *lll)
 	return NULL;
 }
 
-void ull_scan_aux_release(memq_link_t *link, struct node_rx_pdu *rx)
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ull_scan_aux_release(memq_link_t *link, struct node_rx_pdu *rx)
 {
 	struct lll_scan_aux *lll_aux;
 	void *param_ull;
@@ -2383,7 +2383,7 @@ struct lll_scan_aux *ull_scan_aux_lll_is_valid_get(struct lll_scan_aux *lll)
 	return NULL;
 }
 
-void ull_scan_aux_release(memq_link_t *link, struct node_rx_pdu *rx)
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ull_scan_aux_release(memq_link_t *link, struct node_rx_pdu *rx)
 {
 	struct lll_scan_aux *lll_aux;
 	void *param_ull;

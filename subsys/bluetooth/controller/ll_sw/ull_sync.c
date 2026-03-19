@@ -791,7 +791,7 @@ struct ll_sync_set *ull_sync_set_get(uint16_t handle)
 	return &ll_sync_pool[handle];
 }
 
-struct ll_sync_set *ull_sync_is_enabled_get(uint16_t handle)
+BT_CTLR_ULL_LOW_CODE_RAM_ATTR struct ll_sync_set *ull_sync_is_enabled_get(uint16_t handle)
 {
 	struct ll_sync_set *sync;
 
@@ -827,7 +827,7 @@ struct lll_sync *ull_sync_lll_is_valid_get(struct lll_sync *lll)
 	return NULL;
 }
 
-uint16_t ull_sync_handle_get(struct ll_sync_set *sync)
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR uint16_t ull_sync_handle_get(struct ll_sync_set *sync)
 {
 	return mem_index_get(sync, ll_sync_pool, sizeof(struct ll_sync_set));
 }

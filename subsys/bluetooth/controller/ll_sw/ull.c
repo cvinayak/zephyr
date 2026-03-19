@@ -1914,7 +1914,7 @@ void *ll_pdu_rx_alloc(void)
 #endif /* CONFIG_BT_CONN */
 
 #if defined(CONFIG_BT_CONN) || defined(CONFIG_BT_CTLR_ADV_ISO)
-void ll_tx_ack_put(uint16_t handle, struct node_tx *node_tx)
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ll_tx_ack_put(uint16_t handle, struct node_tx *node_tx)
 {
 	struct lll_tx *tx;
 	uint8_t idx;

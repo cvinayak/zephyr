@@ -4,6 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#ifndef BT_CTLR_ULL_HIGH_CODE_RAM_ATTR
+#if defined(CONFIG_BT_CTLR_ULL_HIGH_CODE_IN_RAM)
+#define BT_CTLR_ULL_HIGH_CODE_RAM_ATTR __ramfunc
+#else
+#define BT_CTLR_ULL_HIGH_CODE_RAM_ATTR
+#endif
+#endif /* BT_CTLR_ULL_HIGH_CODE_RAM_ATTR */
+
 /* Calculate ISO PDU buffers required considering SDU fragmentation */
 #if defined(CONFIG_BT_CTLR_ADV_ISO) || defined(CONFIG_BT_CTLR_CONN_ISO)
 /* Internal ISO Tx SDU maximum length.
@@ -46,7 +54,7 @@ int ull_iso_init(void);
 int ull_iso_reset(void);
 struct ll_iso_datapath *ull_iso_datapath_alloc(void);
 void ull_iso_datapath_release(struct ll_iso_datapath *dp);
-void ll_iso_rx_put(memq_link_t *link, void *rx);
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ll_iso_rx_put(memq_link_t *link, void *rx);
 void *ll_iso_rx_get(void);
 void ll_iso_rx_dequeue(void);
 void ll_iso_transmit_test_send_sdu(uint16_t handle, uint32_t ticks_at_expire);

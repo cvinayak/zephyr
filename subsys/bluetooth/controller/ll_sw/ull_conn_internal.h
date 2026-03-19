@@ -15,10 +15,10 @@
 struct ll_conn *ll_conn_acquire(void);
 void ll_conn_release(struct ll_conn *conn);
 uint16_t ll_conn_handle_get(struct ll_conn *conn);
-struct ll_conn *ll_conn_get(uint16_t handle);
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR struct ll_conn *ll_conn_get(uint16_t handle);
 struct ll_conn *ll_connected_get(uint16_t handle);
 uint16_t ll_conn_free_count_get(void);
-void ll_tx_ack_put(uint16_t handle, struct node_tx *node_tx);
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ll_tx_ack_put(uint16_t handle, struct node_tx *node_tx);
 int ull_conn_init(void);
 int ull_conn_reset(void);
 uint16_t ull_conn_default_tx_octets_get(void);
@@ -39,14 +39,14 @@ int ull_conn_llcp(struct ll_conn *conn, uint32_t ticks_at_expire,
 void ull_conn_done(struct node_rx_event_done *done);
 BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ull_conn_tx_demux(uint8_t count);
 BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ull_conn_tx_lll_enqueue(struct ll_conn *conn, uint8_t count);
-void ull_conn_link_tx_release(void *link);
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ull_conn_link_tx_release(void *link);
 uint8_t ull_conn_ack_last_idx_get(void);
-memq_link_t *ull_conn_ack_peek(uint8_t *ack_last, uint16_t *handle,
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR memq_link_t *ull_conn_ack_peek(uint8_t *ack_last, uint16_t *handle,
 			       struct node_tx **tx);
-memq_link_t *ull_conn_ack_by_last_peek(uint8_t last, uint16_t *handle,
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR memq_link_t *ull_conn_ack_by_last_peek(uint8_t last, uint16_t *handle,
 				       struct node_tx **tx);
-void *ull_conn_ack_dequeue(void);
-void ull_conn_tx_ack(uint16_t handle, memq_link_t *link, struct node_tx *tx);
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void *ull_conn_ack_dequeue(void);
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ull_conn_tx_ack(uint16_t handle, memq_link_t *link, struct node_tx *tx);
 uint8_t ull_conn_llcp_req(void *conn);
 
 void ull_pdu_data_init(struct pdu_data *pdu);

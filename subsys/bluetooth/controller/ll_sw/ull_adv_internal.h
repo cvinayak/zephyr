@@ -4,6 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#ifndef BT_CTLR_ULL_LOW_CODE_RAM_ATTR
+#if defined(CONFIG_BT_CTLR_ULL_LOW_CODE_IN_RAM)
+#define BT_CTLR_ULL_LOW_CODE_RAM_ATTR __ramfunc
+#else
+#define BT_CTLR_ULL_LOW_CODE_RAM_ATTR
+#endif
+#endif /* BT_CTLR_ULL_LOW_CODE_RAM_ATTR */
+
 #define ULL_ADV_RANDOM_DELAY HAL_TICKER_US_TO_TICKS(10000)
 
 /* Bitmask value returned by ull_adv_is_enabled() */
@@ -78,7 +86,7 @@ int ull_adv_aux_init(void);
 int ull_adv_aux_reset_finalize(void);
 
 /* Return the aux set handle given the aux set instance */
-uint8_t ull_adv_aux_handle_get(struct ll_adv_aux_set *aux);
+BT_CTLR_ULL_LOW_CODE_RAM_ATTR uint8_t ull_adv_aux_handle_get(struct ll_adv_aux_set *aux);
 
 /* Helper function to apply Channel Map Update for auxiliary PDUs */
 uint8_t ull_adv_aux_chm_update(void);
@@ -230,7 +238,7 @@ int ull_adv_sync_reset(void);
 int ull_adv_sync_reset_finalize(void);
 
 /* Return ll_adv_sync_set context (unconditional) */
-struct ll_adv_sync_set *ull_adv_sync_get(uint8_t handle);
+BT_CTLR_ULL_LOW_CODE_RAM_ATTR struct ll_adv_sync_set *ull_adv_sync_get(uint8_t handle);
 
 /* Return the aux set handle given the sync set instance */
 uint16_t ull_adv_sync_handle_get(const struct ll_adv_sync_set *sync);

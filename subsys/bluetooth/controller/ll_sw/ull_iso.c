@@ -1746,7 +1746,7 @@ static BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void iso_rx_demux(void *param)
 }
 #endif /* CONFIG_BT_CTLR_ISO_VENDOR_DATA_PATH */
 
-void ll_iso_rx_put(memq_link_t *link, void *rx)
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ll_iso_rx_put(memq_link_t *link, void *rx)
 {
 	/* Enqueue the Rx object */
 	memq_enqueue(link, rx, &memq_ll_iso_rx.tail);

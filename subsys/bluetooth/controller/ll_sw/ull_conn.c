@@ -177,7 +177,7 @@ uint16_t ll_conn_handle_get(struct ll_conn *conn)
 	return mem_index_get(conn, conn_pool, sizeof(struct ll_conn));
 }
 
-struct ll_conn *ll_conn_get(uint16_t handle)
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR struct ll_conn *ll_conn_get(uint16_t handle)
 {
 	if (handle >= CONFIG_BT_MAX_CONN) {
 		return NULL;
@@ -1488,7 +1488,7 @@ BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ull_conn_tx_lll_enqueue(struct ll_conn *conn
 	}
 }
 
-void ull_conn_link_tx_release(void *link)
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ull_conn_link_tx_release(void *link)
 {
 	mem_release(link, &mem_link_tx.free);
 }
@@ -1498,7 +1498,7 @@ uint8_t ull_conn_ack_last_idx_get(void)
 	return mfifo_fifo_conn_ack.l;
 }
 
-memq_link_t *ull_conn_ack_peek(uint8_t *ack_last, uint16_t *handle,
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR memq_link_t *ull_conn_ack_peek(uint8_t *ack_last, uint16_t *handle,
 			       struct node_tx **tx)
 {
 	struct lll_tx *lll_tx;
@@ -1516,7 +1516,7 @@ memq_link_t *ull_conn_ack_peek(uint8_t *ack_last, uint16_t *handle,
 	return (*tx)->link;
 }
 
-memq_link_t *ull_conn_ack_by_last_peek(uint8_t last, uint16_t *handle,
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR memq_link_t *ull_conn_ack_by_last_peek(uint8_t last, uint16_t *handle,
 				       struct node_tx **tx)
 {
 	struct lll_tx *lll_tx;
@@ -1533,7 +1533,7 @@ memq_link_t *ull_conn_ack_by_last_peek(uint8_t last, uint16_t *handle,
 	return (*tx)->link;
 }
 
-void *ull_conn_ack_dequeue(void)
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void *ull_conn_ack_dequeue(void)
 {
 	return MFIFO_DEQUEUE(conn_ack);
 }
@@ -1552,7 +1552,7 @@ void ull_conn_lll_ack_enqueue(uint16_t handle, struct node_tx *tx)
 	MFIFO_ENQUEUE(conn_ack, idx);
 }
 
-void ull_conn_tx_ack(uint16_t handle, memq_link_t *link, struct node_tx *tx)
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ull_conn_tx_ack(uint16_t handle, memq_link_t *link, struct node_tx *tx)
 {
 	struct pdu_data *pdu_tx;
 
@@ -2849,7 +2849,7 @@ static void ticker_get_offset_op_cb(uint32_t status, void *param)
 	*((uint32_t volatile *)param) = status;
 }
 
-static uint32_t get_ticker_offset(const struct ll_conn *conn, uint8_t ticker_id, uint16_t *lazy)
+static BT_CTLR_ULL_LOW_CODE_RAM_ATTR uint32_t get_ticker_offset(const struct ll_conn *conn, uint8_t ticker_id, uint16_t *lazy)
 {
 	uint32_t volatile ret_cb;
 	uint32_t ticks_to_expire;

@@ -96,7 +96,7 @@ static uint8_t ull_adv_sync_remove_adi(struct lll_adv_sync *lll_sync,
 static uint8_t adv_type_check(struct ll_adv_set *adv);
 static inline struct ll_adv_sync_set *sync_acquire(void);
 static inline void sync_release(struct ll_adv_sync_set *sync);
-static inline uint16_t sync_handle_get(const struct ll_adv_sync_set *sync);
+static inline BT_CTLR_ULL_LOW_CODE_RAM_ATTR uint16_t sync_handle_get(const struct ll_adv_sync_set *sync);
 static uint32_t sync_time_get(const struct ll_adv_sync_set *sync,
 			      const struct pdu_adv *pdu);
 static inline uint8_t sync_remove(struct ll_adv_sync_set *sync,
@@ -108,14 +108,14 @@ static void sync_info_offset_fill(struct pdu_adv_sync_info *si, uint32_t offs);
 
 #else /* !CONFIG_BT_TICKER_EXT_EXPIRE_INFO */
 static BT_CTLR_ULL_LOW_CODE_RAM_ATTR void mfy_sync_offset_get(void *param);
-static void sync_info_offset_fill(struct pdu_adv_sync_info *si,
+static BT_CTLR_ULL_LOW_CODE_RAM_ATTR void sync_info_offset_fill(struct pdu_adv_sync_info *si,
 				  uint32_t ticks_offset,
 				  uint32_t remainder_us,
 				  uint32_t start_us);
 static void ticker_op_cb(uint32_t status, void *param);
 #endif /* !CONFIG_BT_TICKER_EXT_EXPIRE_INFO */
 
-static struct pdu_adv_sync_info *sync_info_get(struct pdu_adv *pdu);
+static BT_CTLR_ULL_LOW_CODE_RAM_ATTR struct pdu_adv_sync_info *sync_info_get(struct pdu_adv *pdu);
 static void ticker_cb(uint32_t ticks_at_expire, uint32_t ticks_drift,
 		      uint32_t remainder, uint16_t lazy, uint8_t force,
 		      void *param);
@@ -734,7 +734,7 @@ int ull_adv_sync_reset_finalize(void)
 	return 0;
 }
 
-struct ll_adv_sync_set *ull_adv_sync_get(uint8_t handle)
+BT_CTLR_ULL_LOW_CODE_RAM_ATTR struct ll_adv_sync_set *ull_adv_sync_get(uint8_t handle)
 {
 	if (handle >= CONFIG_BT_CTLR_ADV_SYNC_SET) {
 		return NULL;
@@ -2451,7 +2451,7 @@ static inline void sync_release(struct ll_adv_sync_set *sync)
 	mem_release(sync, &adv_sync_free);
 }
 
-static inline uint16_t sync_handle_get(const struct ll_adv_sync_set *sync)
+static inline BT_CTLR_ULL_LOW_CODE_RAM_ATTR uint16_t sync_handle_get(const struct ll_adv_sync_set *sync)
 {
 	return mem_index_get(sync, ll_adv_sync_pool,
 			     sizeof(struct ll_adv_sync_set));
@@ -2774,7 +2774,7 @@ static BT_CTLR_ULL_LOW_CODE_RAM_ATTR void mfy_sync_offset_get(void *param)
 		 PDU_SYNC_INFO_SCA_CHM_SCA_BIT_MASK);
 }
 
-static void sync_info_offset_fill(struct pdu_adv_sync_info *si,
+static BT_CTLR_ULL_LOW_CODE_RAM_ATTR void sync_info_offset_fill(struct pdu_adv_sync_info *si,
 				  uint32_t ticks_offset,
 				  uint32_t remainder_us,
 				  uint32_t start_us)
@@ -2804,7 +2804,7 @@ static void ticker_op_cb(uint32_t status, void *param)
 }
 #endif /* !CONFIG_BT_TICKER_EXT_EXPIRE_INFO */
 
-static struct pdu_adv_sync_info *sync_info_get(struct pdu_adv *pdu)
+static BT_CTLR_ULL_LOW_CODE_RAM_ATTR struct pdu_adv_sync_info *sync_info_get(struct pdu_adv *pdu)
 {
 	struct pdu_adv_com_ext_adv *p;
 	struct pdu_adv_ext_hdr *h;

@@ -4,6 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#ifndef BT_CTLR_ULL_HIGH_CODE_RAM_ATTR
+#if defined(CONFIG_BT_CTLR_ULL_HIGH_CODE_IN_RAM)
+#define BT_CTLR_ULL_HIGH_CODE_RAM_ATTR __ramfunc
+#else
+#define BT_CTLR_ULL_HIGH_CODE_RAM_ATTR
+#endif
+#endif /* BT_CTLR_ULL_HIGH_CODE_RAM_ATTR */
+
 #define LLL_CIS_FLUSH_NONE      0
 #define LLL_CIS_FLUSH_PENDING   1
 #define LLL_CIS_FLUSH_COMPLETE  2
@@ -145,5 +153,5 @@ ull_conn_iso_lll_group_get_by_stream(struct lll_conn_iso_stream *cis_lll);
 extern struct lll_conn_iso_stream *ull_conn_iso_lll_stream_get(uint16_t handle);
 extern void
 ull_conn_iso_lll_cis_established(struct lll_conn_iso_stream *cis_lll);
-extern void ll_iso_rx_put(memq_link_t *link, void *rx);
-extern void ll_rx_sched(void);
+extern BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ll_iso_rx_put(memq_link_t *link, void *rx);
+extern BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ll_rx_sched(void);

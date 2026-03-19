@@ -106,7 +106,7 @@ void ll_conn_iso_group_release(struct ll_conn_iso_group *cig)
 	mem_release(cig, &cig_free);
 }
 
-uint16_t ll_conn_iso_group_handle_get(struct ll_conn_iso_group *cig)
+BT_CTLR_ULL_LOW_CODE_RAM_ATTR uint16_t ll_conn_iso_group_handle_get(struct ll_conn_iso_group *cig)
 {
 	return mem_index_get(cig, cig_pool, sizeof(struct ll_conn_iso_group));
 }

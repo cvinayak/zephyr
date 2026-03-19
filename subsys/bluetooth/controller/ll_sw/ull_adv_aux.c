@@ -2503,7 +2503,7 @@ void ull_adv_aux_ptr_fill(struct pdu_adv_aux_ptr *aux_ptr, uint32_t offs_us,
 }
 
 #if (CONFIG_BT_CTLR_ADV_AUX_SET > 0)
-inline uint8_t ull_adv_aux_handle_get(struct ll_adv_aux_set *aux)
+inline BT_CTLR_ULL_LOW_CODE_RAM_ATTR uint8_t ull_adv_aux_handle_get(struct ll_adv_aux_set *aux)
 {
 	return mem_index_get(aux, ll_adv_aux_pool,
 			     sizeof(struct ll_adv_aux_set));
