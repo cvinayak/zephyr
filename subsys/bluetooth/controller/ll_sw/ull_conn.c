@@ -89,7 +89,7 @@ static int init_reset(void);
 #if !defined(CONFIG_BT_CTLR_LOW_LAT)
 static void tx_demux_sched(struct ll_conn *conn);
 #endif /* CONFIG_BT_CTLR_LOW_LAT */
-static void tx_demux(void *param);
+static BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void tx_demux(void *param);
 static struct node_tx *tx_ull_dequeue(struct ll_conn *conn, struct node_tx *tx);
 
 static void ticker_update_conn_op_cb(uint32_t status, void *param);
@@ -102,9 +102,9 @@ static void conn_cleanup(struct ll_conn *conn, uint8_t reason);
 static void conn_cleanup_finalize(struct ll_conn *conn);
 static void tx_ull_flush(struct ll_conn *conn);
 static void ticker_stop_op_cb(uint32_t status, void *param);
-static void conn_disable(void *param);
+static BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void conn_disable(void *param);
 static void disabled_cb(void *param);
-static void tx_lll_flush(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void tx_lll_flush(void *param);
 
 #if defined(CONFIG_BT_CTLR_LLID_DATA_START_EMPTY)
 static int empty_data_start_release(struct ll_conn *conn, struct node_tx *tx);
@@ -177,7 +177,7 @@ uint16_t ll_conn_handle_get(struct ll_conn *conn)
 	return mem_index_get(conn, conn_pool, sizeof(struct ll_conn));
 }
 
-struct ll_conn *ll_conn_get(uint16_t handle)
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR struct ll_conn *ll_conn_get(uint16_t handle)
 {
 	if (handle >= CONFIG_BT_MAX_CONN) {
 		return NULL;
@@ -1430,7 +1430,7 @@ void ull_conn_lll_tx_demux_sched(struct lll_conn *lll)
 }
 #endif /* CONFIG_BT_CTLR_LOW_LAT */
 
-void ull_conn_tx_demux(uint8_t count)
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ull_conn_tx_demux(uint8_t count)
 {
 	do {
 		struct lll_tx *lll_tx;
@@ -1468,7 +1468,7 @@ ull_conn_tx_demux_release:
 	} while (--count);
 }
 
-void ull_conn_tx_lll_enqueue(struct ll_conn *conn, uint8_t count)
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ull_conn_tx_lll_enqueue(struct ll_conn *conn, uint8_t count)
 {
 	while (count--) {
 		struct node_tx *tx;
@@ -1488,7 +1488,7 @@ void ull_conn_tx_lll_enqueue(struct ll_conn *conn, uint8_t count)
 	}
 }
 
-void ull_conn_link_tx_release(void *link)
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ull_conn_link_tx_release(void *link)
 {
 	mem_release(link, &mem_link_tx.free);
 }
@@ -1498,7 +1498,7 @@ uint8_t ull_conn_ack_last_idx_get(void)
 	return mfifo_fifo_conn_ack.l;
 }
 
-memq_link_t *ull_conn_ack_peek(uint8_t *ack_last, uint16_t *handle,
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR memq_link_t *ull_conn_ack_peek(uint8_t *ack_last, uint16_t *handle,
 			       struct node_tx **tx)
 {
 	struct lll_tx *lll_tx;
@@ -1516,7 +1516,7 @@ memq_link_t *ull_conn_ack_peek(uint8_t *ack_last, uint16_t *handle,
 	return (*tx)->link;
 }
 
-memq_link_t *ull_conn_ack_by_last_peek(uint8_t last, uint16_t *handle,
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR memq_link_t *ull_conn_ack_by_last_peek(uint8_t last, uint16_t *handle,
 				       struct node_tx **tx)
 {
 	struct lll_tx *lll_tx;
@@ -1533,7 +1533,7 @@ memq_link_t *ull_conn_ack_by_last_peek(uint8_t last, uint16_t *handle,
 	return (*tx)->link;
 }
 
-void *ull_conn_ack_dequeue(void)
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void *ull_conn_ack_dequeue(void)
 {
 	return MFIFO_DEQUEUE(conn_ack);
 }
@@ -1552,7 +1552,7 @@ void ull_conn_lll_ack_enqueue(uint16_t handle, struct node_tx *tx)
 	MFIFO_ENQUEUE(conn_ack, idx);
 }
 
-void ull_conn_tx_ack(uint16_t handle, memq_link_t *link, struct node_tx *tx)
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ull_conn_tx_ack(uint16_t handle, memq_link_t *link, struct node_tx *tx)
 {
 	struct pdu_data *pdu_tx;
 
@@ -1753,7 +1753,7 @@ static void tx_demux_sched(struct ll_conn *conn)
 }
 #endif /* !CONFIG_BT_CTLR_LOW_LAT */
 
-static void tx_demux(void *param)
+static BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void tx_demux(void *param)
 {
 	ull_conn_tx_demux(1);
 
@@ -2051,7 +2051,7 @@ static void ticker_stop_op_cb(uint32_t status, void *param)
 	LL_ASSERT_ERR(!ret);
 }
 
-static void conn_disable(void *param)
+static BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void conn_disable(void *param)
 {
 	struct ll_conn *conn;
 	struct ull_hdr *hdr;
@@ -2095,7 +2095,7 @@ static void disabled_cb(void *param)
 	LL_ASSERT_ERR(!ret);
 }
 
-static void tx_lll_flush(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void tx_lll_flush(void *param)
 {
 	struct node_rx_pdu *rx;
 	struct lll_conn *lll;
@@ -2849,7 +2849,7 @@ static void ticker_get_offset_op_cb(uint32_t status, void *param)
 	*((uint32_t volatile *)param) = status;
 }
 
-static uint32_t get_ticker_offset(const struct ll_conn *conn, uint8_t ticker_id, uint16_t *lazy)
+static BT_CTLR_ULL_LOW_CODE_RAM_ATTR uint32_t get_ticker_offset(const struct ll_conn *conn, uint8_t ticker_id, uint16_t *lazy)
 {
 	uint32_t volatile ret_cb;
 	uint32_t ticks_to_expire;
@@ -2896,7 +2896,7 @@ static uint32_t get_ticker_offset(const struct ll_conn *conn, uint8_t ticker_id,
 					(sync_remainder_us - start_us));
 }
 
-static void mfy_past_sender_offset_get(void *param)
+static BT_CTLR_ULL_LOW_CODE_RAM_ATTR void mfy_past_sender_offset_get(void *param)
 {
 	uint16_t last_pa_event_counter;
 	uint32_t ticker_offset_us;

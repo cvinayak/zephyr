@@ -73,11 +73,11 @@ static uint32_t adv_iso_start(struct ll_adv_iso_set *adv_iso,
 			      uint32_t iso_interval_us);
 static uint8_t adv_iso_chm_update(uint8_t big_handle);
 static void adv_iso_chm_complete_commit(struct lll_adv_iso *lll_iso);
-static void mfy_iso_offset_get(void *param);
-static void pdu_big_info_chan_map_phy_set(uint8_t *chm_phy, uint8_t *chan_map,
+static BT_CTLR_ULL_LOW_CODE_RAM_ATTR void mfy_iso_offset_get(void *param);
+static BT_CTLR_ULL_LOW_CODE_RAM_ATTR void pdu_big_info_chan_map_phy_set(uint8_t *chm_phy, uint8_t *chan_map,
 					  uint8_t phy);
-static inline struct pdu_big_info *big_info_get(struct pdu_adv *pdu);
-static inline void big_info_offset_fill(struct pdu_big_info *bi,
+static inline BT_CTLR_ULL_LOW_CODE_RAM_ATTR struct pdu_big_info *big_info_get(struct pdu_adv *pdu);
+static inline BT_CTLR_ULL_LOW_CODE_RAM_ATTR void big_info_offset_fill(struct pdu_big_info *bi,
 					uint32_t ticks_offset,
 					uint32_t start_us);
 static void ticker_cb(uint32_t ticks_at_expire, uint32_t ticks_drift,
@@ -85,9 +85,9 @@ static void ticker_cb(uint32_t ticks_at_expire, uint32_t ticks_drift,
 		      void *param);
 static void ticker_op_cb(uint32_t status, void *param);
 static void ticker_stop_op_cb(uint32_t status, void *param);
-static void adv_iso_disable(void *param);
+static BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void adv_iso_disable(void *param);
 static void disabled_cb(void *param);
-static void tx_lll_flush(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void tx_lll_flush(void *param);
 
 static memq_link_t link_lll_prepare;
 static struct mayfly mfy_lll_prepare = {0U, 0U, &link_lll_prepare, NULL, NULL};
@@ -1423,7 +1423,7 @@ static void adv_iso_chm_complete_commit(struct lll_adv_iso *lll_iso)
 	lll_adv_sync_data_enqueue(lll_sync, ter_idx);
 }
 
-static void mfy_iso_offset_get(void *param)
+static BT_CTLR_ULL_LOW_CODE_RAM_ATTR void mfy_iso_offset_get(void *param)
 {
 	struct lll_adv_sync *lll_sync;
 	struct ll_adv_sync_set *sync;
@@ -1506,7 +1506,7 @@ static void mfy_iso_offset_get(void *param)
 	}
 }
 
-static void pdu_big_info_chan_map_phy_set(uint8_t *chm_phy, uint8_t *chan_map,
+static BT_CTLR_ULL_LOW_CODE_RAM_ATTR void pdu_big_info_chan_map_phy_set(uint8_t *chm_phy, uint8_t *chan_map,
 					  uint8_t phy)
 {
 	(void)memcpy(chm_phy, chan_map, PDU_CHANNEL_MAP_SIZE);
@@ -1514,7 +1514,7 @@ static void pdu_big_info_chan_map_phy_set(uint8_t *chm_phy, uint8_t *chan_map,
 	chm_phy[4] |= ((find_lsb_set(phy) - 1U) << 5);
 }
 
-static inline struct pdu_big_info *big_info_get(struct pdu_adv *pdu)
+static inline BT_CTLR_ULL_LOW_CODE_RAM_ATTR struct pdu_big_info *big_info_get(struct pdu_adv *pdu)
 {
 	struct pdu_adv_com_ext_adv *p;
 	struct pdu_adv_ext_hdr *h;
@@ -1554,7 +1554,7 @@ static inline struct pdu_big_info *big_info_get(struct pdu_adv *pdu)
 	return (void *)ptr;
 }
 
-static inline void big_info_offset_fill(struct pdu_big_info *bi,
+static inline BT_CTLR_ULL_LOW_CODE_RAM_ATTR void big_info_offset_fill(struct pdu_big_info *bi,
 					uint32_t ticks_offset,
 					uint32_t start_us)
 {
@@ -1640,7 +1640,7 @@ static void ticker_stop_op_cb(uint32_t status, void *param)
 	LL_ASSERT_ERR(!ret);
 }
 
-static void adv_iso_disable(void *param)
+static BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void adv_iso_disable(void *param)
 {
 	struct ll_adv_iso_set *adv_iso;
 	struct ull_hdr *hdr;
@@ -1684,7 +1684,7 @@ static void disabled_cb(void *param)
 	LL_ASSERT_ERR(!ret);
 }
 
-static void tx_lll_flush(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void tx_lll_flush(void *param)
 {
 	struct ll_adv_iso_set *adv_iso;
 	struct lll_adv_iso *lll;

@@ -54,10 +54,10 @@ static int init_reset(void);
 static int prepare_cb(struct lll_prepare_param *p);
 static int is_abort_cb(void *next, void *curr, lll_prepare_cb_t *resume_cb);
 static void abort_cb(struct lll_prepare_param *prepare_param, void *param);
-static void isr_done(void *param);
-static void isr_rx_ull_schedule(void *param);
-static void isr_rx_lll_schedule(void *param);
-static void isr_rx(struct lll_scan *lll, struct lll_scan_aux *lll_aux,
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_done(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_rx_ull_schedule(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_rx_lll_schedule(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_rx(struct lll_scan *lll, struct lll_scan_aux *lll_aux,
 		   uint8_t phy_aux);
 static int isr_rx_pdu(struct lll_scan *lll, struct lll_scan_aux *lll_aux,
 		      struct node_rx_pdu *node_rx, struct pdu_adv *pdu,
@@ -65,15 +65,15 @@ static int isr_rx_pdu(struct lll_scan *lll, struct lll_scan_aux *lll_aux,
 		      uint8_t devmatch_ok, uint8_t devmatch_id,
 		      uint8_t irkmatch_ok, uint8_t irkmatch_id, uint8_t rl_idx,
 		      uint8_t rssi_ready);
-static void isr_tx_scan_req_ull_schedule(void *param);
-static void isr_tx_scan_req_lll_schedule(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_tx_scan_req_ull_schedule(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_tx_scan_req_lll_schedule(void *param);
 #if defined(CONFIG_BT_CENTRAL)
-static void isr_tx_connect_req(void *param);
-static void isr_rx_connect_rsp(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_tx_connect_req(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_rx_connect_rsp(void *param);
 static bool isr_rx_connect_rsp_check(struct lll_scan *lll,
 				     struct pdu_adv *pdu_tx,
 				     struct pdu_adv *pdu_rx, uint8_t rl_idx);
-static void isr_early_abort(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_early_abort(void *param);
 #endif /* CONFIG_BT_CENTRAL */
 
 static uint16_t trx_cnt; /* TODO: move to a union in lll.c, common to all roles
@@ -103,7 +103,7 @@ int lll_scan_aux_reset(void)
 	return 0;
 }
 
-void lll_scan_aux_prepare(void *param)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_scan_aux_prepare(void *param)
 {
 	int err;
 
@@ -248,7 +248,7 @@ uint8_t lll_scan_aux_setup(struct pdu_adv *pdu, uint8_t pdu_phy,
 	return 1;
 }
 
-void lll_scan_aux_isr_aux_setup(void *param)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_scan_aux_isr_aux_setup(void *param)
 {
 	struct pdu_adv_aux_ptr *aux_ptr;
 	struct lll_scan_aux *lll_aux;
@@ -702,7 +702,7 @@ static void abort_cb(struct lll_prepare_param *prepare_param, void *param)
 	lll_done(param);
 }
 
-static void isr_done(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_done(void *param)
 {
 	struct lll_scan *scan_lll = NULL;
 	struct lll_sync *lll;
@@ -766,7 +766,7 @@ static void isr_done(void *param)
 	lll_isr_cleanup(param);
 }
 
-static void isr_rx_ull_schedule(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_rx_ull_schedule(void *param)
 {
 	struct lll_scan_aux *lll_aux;
 	struct lll_scan *lll;
@@ -777,7 +777,7 @@ static void isr_rx_ull_schedule(void *param)
 	isr_rx(lll, lll_aux, lll_aux->phy);
 }
 
-static void isr_rx_lll_schedule(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_rx_lll_schedule(void *param)
 {
 	struct node_rx_pdu *node_rx;
 	struct lll_scan *lll;
@@ -800,7 +800,7 @@ static void isr_rx_lll_schedule(void *param)
 	}
 }
 
-static void isr_rx(struct lll_scan *lll, struct lll_scan_aux *lll_aux,
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_rx(struct lll_scan *lll, struct lll_scan_aux *lll_aux,
 		   uint8_t phy_aux)
 {
 	struct node_rx_pdu *node_rx;
@@ -1415,7 +1415,7 @@ static int isr_rx_pdu(struct lll_scan *lll, struct lll_scan_aux *lll_aux,
 	return -EINVAL;
 }
 
-static void isr_tx(struct lll_scan_aux *lll_aux, void (*isr)(void *), void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_tx(struct lll_scan_aux *lll_aux, void (*isr)(void *), void *param)
 {
 	struct node_rx_pdu *node_rx_prof;
 	struct node_rx_pdu *node_rx;
@@ -1497,12 +1497,12 @@ static void isr_tx(struct lll_scan_aux *lll_aux, void (*isr)(void *), void *para
 	}
 }
 
-static void isr_tx_scan_req_ull_schedule(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_tx_scan_req_ull_schedule(void *param)
 {
 	isr_tx(param, isr_rx_ull_schedule, param);
 }
 
-static void isr_tx_scan_req_lll_schedule(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_tx_scan_req_lll_schedule(void *param)
 {
 	struct node_rx_pdu *node_rx_adv = param;
 	struct lll_scan *lll;
@@ -1513,12 +1513,12 @@ static void isr_tx_scan_req_lll_schedule(void *param)
 }
 
 #if defined(CONFIG_BT_CENTRAL)
-static void isr_tx_connect_req(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_tx_connect_req(void *param)
 {
 	isr_tx(param, isr_rx_connect_rsp, param);
 }
 
-static void isr_rx_connect_rsp(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_rx_connect_rsp(void *param)
 {
 	struct lll_scan_aux *lll_aux;
 	uint8_t phy_aux_flags_rx;
@@ -1700,7 +1700,7 @@ static bool isr_rx_connect_rsp_check(struct lll_scan *lll,
 		       pdu_tx->connect_ind.init_addr, BDADDR_SIZE) == 0);
 }
 
-static void isr_early_abort(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_early_abort(void *param)
 {
 	struct event_done_extra *e;
 

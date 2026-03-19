@@ -574,7 +574,7 @@ static struct ticker_ext test_ticker_ext[TEST_TICKER_NODES];
 #endif /* CONFIG_BT_CTLR_TEST */
 
 static inline int init_reset(void);
-static void perform_lll_reset(void *param);
+static BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void perform_lll_reset(void *param);
 static inline void *mark_set(void **m, void *param);
 static inline void *mark_unset(void **m, void *param);
 static inline void *mark_get(void *m);
@@ -590,18 +590,18 @@ static void rx_link_dequeue_release_quota_inc(memq_link_t *link);
 	* CONFIG_BT_CTLR_ADV_PERIODIC ||
 	* CONFIG_BT_CTLR_ADV_ISO
 	*/
-static void rx_demux(void *param);
+static BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void rx_demux(void *param);
 #if defined(CONFIG_BT_CTLR_LOW_LAT_ULL)
-static void rx_demux_yield(void);
+static BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void rx_demux_yield(void);
 #endif /* CONFIG_BT_CTLR_LOW_LAT_ULL */
 #if defined(CONFIG_BT_CONN) || defined(CONFIG_BT_CTLR_ADV_ISO)
 static uint8_t tx_cmplt_get(uint16_t *handle, uint8_t *first, uint8_t last);
-static inline void rx_demux_conn_tx_ack(uint8_t ack_last, uint16_t handle,
+static inline BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void rx_demux_conn_tx_ack(uint8_t ack_last, uint16_t handle,
 					memq_link_t *link,
 					struct node_tx *node_tx);
 #endif /* CONFIG_BT_CONN || CONFIG_BT_CTLR_ADV_ISO */
-static inline void rx_demux_rx(memq_link_t *link, struct node_rx_hdr *rx_hdr);
-static inline void rx_demux_event_done(memq_link_t *link,
+static inline BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void rx_demux_rx(memq_link_t *link, struct node_rx_hdr *rx_hdr);
+static inline BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void rx_demux_event_done(memq_link_t *link,
 				       struct node_rx_event_done *done);
 static void ll_rx_link_quota_inc(void);
 static void ll_rx_link_quota_dec(void);
@@ -1864,7 +1864,7 @@ void ll_rx_release(void *node_rx)
 	mem_release(node_rx, &mem_pdu_rx.free);
 }
 
-void ll_rx_put(memq_link_t *link, void *rx)
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ll_rx_put(memq_link_t *link, void *rx)
 {
 #if defined(CONFIG_BT_CONN) || defined(CONFIG_BT_CTLR_ADV_ISO)
 	struct node_rx_hdr *rx_hdr = rx;
@@ -1883,7 +1883,7 @@ void ll_rx_put(memq_link_t *link, void *rx)
  * @brief Permit another loop in the controller thread (prio_recv_thread)
  * @details Execution context: ULL mayfly
  */
-void ll_rx_sched(void)
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ll_rx_sched(void)
 {
 	/* sem_recv references the same semaphore (sem_prio_recv)
 	 * in prio_recv_thread
@@ -1891,7 +1891,7 @@ void ll_rx_sched(void)
 	k_sem_give(sem_recv);
 }
 
-void ll_rx_put_sched(memq_link_t *link, void *rx)
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ll_rx_put_sched(memq_link_t *link, void *rx)
 {
 	ll_rx_put(link, rx);
 	ll_rx_sched();
@@ -1914,7 +1914,7 @@ void *ll_pdu_rx_alloc(void)
 #endif /* CONFIG_BT_CONN */
 
 #if defined(CONFIG_BT_CONN) || defined(CONFIG_BT_CTLR_ADV_ISO)
-void ll_tx_ack_put(uint16_t handle, struct node_tx *node_tx)
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ll_tx_ack_put(uint16_t handle, struct node_tx *node_tx)
 {
 	struct lll_tx *tx;
 	uint8_t idx;
@@ -2175,7 +2175,7 @@ void *ull_pdu_rx_alloc(void)
 	return MFIFO_DEQUEUE(pdu_rx_free);
 }
 
-void ull_rx_put(memq_link_t *link, void *rx)
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ull_rx_put(memq_link_t *link, void *rx)
 {
 #if defined(CONFIG_BT_CONN)
 	struct node_rx_hdr *rx_hdr = rx;
@@ -2190,7 +2190,7 @@ void ull_rx_put(memq_link_t *link, void *rx)
 	memq_enqueue(link, rx, &memq_ull_rx.tail);
 }
 
-void ull_rx_sched(void)
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ull_rx_sched(void)
 {
 	static memq_link_t link;
 	static struct mayfly mfy = {0, 0, &link, NULL, rx_demux};
@@ -2199,7 +2199,7 @@ void ull_rx_sched(void)
 	mayfly_enqueue(TICKER_USER_ID_LLL, TICKER_USER_ID_ULL_HIGH, 1, &mfy);
 }
 
-void ull_rx_put_sched(memq_link_t *link, void *rx)
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ull_rx_put_sched(memq_link_t *link, void *rx)
 {
 	ull_rx_put(link, rx);
 	ull_rx_sched();
@@ -2539,7 +2539,7 @@ static inline int init_reset(void)
 	return 0;
 }
 
-static void perform_lll_reset(void *param)
+static BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void perform_lll_reset(void *param)
 {
 	int err;
 
@@ -2700,7 +2700,7 @@ static void rx_link_dequeue_release_quota_inc(memq_link_t *link)
 	* CONFIG_BT_CTLR_ADV_ISO
 	*/
 
-static void rx_demux(void *param)
+static BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void rx_demux(void *param)
 {
 	memq_link_t *link;
 
@@ -2762,7 +2762,7 @@ static void rx_demux(void *param)
 }
 
 #if defined(CONFIG_BT_CTLR_LOW_LAT_ULL)
-static void rx_demux_yield(void)
+static BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void rx_demux_yield(void)
 {
 	static memq_link_t link;
 	static struct mayfly mfy = {0, 0, &link, NULL, rx_demux};
@@ -2923,7 +2923,7 @@ next_ack:
 	return cmplt;
 }
 
-static inline void rx_demux_conn_tx_ack(uint8_t ack_last, uint16_t handle,
+static inline BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void rx_demux_conn_tx_ack(uint8_t ack_last, uint16_t handle,
 					memq_link_t *link,
 					struct node_tx *node_tx)
 {
@@ -2960,7 +2960,7 @@ static inline void rx_demux_conn_tx_ack(uint8_t ack_last, uint16_t handle,
  * @details Rx objects are only peeked, not dequeued yet.
  *   Execution context: ULL high priority Mayfly
  */
-static inline void rx_demux_rx(memq_link_t *link, struct node_rx_hdr *rx)
+static inline BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void rx_demux_rx(memq_link_t *link, struct node_rx_hdr *rx)
 {
 	/* Demux Rx objects */
 	switch (rx->type) {
@@ -3145,7 +3145,7 @@ static inline void rx_demux_rx(memq_link_t *link, struct node_rx_hdr *rx)
 	}
 }
 
-static inline void rx_demux_event_done(memq_link_t *link,
+static inline BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void rx_demux_event_done(memq_link_t *link,
 				       struct node_rx_event_done *done)
 {
 	struct ull_hdr *ull_hdr;

@@ -75,7 +75,7 @@ static inline struct lll_event *prepare_dequeue_iter_ready_get(uint8_t *idx);
 static inline struct lll_event *resume_enqueue(lll_is_abort_cb_t is_abort_cb,
 					       lll_abort_cb_t abort_cb, lll_prepare_cb_t resume_cb,
 					       void *param);
-static void isr_race(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_race(void *param);
 
 #if !defined(CONFIG_BT_CTLR_LOW_LAT)
 static uint32_t preempt_ticker_start(struct lll_event *first,
@@ -85,10 +85,10 @@ static uint32_t preempt_ticker_stop(void);
 static void preempt_ticker_cb(uint32_t ticks_at_expire, uint32_t ticks_drift,
 			      uint32_t remainder, uint16_t lazy, uint8_t force,
 			      void *param);
-static void preempt(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void preempt(void *param);
 #else /* CONFIG_BT_CTLR_LOW_LAT */
 #if (CONFIG_BT_CTLR_LLL_PRIO == CONFIG_BT_CTLR_ULL_LOW_PRIO)
-static void mfy_ticker_job_idle_get(void *param);
+static BT_CTLR_ULL_LOW_CODE_RAM_ATTR void mfy_ticker_job_idle_get(void *param);
 static void ticker_op_job_disable(uint32_t status, void *op_context);
 #endif
 #endif /* CONFIG_BT_CTLR_LOW_LAT */
@@ -479,7 +479,7 @@ int lll_reset(void)
 	return 0;
 }
 
-void lll_disable(void *param)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_disable(void *param)
 {
 	/* LLL disable of current event, done is generated */
 	if (!param || (param == event.curr.param)) {
@@ -536,7 +536,7 @@ int lll_prepare_done(void *param)
 #endif /* CONFIG_BT_CTLR_LOW_LAT */
 }
 
-int lll_done(void *param)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR int lll_done(void *param)
 {
 	struct lll_event *next;
 	struct ull_hdr *ull;
@@ -745,7 +745,7 @@ int8_t lll_radio_tx_pwr_floor(int8_t tx_pwr_lvl)
 	return radio_tx_power_floor(tx_pwr_lvl);
 }
 
-void lll_isr_tx_status_reset(void)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_isr_tx_status_reset(void)
 {
 	radio_status_reset();
 	radio_tmr_status_reset();
@@ -756,7 +756,7 @@ void lll_isr_tx_status_reset(void)
 	}
 }
 
-void lll_isr_rx_status_reset(void)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_isr_rx_status_reset(void)
 {
 	radio_status_reset();
 	radio_tmr_status_reset();
@@ -768,7 +768,7 @@ void lll_isr_rx_status_reset(void)
 	}
 }
 
-void lll_isr_tx_sub_status_reset(void)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_isr_tx_sub_status_reset(void)
 {
 	radio_status_reset();
 	radio_tmr_tx_status_reset();
@@ -779,7 +779,7 @@ void lll_isr_tx_sub_status_reset(void)
 	}
 }
 
-void lll_isr_rx_sub_status_reset(void)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_isr_rx_sub_status_reset(void)
 {
 	radio_status_reset();
 	radio_tmr_rx_status_reset();
@@ -790,7 +790,7 @@ void lll_isr_rx_sub_status_reset(void)
 	}
 }
 
-void lll_isr_status_reset(void)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_isr_status_reset(void)
 {
 	radio_status_reset();
 	radio_tmr_status_reset();
@@ -806,18 +806,22 @@ void lll_isr_status_reset(void)
 	}
 }
 
+#if defined(CONFIG_BT_CTLR_LLL_ISR_CODE_IN_RAM)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_isr_abort(void *param)
+#else
 inline void lll_isr_abort(void *param)
+#endif
 {
 	lll_isr_status_reset();
 	lll_isr_cleanup(param);
 }
 
-void lll_isr_done(void *param)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_isr_done(void *param)
 {
 	lll_isr_abort(param);
 }
 
-void lll_isr_cleanup(void *param)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_isr_cleanup(void *param)
 {
 	int err;
 
@@ -835,7 +839,7 @@ void lll_isr_cleanup(void *param)
 	lll_done(NULL);
 }
 
-void lll_isr_early_abort(void *param)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_isr_early_abort(void *param)
 {
 	int err;
 
@@ -1106,7 +1110,7 @@ static inline struct lll_event *resume_enqueue(lll_is_abort_cb_t is_abort_cb,
 	return ull_prepare_enqueue(is_abort_cb, abort_cb, &prepare_param, resume_cb, 1U);
 }
 
-static void isr_race(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_race(void *param)
 {
 	/* NOTE: lll_disable could have a race with ... */
 	radio_status_reset();
@@ -1277,7 +1281,7 @@ static void preempt_ticker_cb(uint32_t ticks_at_expire, uint32_t ticks_drift,
 	LL_ASSERT_ERR(!ret);
 }
 
-static void preempt(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void preempt(void *param)
 {
 	lll_prepare_cb_t resume_cb;
 	struct lll_event *ready;
@@ -1506,7 +1510,7 @@ preempt_abort_resume:
 #else /* CONFIG_BT_CTLR_LOW_LAT */
 
 #if (CONFIG_BT_CTLR_LLL_PRIO == CONFIG_BT_CTLR_ULL_LOW_PRIO)
-static void mfy_ticker_job_idle_get(void *param)
+static BT_CTLR_ULL_LOW_CODE_RAM_ATTR void mfy_ticker_job_idle_get(void *param)
 {
 	uint32_t ret;
 

@@ -4,6 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#ifndef BT_CTLR_ULL_HIGH_CODE_RAM_ATTR
+#if defined(CONFIG_BT_CTLR_ULL_HIGH_CODE_IN_RAM)
+#define BT_CTLR_ULL_HIGH_CODE_RAM_ATTR __ramfunc
+#else
+#define BT_CTLR_ULL_HIGH_CODE_RAM_ATTR
+#endif
+#endif /* BT_CTLR_ULL_HIGH_CODE_RAM_ATTR */
+
 /* NOTE: Definitions used internal to ULL implementations */
 
 #define SCAN_HANDLE_1M        0
@@ -88,7 +96,7 @@ struct ll_scan_aux_set *ull_scan_aux_set_get(uint8_t handle);
 struct ll_scan_aux_set *ull_scan_aux_is_valid_get(struct ll_scan_aux_set *aux);
 
 /* Helper function to flush and release incomplete auxiliary PDU chaining */
-void ull_scan_aux_release(memq_link_t *link, struct node_rx_pdu *rx);
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ull_scan_aux_release(memq_link_t *link, struct node_rx_pdu *rx);
 
 /* Helper function to stop auxiliary scan context */
 #if defined(CONFIG_BT_CTLR_SCAN_AUX_USE_CHAINS)

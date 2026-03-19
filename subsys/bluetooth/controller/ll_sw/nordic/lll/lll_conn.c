@@ -44,16 +44,16 @@
 #include "hal/debug.h"
 
 static int init_reset(void);
-static void isr_done(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_done(void *param);
 static inline int isr_rx_pdu(struct lll_conn *lll, struct pdu_data *pdu_data_rx,
 			     uint8_t *is_rx_enqueue,
 			     struct node_tx **tx_release, uint8_t *is_done);
 
 #if defined(CONFIG_BT_CTLR_TX_DEFER)
-static void isr_tx_deferred_set(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_tx_deferred_set(void *param);
 #endif /* CONFIG_BT_CTLR_TX_DEFER */
 
-static void empty_tx_init(void);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void empty_tx_init(void);
 
 #if defined(CONFIG_BT_CTLR_DF_CONN_CTE_RX)
 static inline bool create_iq_report(struct lll_conn *lll, uint8_t rssi_ready,
@@ -61,7 +61,7 @@ static inline bool create_iq_report(struct lll_conn *lll, uint8_t rssi_ready,
 #endif /* CONFIG_BT_CTLR_DF_CONN_CTE_RX */
 
 #if defined(CONFIG_BT_CTLR_DF_CONN_CTE_TX)
-static struct pdu_data *get_last_tx_pdu(struct lll_conn *lll);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR struct pdu_data *get_last_tx_pdu(struct lll_conn *lll);
 #endif /* CONFIG_BT_CTLR_DF_CONN_CTE_TX */
 
 static uint8_t crc_expire;
@@ -304,7 +304,7 @@ void lll_conn_abort_cb(struct lll_prepare_param *prepare_param, void *param)
 	lll_done(param);
 }
 
-void lll_conn_isr_rx(void *param)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_conn_isr_rx(void *param)
 {
 	uint8_t is_empty_pdu_tx_retry;
 	struct pdu_data *pdu_data_rx;
@@ -647,7 +647,7 @@ lll_conn_isr_rx_exit:
 #endif /* CONFIG_BT_CTLR_PROFILE_ISR */
 }
 
-void lll_conn_isr_tx(void *param)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_conn_isr_tx(void *param)
 {
 #if defined(CONFIG_BT_CTLR_DF_CONN_CTE_TX)
 	static struct pdu_data *pdu_tx;
@@ -828,7 +828,7 @@ void lll_conn_isr_tx(void *param)
 #endif /* CONFIG_BT_CTLR_LOW_LAT */
 }
 
-void lll_conn_rx_pkt_set(struct lll_conn *lll)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_conn_rx_pkt_set(struct lll_conn *lll)
 {
 	struct pdu_data *pdu_data_rx;
 	struct node_rx_pdu *node_rx;
@@ -895,7 +895,7 @@ void lll_conn_rx_pkt_set(struct lll_conn *lll)
 	}
 }
 
-void lll_conn_tx_pkt_set(struct lll_conn *lll, struct pdu_data *pdu_data_tx)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_conn_tx_pkt_set(struct lll_conn *lll, struct pdu_data *pdu_data_tx)
 {
 	uint8_t phy, flags, pkt_flags;
 	uint16_t max_tx_octets;
@@ -947,7 +947,7 @@ void lll_conn_tx_pkt_set(struct lll_conn *lll, struct pdu_data *pdu_data_tx)
 	}
 }
 
-void lll_conn_pdu_tx_prep(struct lll_conn *lll, struct pdu_data **pdu_data_tx)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_conn_pdu_tx_prep(struct lll_conn *lll, struct pdu_data **pdu_data_tx)
 {
 	struct node_tx *tx;
 	struct pdu_data *p;
@@ -1018,7 +1018,7 @@ void lll_conn_pdu_tx_prep(struct lll_conn *lll, struct pdu_data **pdu_data_tx)
 }
 
 #if defined(CONFIG_BT_CTLR_FORCE_MD_AUTO)
-uint8_t lll_conn_force_md_cnt_set(uint8_t reload_cnt)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR uint8_t lll_conn_force_md_cnt_set(uint8_t reload_cnt)
 {
 	uint8_t previous;
 
@@ -1034,7 +1034,7 @@ static int init_reset(void)
 	return 0;
 }
 
-static void isr_done(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_done(void *param)
 {
 	struct event_done_extra *e;
 
@@ -1261,7 +1261,7 @@ static inline int isr_rx_pdu(struct lll_conn *lll, struct pdu_data *pdu_data_rx,
 }
 
 #if defined(CONFIG_BT_CTLR_TX_DEFER)
-static void isr_tx_deferred_set(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_tx_deferred_set(void *param)
 {
 	struct pdu_data *pdu_data_tx;
 	struct lll_conn *lll;
@@ -1279,7 +1279,7 @@ static void isr_tx_deferred_set(void *param)
 }
 #endif /* CONFIG_BT_CTLR_TX_DEFER */
 
-static void empty_tx_init(void)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void empty_tx_init(void)
 {
 	struct pdu_data *p;
 
@@ -1351,7 +1351,7 @@ static inline bool create_iq_report(struct lll_conn *lll, uint8_t rssi_ready, ui
  *
  * @return Return pointer to latest pdu_data instance
  */
-static struct pdu_data *get_last_tx_pdu(struct lll_conn *lll)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR struct pdu_data *get_last_tx_pdu(struct lll_conn *lll)
 {
 	struct node_tx *tx;
 	struct pdu_data *p;

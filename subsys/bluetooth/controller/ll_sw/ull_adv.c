@@ -86,7 +86,7 @@ static void ticker_stop_cb(uint32_t ticks_at_expire, uint32_t ticks_drift,
 			   uint32_t remainder, uint16_t lazy, uint8_t force,
 			   void *param);
 static void ticker_stop_op_cb(uint32_t status, void *param);
-static void adv_disable(void *param);
+static BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void adv_disable(void *param);
 static void disabled_cb(void *param);
 static void conn_release(struct ll_adv_set *adv);
 #endif /* CONFIG_BT_PERIPHERAL */
@@ -97,10 +97,10 @@ static void adv_max_events_duration_set(struct ll_adv_set *adv,
 					uint16_t duration,
 					uint8_t max_ext_adv_evts);
 static void ticker_stop_aux_op_cb(uint32_t status, void *param);
-static void aux_disable(void *param);
+static BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void aux_disable(void *param);
 static void aux_disabled_cb(void *param);
 static void ticker_stop_ext_op_cb(uint32_t status, void *param);
-static void ext_disable(void *param);
+static BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ext_disable(void *param);
 static void ext_disabled_cb(void *param);
 #endif /* CONFIG_BT_CTLR_ADV_EXT */
 
@@ -2563,7 +2563,7 @@ static void ticker_stop_op_cb(uint32_t status, void *param)
 	LL_ASSERT_ERR(!ret);
 }
 
-static void adv_disable(void *param)
+static BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void adv_disable(void *param)
 {
 	struct ll_adv_set *adv;
 	struct ull_hdr *hdr;
@@ -2711,7 +2711,7 @@ static void ticker_stop_aux_op_cb(uint32_t status, void *param)
 	LL_ASSERT_ERR(!ret);
 }
 
-static void aux_disable(void *param)
+static BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void aux_disable(void *param)
 {
 	struct lll_adv_aux *lll_aux;
 	struct ll_adv_aux_set *aux;
@@ -2765,7 +2765,7 @@ static void ticker_stop_ext_op_cb(uint32_t status, void *param)
 	LL_ASSERT_ERR(!ret);
 }
 
-static void ext_disable(void *param)
+static BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ext_disable(void *param)
 {
 	struct ll_adv_set *adv;
 	struct ull_hdr *hdr;

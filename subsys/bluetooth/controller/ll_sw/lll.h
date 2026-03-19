@@ -8,6 +8,30 @@
 #include "lll_meta.h"
 #endif /* CONFIG_BT_CTLR_RX_PDU_META */
 
+#ifndef BT_CTLR_LLL_ISR_CODE_RAM_ATTR
+#if defined(CONFIG_BT_CTLR_LLL_ISR_CODE_IN_RAM)
+#define BT_CTLR_LLL_ISR_CODE_RAM_ATTR __ramfunc
+#else
+#define BT_CTLR_LLL_ISR_CODE_RAM_ATTR
+#endif
+#endif /* BT_CTLR_LLL_ISR_CODE_RAM_ATTR */
+
+#ifndef BT_CTLR_ULL_HIGH_CODE_RAM_ATTR
+#if defined(CONFIG_BT_CTLR_ULL_HIGH_CODE_IN_RAM)
+#define BT_CTLR_ULL_HIGH_CODE_RAM_ATTR __ramfunc
+#else
+#define BT_CTLR_ULL_HIGH_CODE_RAM_ATTR
+#endif
+#endif /* BT_CTLR_ULL_HIGH_CODE_RAM_ATTR */
+
+#ifndef BT_CTLR_ULL_LOW_CODE_RAM_ATTR
+#if defined(CONFIG_BT_CTLR_ULL_LOW_CODE_IN_RAM)
+#define BT_CTLR_ULL_LOW_CODE_RAM_ATTR __ramfunc
+#else
+#define BT_CTLR_ULL_LOW_CODE_RAM_ATTR
+#endif
+#endif /* BT_CTLR_ULL_LOW_CODE_RAM_ATTR */
+
 #define TICKER_INSTANCE_ID_CTLR 0
 #define TICKER_USER_ID_LLL      MAYFLY_CALL_ID_0
 #define TICKER_USER_ID_ULL_HIGH MAYFLY_CALL_ID_1
@@ -590,8 +614,8 @@ void lll_done_score(void *param, uint8_t result);
 int lll_init(void);
 int lll_deinit(void);
 int lll_reset(void);
-void lll_resume(void *param);
-void lll_disable(void *param);
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_resume(void *param);
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_disable(void *param);
 void lll_done_ull_inc(void);
 uint32_t lll_radio_is_idle(void);
 uint32_t lll_radio_tx_ready_delay_get(uint8_t phy, uint8_t flags);
@@ -618,9 +642,9 @@ void *ull_pdu_rx_alloc_peek_iter(uint8_t *idx);
 void *ull_pdu_rx_alloc(void);
 void *ull_iso_pdu_rx_alloc_peek(uint8_t count);
 void *ull_iso_pdu_rx_alloc(void);
-void ull_rx_put(memq_link_t *link, void *rx);
-void ull_rx_sched(void);
-void ull_rx_put_sched(memq_link_t *link, void *rx);
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ull_rx_put(memq_link_t *link, void *rx);
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ull_rx_sched(void);
+BT_CTLR_ULL_HIGH_CODE_RAM_ATTR void ull_rx_put_sched(memq_link_t *link, void *rx);
 void ull_iso_rx_put(memq_link_t *link, void *rx);
 void ull_iso_rx_sched(void);
 void *ull_iso_tx_ack_dequeue(void);
@@ -631,7 +655,7 @@ struct event_done_extra *ull_event_done_extra_get(void);
 struct event_done_extra *ull_done_extra_type_set(uint8_t type);
 void *ull_event_done(void *param);
 
-int lll_prepare(lll_is_abort_cb_t is_abort_cb,
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR int lll_prepare(lll_is_abort_cb_t is_abort_cb,
 		lll_abort_cb_t abort_cb,
 		lll_prepare_cb_t prepare_cb, int8_t event_prio,
 		struct lll_prepare_param *prepare_param);

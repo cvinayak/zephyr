@@ -459,7 +459,7 @@ uint32_t lll_radio_rx_ready_delay_get(uint8_t phy, uint8_t flags)
 	return radio_rx_ready_delay_get(phy, flags);
 }
 
-void lll_isr_status_reset(void)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_isr_status_reset(void)
 {
 	radio_status_reset();
 	radio_tmr_status_reset();

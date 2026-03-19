@@ -692,6 +692,45 @@ config BT_CTLR_ZLI
 	  shall not use Zero Latency IRQ themselves when this option is selected,
 	  else will impact controller stability.
 
+config BT_CTLR_LLL_ISR_CODE_IN_RAM
+	bool "Execute ISR code path from RAM"
+	depends on ARCH_HAS_RAMFUNC_SUPPORT && XIP
+	help
+	  Place the ISR entry functions and their complete code path into the
+	  RAM section for faster execution. This includes the radio, timer,
+	  RTC, and software interrupt handlers, as well as the common ISR
+	  helper functions (status reset, abort, done, cleanup) used in the
+	  Lower Link Layer (LLL).
+
+	  Enabling this option reduces ISR latency by avoiding flash fetch
+	  delays at the cost of additional RAM usage.
+
+config BT_CTLR_ULL_HIGH_CODE_IN_RAM
+	bool "Execute ULL_HIGH mayfly code path from RAM"
+	depends on ARCH_HAS_RAMFUNC_SUPPORT && XIP
+	help
+	  Place functions executed in ULL_HIGH priority mayfly context into the
+	  RAM section for faster execution. This includes RX/TX demux handlers,
+	  disable callbacks, and other high-priority Upper Link Layer functions
+	  dispatched via mayfly_enqueue() with TICKER_USER_ID_ULL_HIGH as
+	  callee.
+
+	  Enabling this option reduces latency for high-priority ULL operations
+	  at the cost of additional RAM usage.
+
+config BT_CTLR_ULL_LOW_CODE_IN_RAM
+	bool "Execute ULL_LOW mayfly code path from RAM"
+	depends on ARCH_HAS_RAMFUNC_SUPPORT && XIP
+	help
+	  Place functions executed in ULL_LOW priority mayfly context into the
+	  RAM section for faster execution. This includes offset calculation
+	  helpers, scheduling functions, and other low-priority Upper Link
+	  Layer functions dispatched via mayfly_enqueue() with
+	  TICKER_USER_ID_ULL_LOW as callee.
+
+	  Enabling this option reduces latency for low-priority ULL operations
+	  at the cost of additional RAM usage.
+
 config BT_CTLR_DYNAMIC_INTERRUPTS
 	bool "Use Dynamic Interrupts allocation only"
 	depends on DYNAMIC_INTERRUPTS

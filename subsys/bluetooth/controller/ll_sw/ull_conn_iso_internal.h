@@ -4,6 +4,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#ifndef BT_CTLR_ULL_LOW_CODE_RAM_ATTR
+#if defined(CONFIG_BT_CTLR_ULL_LOW_CODE_IN_RAM)
+#define BT_CTLR_ULL_LOW_CODE_RAM_ATTR __ramfunc
+#else
+#define BT_CTLR_ULL_LOW_CODE_RAM_ATTR
+#endif
+#endif /* BT_CTLR_ULL_LOW_CODE_RAM_ATTR */
+
 #define IS_PERIPHERAL(cig) \
 	(IS_ENABLED(CONFIG_BT_CTLR_PERIPHERAL_ISO) && \
 	 (cig->lll.role == BT_HCI_ROLE_PERIPHERAL))
@@ -21,7 +29,7 @@ int ull_conn_iso_reset(void);
 
 struct ll_conn_iso_group *ll_conn_iso_group_acquire(void);
 void ll_conn_iso_group_release(struct ll_conn_iso_group *cig);
-uint16_t ll_conn_iso_group_handle_get(struct ll_conn_iso_group *cig);
+BT_CTLR_ULL_LOW_CODE_RAM_ATTR uint16_t ll_conn_iso_group_handle_get(struct ll_conn_iso_group *cig);
 struct ll_conn_iso_group *ll_conn_iso_group_get(uint16_t handle);
 struct ll_conn_iso_group *ll_conn_iso_group_get_by_id(uint8_t id);
 

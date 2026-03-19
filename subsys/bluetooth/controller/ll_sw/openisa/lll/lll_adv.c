@@ -298,7 +298,7 @@ struct pdu_adv *lll_adv_pdu_latest_get(struct lll_adv_pdu *pdu,
 	return (void *)pdu->pdu[first];
 }
 
-void lll_adv_prepare(void *param)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_adv_prepare(void *param)
 {
 	struct lll_prepare_param *p = param;
 	int err;

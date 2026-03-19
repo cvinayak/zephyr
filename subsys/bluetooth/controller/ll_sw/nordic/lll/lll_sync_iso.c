@@ -45,10 +45,10 @@ static int prepare_cb(struct lll_prepare_param *p);
 static int prepare_cb_common(struct lll_prepare_param *p);
 static int is_abort_cb(void *next, void *curr, lll_prepare_cb_t *resume_cb);
 static void abort_cb(struct lll_prepare_param *prepare_param, void *param);
-static void isr_rx_estab(void *param);
-static void isr_rx(void *param);
-static void isr_rx_done(void *param);
-static void isr_done(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_rx_estab(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_rx(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_rx_done(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_done(void *param);
 static uint16_t payload_index_get(const struct lll_sync_iso *lll);
 #if defined(CONFIG_BT_CTLR_SYNC_ISO_SEQUENTIAL)
 static void next_chan_calc_seq(struct lll_sync_iso *lll, uint16_t event_counter,
@@ -58,13 +58,13 @@ static void next_chan_calc_seq(struct lll_sync_iso *lll, uint16_t event_counter,
 static void next_chan_calc_int(struct lll_sync_iso *lll,
 			       uint16_t event_counter);
 #endif /* CONFIG_BT_CTLR_SYNC_ISO_INTERLEAVED */
-static void isr_rx_iso_data_valid(const struct lll_sync_iso *const lll,
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_rx_iso_data_valid(const struct lll_sync_iso *const lll,
 				  uint16_t handle, struct node_rx_pdu *node_rx);
-static void isr_rx_iso_data_invalid(const struct lll_sync_iso *const lll,
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_rx_iso_data_invalid(const struct lll_sync_iso *const lll,
 				    uint16_t latency, uint8_t bn,
 				    uint16_t handle,
 				    struct node_rx_pdu *node_rx);
-static void isr_rx_ctrl_recv(struct lll_sync_iso *lll, struct pdu_bis *pdu);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_rx_ctrl_recv(struct lll_sync_iso *lll, struct pdu_bis *pdu);
 
 /* FIXME: Optimize by moving to a common place, as similar variable is used for
  *        connections too.
@@ -96,7 +96,7 @@ int lll_sync_iso_reset(void)
 	return 0;
 }
 
-void lll_sync_iso_create_prepare(void *param)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_sync_iso_create_prepare(void *param)
 {
 	int err;
 
@@ -108,7 +108,7 @@ void lll_sync_iso_create_prepare(void *param)
 	LL_ASSERT_ERR(err == 0 || err == -EINPROGRESS);
 }
 
-void lll_sync_iso_prepare(void *param)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_sync_iso_prepare(void *param)
 {
 	int err;
 
@@ -496,7 +496,7 @@ static void abort_cb(struct lll_prepare_param *prepare_param, void *param)
 	lll_done(param);
 }
 
-static void isr_rx_estab(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_rx_estab(void *param)
 {
 	struct event_done_extra *e;
 	struct lll_sync_iso *lll;
@@ -569,7 +569,7 @@ static void isr_rx_estab(void *param)
 	lll_isr_cleanup(param);
 }
 
-static void isr_rx(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_rx(void *param)
 {
 	struct lll_sync_iso_stream *stream;
 	struct lll_sync_iso *lll;
@@ -1436,7 +1436,7 @@ isr_rx_next_subevent:
 	}
 }
 
-static void isr_rx_done(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_rx_done(void *param)
 {
 	struct node_rx_pdu *node_rx;
 	struct event_done_extra *e;
@@ -1583,7 +1583,7 @@ isr_done_cleanup:
 	lll_isr_cleanup(param);
 }
 
-static void isr_done(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_done(void *param)
 {
 	lll_isr_status_reset();
 
@@ -1733,7 +1733,7 @@ static void next_chan_calc_int(struct lll_sync_iso *lll, uint16_t event_counter)
 }
 #endif /* CONFIG_BT_CTLR_SYNC_ISO_INTERLEAVED */
 
-static void isr_rx_iso_data_valid(const struct lll_sync_iso *const lll,
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_rx_iso_data_valid(const struct lll_sync_iso *const lll,
 				  uint16_t handle, struct node_rx_pdu *node_rx)
 {
 	struct lll_sync_iso_stream *stream;
@@ -1771,7 +1771,7 @@ static void isr_rx_iso_data_valid(const struct lll_sync_iso *const lll,
 	iso_meta->status = 0U;
 }
 
-static void isr_rx_iso_data_invalid(const struct lll_sync_iso *const lll,
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_rx_iso_data_invalid(const struct lll_sync_iso *const lll,
 				    uint16_t latency, uint8_t bn,
 				    uint16_t handle,
 				    struct node_rx_pdu *node_rx)
@@ -1810,7 +1810,7 @@ static void isr_rx_iso_data_invalid(const struct lll_sync_iso *const lll,
 	iso_meta->status = 1U;
 }
 
-static void isr_rx_ctrl_recv(struct lll_sync_iso *lll, struct pdu_bis *pdu)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_rx_ctrl_recv(struct lll_sync_iso *lll, struct pdu_bis *pdu)
 {
 	const uint8_t opcode = pdu->ctrl.opcode;
 

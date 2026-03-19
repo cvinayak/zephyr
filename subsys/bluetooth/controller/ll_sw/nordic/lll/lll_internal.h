@@ -4,8 +4,32 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#ifndef BT_CTLR_LLL_ISR_CODE_RAM_ATTR
+#if defined(CONFIG_BT_CTLR_LLL_ISR_CODE_IN_RAM)
+#define BT_CTLR_LLL_ISR_CODE_RAM_ATTR __ramfunc
+#else
+#define BT_CTLR_LLL_ISR_CODE_RAM_ATTR
+#endif
+#endif /* BT_CTLR_LLL_ISR_CODE_RAM_ATTR */
+
+#ifndef BT_CTLR_ULL_HIGH_CODE_RAM_ATTR
+#if defined(CONFIG_BT_CTLR_ULL_HIGH_CODE_IN_RAM)
+#define BT_CTLR_ULL_HIGH_CODE_RAM_ATTR __ramfunc
+#else
+#define BT_CTLR_ULL_HIGH_CODE_RAM_ATTR
+#endif
+#endif /* BT_CTLR_ULL_HIGH_CODE_RAM_ATTR */
+
+#ifndef BT_CTLR_ULL_LOW_CODE_RAM_ATTR
+#if defined(CONFIG_BT_CTLR_ULL_LOW_CODE_IN_RAM)
+#define BT_CTLR_ULL_LOW_CODE_RAM_ATTR __ramfunc
+#else
+#define BT_CTLR_ULL_LOW_CODE_RAM_ATTR
+#endif
+#endif /* BT_CTLR_ULL_LOW_CODE_RAM_ATTR */
+
 int lll_prepare_done(void *param);
-int lll_done(void *param);
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR int lll_done(void *param);
 bool lll_is_done(void *param, bool *is_resume);
 int lll_is_abort_cb(void *next, void *curr, lll_prepare_cb_t *resume_cb);
 void lll_abort_cb(struct lll_prepare_param *prepare_param, void *param);
@@ -16,12 +40,12 @@ uint32_t lll_preempt_calc(struct ull_hdr *ull, uint8_t ticker_id,
 
 void lll_chan_set(uint32_t chan);
 
-void lll_isr_tx_status_reset(void);
-void lll_isr_rx_status_reset(void);
-void lll_isr_tx_sub_status_reset(void);
-void lll_isr_rx_sub_status_reset(void);
-void lll_isr_status_reset(void);
-void lll_isr_abort(void *param);
-void lll_isr_done(void *param);
-void lll_isr_cleanup(void *param);
-void lll_isr_early_abort(void *param);
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_isr_tx_status_reset(void);
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_isr_rx_status_reset(void);
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_isr_tx_sub_status_reset(void);
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_isr_rx_sub_status_reset(void);
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_isr_status_reset(void);
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_isr_abort(void *param);
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_isr_done(void *param);
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_isr_cleanup(void *param);
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_isr_early_abort(void *param);

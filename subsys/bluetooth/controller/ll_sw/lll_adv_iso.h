@@ -4,10 +4,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#ifndef BT_CTLR_LLL_ISR_CODE_RAM_ATTR
+#if defined(CONFIG_BT_CTLR_LLL_ISR_CODE_IN_RAM)
+#define BT_CTLR_LLL_ISR_CODE_RAM_ATTR __ramfunc
+#else
+#define BT_CTLR_LLL_ISR_CODE_RAM_ATTR
+#endif
+#endif /* BT_CTLR_LLL_ISR_CODE_RAM_ATTR */
+
 int lll_adv_iso_init(void);
 int lll_adv_iso_reset(void);
-void lll_adv_iso_create_prepare(void *param);
-void lll_adv_iso_prepare(void *param);
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_adv_iso_create_prepare(void *param);
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_adv_iso_prepare(void *param);
 
 extern struct lll_adv_iso_stream *ull_adv_iso_lll_stream_get(uint16_t handle);
 

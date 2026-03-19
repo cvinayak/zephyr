@@ -153,7 +153,7 @@ NRF_DT_CHECK_GPIO_CTLR_IS_SOC(FEM_NODE, pdn_gpios, "pdn-gpios");
 static radio_isr_cb_t isr_cb;
 static void           *isr_cb_param;
 
-void isr_radio(void)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_radio(void)
 {
 	if (radio_has_disabled()) {
 		isr_cb(isr_cb_param);
@@ -162,7 +162,7 @@ void isr_radio(void)
 	}
 }
 
-void radio_isr_set(radio_isr_cb_t cb, void *param)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void radio_isr_set(radio_isr_cb_t cb, void *param)
 {
 	isr_cb_param = param;
 	isr_cb = cb;
@@ -1287,7 +1287,7 @@ uint32_t radio_bc_has_match(void)
 static radio_isr_cb_t isr_radio_tmr_cb;
 static void           *isr_radio_tmr_cb_param;
 
-void isr_radio_tmr(void)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_radio_tmr(void)
 {
 	irq_disable(TIMER0_IRQn);
 	nrf_timer_int_disable(EVENT_TIMER, TIMER_INTENSET_COMPARE2_Msk);

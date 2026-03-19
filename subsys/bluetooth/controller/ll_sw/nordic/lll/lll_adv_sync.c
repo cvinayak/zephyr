@@ -47,10 +47,10 @@
 static int init_reset(void);
 static int prepare_cb(struct lll_prepare_param *p);
 static void abort_cb(struct lll_prepare_param *prepare_param, void *param);
-static void isr_done(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_done(void *param);
 
 #if defined(CONFIG_BT_CTLR_ADV_SYNC_PDU_BACK2BACK)
-static void isr_tx(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_tx(void *param);
 static int aux_ptr_get(struct pdu_adv *pdu, struct pdu_adv_aux_ptr **aux_ptr);
 static void chain_pdu_aux_ptr_chan_idx_set(struct lll_adv_sync *lll);
 static void aux_ptr_chan_idx_set(struct lll_adv_sync *lll, struct pdu_adv *pdu);
@@ -81,7 +81,7 @@ int lll_adv_sync_reset(void)
 	return 0;
 }
 
-void lll_adv_sync_prepare(void *param)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_adv_sync_prepare(void *param)
 {
 	int err;
 
@@ -314,7 +314,7 @@ static void abort_cb(struct lll_prepare_param *prepare_param, void *param)
 	lll_done(param);
 }
 
-static void isr_done(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_done(void *param)
 {
 	struct lll_adv_sync *lll = param;
 
@@ -348,7 +348,7 @@ static void isr_done(void *param)
 }
 
 #if defined(CONFIG_BT_CTLR_ADV_SYNC_PDU_BACK2BACK)
-static void isr_tx(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_tx(void *param)
 {
 	struct pdu_adv_aux_ptr *aux_ptr;
 	struct lll_adv_sync *lll_sync;

@@ -59,17 +59,17 @@ static void ticker_stop_cb(uint32_t ticks_at_expire, uint32_t ticks_drift,
 			   uint32_t remainder, uint16_t lazy, uint8_t force,
 			   void *param);
 static void ticker_op_start_cb(uint32_t status, void *param);
-static void isr_rx(void *param);
-static void isr_tx(void *param);
-static void isr_done(void *param);
-static void isr_window(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_rx(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_tx(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_done(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_window(void *param);
 #if defined(CONFIG_BT_CTLR_XTAL_ADVANCED) && \
 	(EVENT_OVERHEAD_PREEMPT_US <= EVENT_OVERHEAD_PREEMPT_MIN_US)
-static void isr_abort(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_abort(void *param);
 #endif /* CONFIG_BT_CTLR_XTAL_ADVANCED &&
 	* (EVENT_OVERHEAD_PREEMPT_US <= EVENT_OVERHEAD_PREEMPT_MIN_US)
 	*/
-static void isr_done_cleanup(void *param);
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_done_cleanup(void *param);
 
 static inline int isr_rx_pdu(struct lll_scan *lll, struct pdu_adv *pdu_adv_rx,
 			     uint8_t devmatch_ok, uint8_t devmatch_id,
@@ -120,7 +120,7 @@ int lll_scan_reset(void)
 	return 0;
 }
 
-void lll_scan_prepare(void *param)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_scan_prepare(void *param)
 {
 	int err;
 
@@ -131,7 +131,7 @@ void lll_scan_prepare(void *param)
 	LL_ASSERT_ERR(!err || err == -EINPROGRESS);
 }
 
-void lll_scan_isr_resume(void *param)
+BT_CTLR_LLL_ISR_CODE_RAM_ATTR void lll_scan_isr_resume(void *param)
 {
 	static struct lll_prepare_param p;
 
@@ -661,7 +661,7 @@ static void ticker_op_start_cb(uint32_t status, void *param)
 	LL_ASSERT_ERR(status == TICKER_STATUS_SUCCESS);
 }
 
-static void isr_rx(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_rx(void *param)
 {
 	struct node_rx_pdu *node_rx;
 	uint8_t phy_flags_rx;
@@ -774,7 +774,7 @@ isr_rx_do_close:
 	radio_disable();
 }
 
-static void isr_tx(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_tx(void *param)
 {
 	struct node_rx_pdu *node_rx_prof;
 	struct node_rx_pdu *node_rx;
@@ -847,7 +847,7 @@ static void isr_tx(void *param)
 	}
 }
 
-static void isr_common_done(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_common_done(void *param)
 {
 	struct node_rx_pdu *node_rx;
 	struct lll_scan *lll;
@@ -901,7 +901,7 @@ static void isr_common_done(void *param)
 	radio_isr_set(isr_rx, param);
 }
 
-static void isr_done(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_done(void *param)
 {
 	isr_common_done(param);
 
@@ -922,7 +922,7 @@ static void isr_done(void *param)
 	radio_tmr_end_capture();
 }
 
-static void isr_window(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_window(void *param)
 {
 	uint32_t remainder_us;
 	struct lll_scan *lll;
@@ -1006,7 +1006,7 @@ static void isr_window(void *param)
 
 #if defined(CONFIG_BT_CTLR_XTAL_ADVANCED) && \
 	(EVENT_OVERHEAD_PREEMPT_US <= EVENT_OVERHEAD_PREEMPT_MIN_US)
-static void isr_abort(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_abort(void *param)
 {
 	/* Clear radio status and events */
 	lll_isr_status_reset();
@@ -1030,7 +1030,7 @@ static void isr_abort(void *param)
 	* (EVENT_OVERHEAD_PREEMPT_US <= EVENT_OVERHEAD_PREEMPT_MIN_US)
 	*/
 
-static void isr_done_cleanup(void *param)
+static BT_CTLR_LLL_ISR_CODE_RAM_ATTR void isr_done_cleanup(void *param)
 {
 	struct lll_scan *lll;
 	bool is_resume;
