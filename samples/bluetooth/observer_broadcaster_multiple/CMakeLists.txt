@@ -9,3 +9,7 @@ target_sources(app PRIVATE
   ../observer/src/observer.c
   ../broadcaster_multiple/src/broadcaster_multiple.c
 )
+
+if(CONFIG_BT_LL_SW_SPLIT)
+  zephyr_code_relocate(LIBRARY subsys__bluetooth__controller__ll_sw__nordic LOCATION RAM NOKEEP)
+endif()
