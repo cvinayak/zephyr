@@ -19,3 +19,7 @@ if(CONFIG_USE_USB_AUDIO_OUTPUT)
   include(${ZEPHYR_BASE}/samples/subsys/usb/common/common.cmake)
   target_sources(app PRIVATE src/usb.c)
 endif()
+
+if(CONFIG_BT_LL_SW_SPLIT AND CONFIG_CODE_DATA_RELOCATION_SRAM)
+  zephyr_code_relocate(LIBRARY subsys__bluetooth__controller__ll_sw__nordic LOCATION RAM NOKEEP)
+endif()
