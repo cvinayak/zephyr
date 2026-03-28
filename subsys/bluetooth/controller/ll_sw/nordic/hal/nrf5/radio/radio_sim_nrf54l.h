@@ -369,6 +369,13 @@
 /* HAL abstraction of Radio IRQ number */
 #define HAL_RADIO_IRQn                          RADIO_0_IRQn
 
+/* On nRF54L/H simulation, NRF_TIMER00 is free (BT uses NRF_TIMER10 as event timer).
+ * Override the default preempt timer IRQ to use TIMER00_IRQn.
+ */
+#if defined(CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_SINGLE)
+#define HAL_PREEMPT_TIMER_IRQn                  TIMER00_IRQn
+#endif /* CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_SINGLE */
+
 /* SoC specific NRF_RADIO power-on reset value. Refer to Product Specification,
  * RADIO Registers section for the documented reset values.
  *

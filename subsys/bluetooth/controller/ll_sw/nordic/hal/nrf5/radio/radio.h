@@ -134,6 +134,14 @@ uint32_t radio_bc_has_match(void);
 void isr_radio_tmr(void);
 uint32_t radio_tmr_isr_set(uint32_t start_us, radio_isr_cb_t cb, void *param);
 
+#if defined(CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_SINGLE) || \
+	defined(CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_DUAL)
+void isr_preempt_tmr(void);
+void radio_tmr_preempt_set(uint32_t preempt_to_us, uint32_t target_ticks);
+void radio_tmr_preempt_clear(void);
+void radio_tmr_preempt_isr_set(void (*isr_cb)(void));
+#endif /* CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_SINGLE || CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_DUAL */
+
 void radio_tmr_status_reset(void);
 void radio_tmr_tx_status_reset(void);
 void radio_tmr_rx_status_reset(void);

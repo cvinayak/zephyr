@@ -934,6 +934,43 @@ config BT_CTLR_LLL_PREPARE_AT_MARGIN
 	  requirement at the hard real time radio transmission or reception
 	  instant.
 
+choice BT_CTLR_PREEMPT_TIMEOUT
+	prompt "Event preempt timeout implementation"
+	default BT_CTLR_PREEMPT_TIMEOUT_TICKER
+	depends on !BT_CTLR_LOW_LAT
+	help
+	  Select the implementation used to set up the event preempt timeout.
+
+config BT_CTLR_PREEMPT_TIMEOUT_TICKER
+	bool "Use ticker for preempt timeout"
+	help
+	  Use the ticker to set up the event preempt timeout. This is the
+	  default behavior and works on all supported SoCs.
+
+config BT_CTLR_PREEMPT_TIMEOUT_TIMER_SINGLE
+	bool "Use single NRF_TIMER for preempt timeout"
+	depends on BT_CTLR_SW_SWITCH_SINGLE_TIMER || HAS_HW_NRF_TIMER00
+	help
+	  Use NRF_TIMER0 as a dedicated standalone one-shot timer for the event
+	  preempt timeout. Applicable on SoCs where NRF_TIMER0 is not used as
+	  the BLE controller event timer, such as nRF54L/H SoCs (which use
+	  NRF_TIMER10 for radio events) or nRF52/53 SoCs configured with the
+	  single-timer tIFS switching (which uses NRF_TIMER4 for radio events).
+
+config BT_CTLR_PREEMPT_TIMEOUT_TIMER_DUAL
+	bool "Use dual NRF_TIMER for preempt timeout"
+	depends on !BT_CTLR_TIFS_HW && !BT_CTLR_SW_SWITCH_SINGLE_TIMER && \
+		   (SOC_COMPATIBLE_NRF52X || SOC_COMPATIBLE_NRF53X)
+	help
+	  Use the switch timer (SW_SWITCH_TIMER = NRF_TIMER1) with an additional
+	  compare channel for the event preempt timeout. Applicable on nRF52/53
+	  SoCs using the dual-timer tIFS switching design, where NRF_TIMER0 is
+	  the packet timer and NRF_TIMER1 is the switch timer. On nRF52 the
+	  preempt compare channel requires PHY_CODED to be disabled to have a
+	  free CC channel on NRF_TIMER1.
+
+endchoice # BT_CTLR_PREEMPT_TIMEOUT
+
 config BT_CTLR_LOW_LAT
 	bool "Low latency non-negotiating event preemption"
 	depends on BT_CTLR_LOW_LAT_ULL && BT_CTLR_LOW_LAT_ULL_DONE

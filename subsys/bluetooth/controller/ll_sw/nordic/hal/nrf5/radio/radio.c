@@ -1192,6 +1192,111 @@ uint32_t radio_tmr_isr_set(uint32_t start_us, radio_isr_cb_t cb, void *param)
 }
 #endif /* CONFIG_BT_CTLR_RADIO_TIMER_ISR */
 
+#if defined(CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_SINGLE) || \
+	defined(CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_DUAL)
+static void (*preempt_tmr_isr_cb)(void);
+static uint32_t preempt_target_ticks;
+static bool preempt_pending;
+
+void isr_preempt_tmr(void)
+{
+#if defined(CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_SINGLE)
+	nrf_timer_int_disable(HAL_PREEMPT_TIMER, HAL_PREEMPT_TIMER_INT_MASK);
+	nrf_timer_event_clear(HAL_PREEMPT_TIMER, HAL_PREEMPT_TIMER_EVENT);
+	nrf_timer_task_trigger(HAL_PREEMPT_TIMER, NRF_TIMER_TASK_STOP);
+#else /* CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_DUAL */
+	nrf_timer_int_disable(SW_SWITCH_TIMER, HAL_PREEMPT_TIMER_INT_MASK);
+	nrf_timer_event_clear(SW_SWITCH_TIMER, HAL_PREEMPT_TIMER_EVENT);
+#endif /* CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_SINGLE */
+
+	preempt_pending = false;
+
+	if (preempt_tmr_isr_cb) {
+		preempt_tmr_isr_cb();
+	}
+}
+
+void radio_tmr_preempt_set(uint32_t preempt_to_us, uint32_t target_ticks)
+{
+	preempt_target_ticks = target_ticks;
+	preempt_pending = true;
+
+#if defined(CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_SINGLE)
+	/* Use NRF_TIMER0 as a dedicated one-shot preempt timer. */
+	nrf_timer_task_trigger(HAL_PREEMPT_TIMER, NRF_TIMER_TASK_STOP);
+	nrf_timer_task_trigger(HAL_PREEMPT_TIMER, NRF_TIMER_TASK_CLEAR);
+	HAL_PREEMPT_TIMER->MODE = 0U;
+	HAL_PREEMPT_TIMER->PRESCALER = HAL_PREEMPT_TIMER_PRESCALER;
+	HAL_PREEMPT_TIMER->BITMODE = 2U; /* 24-bit */
+	nrf_timer_cc_set(HAL_PREEMPT_TIMER, HAL_PREEMPT_TIMER_CC_OFFSET, preempt_to_us);
+	nrf_timer_event_clear(HAL_PREEMPT_TIMER, HAL_PREEMPT_TIMER_EVENT);
+	nrf_timer_int_enable(HAL_PREEMPT_TIMER, HAL_PREEMPT_TIMER_INT_MASK);
+	NVIC_ClearPendingIRQ(HAL_PREEMPT_TIMER_IRQn);
+	nrf_timer_task_trigger(HAL_PREEMPT_TIMER, NRF_TIMER_TASK_START);
+
+#else /* CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_DUAL */
+	/* Use SW_SWITCH_TIMER with an additional CC channel.
+	 * Sample EVENT_TIMER to get current count (both timers share the same
+	 * time base as they are cleared together in radio_tmr_start()).
+	 */
+	uint32_t now_us;
+
+	nrf_timer_task_trigger(EVENT_TIMER, HAL_EVENT_TIMER_SAMPLE_TASK);
+	now_us = EVENT_TIMER->CC[HAL_EVENT_TIMER_SAMPLE_CC_OFFSET];
+
+	nrf_timer_cc_set(SW_SWITCH_TIMER, HAL_PREEMPT_TIMER_CC_OFFSET,
+			 now_us + preempt_to_us);
+	nrf_timer_event_clear(SW_SWITCH_TIMER, HAL_PREEMPT_TIMER_EVENT);
+	nrf_timer_int_enable(SW_SWITCH_TIMER, HAL_PREEMPT_TIMER_INT_MASK);
+	NVIC_ClearPendingIRQ(HAL_PREEMPT_TIMER_IRQn);
+#endif /* CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_SINGLE */
+}
+
+void radio_tmr_preempt_clear(void)
+{
+	preempt_pending = false;
+
+#if defined(CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_SINGLE)
+	nrf_timer_int_disable(HAL_PREEMPT_TIMER, HAL_PREEMPT_TIMER_INT_MASK);
+	nrf_timer_event_clear(HAL_PREEMPT_TIMER, HAL_PREEMPT_TIMER_EVENT);
+	nrf_timer_task_trigger(HAL_PREEMPT_TIMER, NRF_TIMER_TASK_STOP);
+#else /* CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_DUAL */
+	nrf_timer_int_disable(SW_SWITCH_TIMER, HAL_PREEMPT_TIMER_INT_MASK);
+	nrf_timer_event_clear(SW_SWITCH_TIMER, HAL_PREEMPT_TIMER_EVENT);
+#endif /* CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_SINGLE */
+}
+
+/* Called from radio_tmr_start() to refresh preempt CC after timer clear.
+ * For dual timer design only: SW_SWITCH_TIMER is cleared at each event start
+ * so the previously set CC must be updated relative to the new timer base.
+ */
+static void radio_tmr_preempt_setup(uint32_t ticks_start)
+{
+#if defined(CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_DUAL)
+	if (!preempt_pending) {
+		return;
+	}
+
+	uint32_t cc;
+
+	cc = HAL_TICKER_TICKS_TO_US(
+		(preempt_target_ticks - ticks_start) & HAL_TICKER_CNTR_MASK);
+
+	nrf_timer_cc_set(SW_SWITCH_TIMER, HAL_PREEMPT_TIMER_CC_OFFSET, cc);
+	nrf_timer_event_clear(SW_SWITCH_TIMER, HAL_PREEMPT_TIMER_EVENT);
+	nrf_timer_int_enable(SW_SWITCH_TIMER, HAL_PREEMPT_TIMER_INT_MASK);
+	NVIC_ClearPendingIRQ(HAL_PREEMPT_TIMER_IRQn);
+#else
+	ARG_UNUSED(ticks_start);
+#endif /* CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_DUAL */
+}
+
+void radio_tmr_preempt_isr_set(void (*isr_cb)(void))
+{
+	preempt_tmr_isr_cb = isr_cb;
+}
+#endif /* CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_SINGLE || CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_DUAL */
+
 void radio_tmr_status_reset(void)
 {
 #if defined(CONFIG_BT_CTLR_NRF_GRTC)
@@ -1481,6 +1586,11 @@ uint32_t radio_tmr_start(uint8_t trx, uint32_t ticks_start, uint32_t remainder)
 	SW_SWITCH_TIMER->BITMODE = 0; /* 16 bit */
 
 	hal_sw_switch_timer_start_ppi_config();
+
+#if defined(CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_DUAL)
+	/* Refresh preempt timeout CC after SW_SWITCH_TIMER clear. */
+	radio_tmr_preempt_setup(ticks_start);
+#endif /* CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_DUAL */
 #endif /* !CONFIG_BT_CTLR_SW_SWITCH_SINGLE_TIMER */
 
 	hal_sw_switch_timer_clear_ppi_config();

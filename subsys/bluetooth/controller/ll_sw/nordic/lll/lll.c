@@ -78,6 +78,7 @@ static inline struct lll_event *resume_enqueue(lll_is_abort_cb_t is_abort_cb,
 static void isr_race(void *param);
 
 #if !defined(CONFIG_BT_CTLR_LOW_LAT)
+#if defined(CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TICKER)
 static uint32_t preempt_ticker_start(struct lll_event *first,
 				     struct lll_event *prev,
 				     struct lll_event *next);
@@ -85,6 +86,18 @@ static uint32_t preempt_ticker_stop(void);
 static void preempt_ticker_cb(uint32_t ticks_at_expire, uint32_t ticks_drift,
 			      uint32_t remainder, uint16_t lazy, uint8_t force,
 			      void *param);
+#define preempt_timeout_start preempt_ticker_start
+#define preempt_timeout_stop  preempt_ticker_stop
+#elif defined(CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_SINGLE) || \
+	defined(CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_DUAL)
+static uint32_t preempt_timer_start(struct lll_event *first,
+				    struct lll_event *prev,
+				    struct lll_event *next);
+static void preempt_timer_stop(void);
+static void preempt_timer_isr_cb(void);
+#define preempt_timeout_start preempt_timer_start
+#define preempt_timeout_stop  preempt_timer_stop
+#endif /* CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TICKER */
 static void preempt(void *param);
 #else /* CONFIG_BT_CTLR_LOW_LAT */
 #if (CONFIG_BT_CTLR_LLL_PRIO == CONFIG_BT_CTLR_ULL_LOW_PRIO)
@@ -164,6 +177,42 @@ ISR_DIRECT_DECLARE(timer_nrf5_isr)
 #endif /* !CONFIG_DYNAMIC_DIRECT_INTERRUPTS */
 }
 #endif /* CONFIG_BT_CTLR_RADIO_TIMER_ISR */
+
+#if defined(CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_SINGLE) || \
+	defined(CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_DUAL)
+#if defined(CONFIG_BT_CTLR_DYNAMIC_INTERRUPTS) && \
+	defined(CONFIG_DYNAMIC_DIRECT_INTERRUPTS)
+static void preempt_timer_nrf5_isr(const void *arg)
+#else /* !CONFIG_BT_CTLR_DYNAMIC_INTERRUPTS */
+ISR_DIRECT_DECLARE(preempt_timer_nrf5_isr)
+#endif /* !CONFIG_BT_CTLR_DYNAMIC_INTERRUPTS */
+{
+	DEBUG_RADIO_ISR(1);
+
+	if (IS_ENABLED(CONFIG_BT_CTLR_PROFILE_ISR)) {
+		lll_prof_enter_radio();
+	}
+
+	isr_preempt_tmr();
+
+#if !defined(CONFIG_BT_CTLR_ZLI)
+	ISR_DIRECT_PM();
+#endif /* !CONFIG_BT_CTLR_ZLI */
+
+	if (IS_ENABLED(CONFIG_BT_CTLR_PROFILE_ISR)) {
+		lll_prof_exit_radio();
+	}
+
+#if !defined(CONFIG_BT_CTLR_DYNAMIC_INTERRUPTS) || \
+	!defined(CONFIG_DYNAMIC_DIRECT_INTERRUPTS)
+#if !defined(CONFIG_BT_CTLR_ZLI)
+	return 1; /* reschedule when non-ZLI, k_sem_give() may have been invoked */
+#else /* CONFIG_BT_CTLR_ZLI */
+	return 0; /* no_reschedule when ZLI, non-ZLI mayfly will be used to call k_sem_give() */
+#endif /* CONFIG_BT_CTLR_ZLI */
+#endif /* !CONFIG_DYNAMIC_DIRECT_INTERRUPTS */
+}
+#endif /* CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_SINGLE || CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_DUAL */
 
 static void rtc0_nrf5_isr(const void *arg)
 {
@@ -293,6 +342,13 @@ int lll_init(void)
 	irq_connect_dynamic(TIMER0_IRQn, CONFIG_BT_CTLR_LLL_PRIO,
 			    timer_nrf5_isr, NULL, IRQ_CONNECT_FLAGS);
 #endif /* CONFIG_BT_CTLR_RADIO_TIMER_ISR */
+#if defined(CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_SINGLE) || \
+	defined(CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_DUAL)
+	ARM_IRQ_DIRECT_DYNAMIC_CONNECT(HAL_PREEMPT_TIMER_IRQn, CONFIG_BT_CTLR_LLL_PRIO,
+				       IRQ_CONNECT_FLAGS, no_reschedule);
+	irq_connect_dynamic(HAL_PREEMPT_TIMER_IRQn, CONFIG_BT_CTLR_LLL_PRIO,
+			    preempt_timer_nrf5_isr, NULL, IRQ_CONNECT_FLAGS);
+#endif /* CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_SINGLE || TIMER_DUAL */
 #else /* !CONFIG_DYNAMIC_DIRECT_INTERRUPTS */
 	IRQ_DIRECT_CONNECT(HAL_RADIO_IRQn, CONFIG_BT_CTLR_LLL_PRIO,
 			   radio_nrf5_isr, IRQ_CONNECT_FLAGS);
@@ -300,6 +356,11 @@ int lll_init(void)
 	IRQ_DIRECT_CONNECT(TIMER0_IRQn, CONFIG_BT_CTLR_LLL_PRIO,
 			   timer_nrf5_isr, IRQ_CONNECT_FLAGS);
 #endif /* CONFIG_BT_CTLR_RADIO_TIMER_ISR */
+#if defined(CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_SINGLE) || \
+	defined(CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_DUAL)
+	IRQ_DIRECT_CONNECT(HAL_PREEMPT_TIMER_IRQn, CONFIG_BT_CTLR_LLL_PRIO,
+			   preempt_timer_nrf5_isr, IRQ_CONNECT_FLAGS);
+#endif /* CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_SINGLE || TIMER_DUAL */
 #endif /* !CONFIG_DYNAMIC_DIRECT_INTERRUPTS */
 	irq_connect_dynamic(HAL_RTC_IRQn, CONFIG_BT_CTLR_ULL_HIGH_PRIO,
 			    rtc0_nrf5_isr, NULL, 0U);
@@ -318,6 +379,11 @@ int lll_init(void)
 	IRQ_DIRECT_CONNECT(TIMER0_IRQn, CONFIG_BT_CTLR_LLL_PRIO,
 			   timer_nrf5_isr, IRQ_CONNECT_FLAGS);
 #endif /* CONFIG_BT_CTLR_RADIO_TIMER_ISR */
+#if defined(CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_SINGLE) || \
+	defined(CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_DUAL)
+	IRQ_DIRECT_CONNECT(HAL_PREEMPT_TIMER_IRQn, CONFIG_BT_CTLR_LLL_PRIO,
+			   preempt_timer_nrf5_isr, IRQ_CONNECT_FLAGS);
+#endif /* CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_SINGLE || TIMER_DUAL */
 	IRQ_CONNECT(HAL_RTC_IRQn, CONFIG_BT_CTLR_ULL_HIGH_PRIO,
 		    rtc0_nrf5_isr, NULL, 0);
 #if defined(CONFIG_BT_CTLR_ZLI)
@@ -345,6 +411,11 @@ int lll_init(void)
 		(CONFIG_BT_CTLR_ULL_HIGH_PRIO != CONFIG_BT_CTLR_ULL_LOW_PRIO)) {
 		irq_enable(HAL_SWI_JOB_IRQ);
 	}
+#if defined(CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_SINGLE) || \
+	defined(CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_DUAL)
+	irq_enable(HAL_PREEMPT_TIMER_IRQn);
+	radio_tmr_preempt_isr_set(preempt_timer_isr_cb);
+#endif /* CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_SINGLE || TIMER_DUAL */
 
 	radio_setup();
 
@@ -374,6 +445,11 @@ int lll_deinit(void)
 		(CONFIG_BT_CTLR_ULL_HIGH_PRIO != CONFIG_BT_CTLR_ULL_LOW_PRIO)) {
 		irq_disable(HAL_SWI_JOB_IRQ);
 	}
+#if defined(CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_SINGLE) || \
+	defined(CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_DUAL)
+	irq_disable(HAL_PREEMPT_TIMER_IRQn);
+	radio_tmr_preempt_clear();
+#endif /* CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_SINGLE || TIMER_DUAL */
 
 	/* Disconnect dynamic ISRs used */
 #if defined(CONFIG_BT_CTLR_DYNAMIC_INTERRUPTS)
@@ -385,6 +461,11 @@ int lll_deinit(void)
 	irq_disconnect_dynamic(TIMER0_IRQn, CONFIG_BT_CTLR_LLL_PRIO,
 			       timer_nrf5_isr, NULL, IRQ_CONNECT_FLAGS);
 #endif /* CONFIG_BT_CTLR_RADIO_TIMER_ISR */
+#if defined(CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_SINGLE) || \
+	defined(CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_DUAL)
+	irq_disconnect_dynamic(HAL_PREEMPT_TIMER_IRQn, CONFIG_BT_CTLR_LLL_PRIO,
+			       preempt_timer_nrf5_isr, NULL, IRQ_CONNECT_FLAGS);
+#endif /* CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_SINGLE || TIMER_DUAL */
 #endif /* CONFIG_DYNAMIC_DIRECT_INTERRUPTS */
 	irq_disconnect_dynamic(HAL_RTC_IRQn, CONFIG_BT_CTLR_ULL_HIGH_PRIO,
 			       rtc0_nrf5_isr, NULL, 0U);
@@ -890,7 +971,7 @@ int lll_prepare_resolve(lll_is_abort_cb_t is_abort_cb, lll_abort_cb_t abort_cb,
 				 * This can happen executing `lll_done()`.
 				 * Hence, we should ignore it being the `first` that setup the
 				 * preempt timeout and also it has already setup the preempt
-				 * timeout, refer to `preempt_ticker_start()` for details.
+				 * timeout, refer to `preempt_timeout_start()` for details.
 				 *
 				 * We also set the `ready` to NULL as it is the same ready, the one
 				 * being enqueued. This help short circuit a related assertion check
@@ -971,7 +1052,7 @@ int lll_prepare_resolve(lll_is_abort_cb_t is_abort_cb, lll_abort_cb_t abort_cb,
 		uint32_t ret;
 
 		/* Start the preempt timeout */
-		ret  = preempt_ticker_start(first, ready, next);
+		ret  = preempt_timeout_start(first, ready, next);
 		LL_ASSERT_ERR((ret == TICKER_STATUS_SUCCESS) ||
 			      (ret == TICKER_STATUS_BUSY));
 
@@ -1043,7 +1124,7 @@ int lll_prepare_resolve(lll_is_abort_cb_t is_abort_cb, lll_abort_cb_t abort_cb,
 	 *       If there is a next prepare event in pipeline, then the prior
 	 *       preempt timeout if started will be stopped before starting
 	 *       the new preempt timeout. Refer to implementation in
-	 *       preempt_ticker_start().
+	 *       preempt_timeout_start().
 	 */
 
 	/* Find next prepare needing preempt timeout to be setup */
@@ -1053,7 +1134,7 @@ int lll_prepare_resolve(lll_is_abort_cb_t is_abort_cb, lll_abort_cb_t abort_cb,
 	}
 
 	/* Start the preempt timeout */
-	ret = preempt_ticker_start(next, NULL, next);
+	ret = preempt_timeout_start(next, NULL, next);
 	LL_ASSERT_ERR((ret == TICKER_STATUS_SUCCESS) ||
 		      (ret == TICKER_STATUS_BUSY));
 #endif /* !CONFIG_BT_CTLR_LOW_LAT */
@@ -1113,13 +1194,16 @@ static void isr_race(void *param)
 }
 
 #if !defined(CONFIG_BT_CTLR_LOW_LAT)
+#if defined(CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TICKER)
 static uint8_t volatile preempt_start_req;
 static uint8_t preempt_start_ack;
 static uint8_t volatile preempt_stop_req;
 static uint8_t preempt_stop_ack;
+#endif /* CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TICKER */
 static uint8_t preempt_req;
 static uint8_t volatile preempt_ack;
 
+#if defined(CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TICKER)
 static void ticker_stop_op_cb(uint32_t status, void *param)
 {
 	ARG_UNUSED(param);
@@ -1276,6 +1360,90 @@ static void preempt_ticker_cb(uint32_t ticks_at_expire, uint32_t ticks_drift,
 			     0, &mfy);
 	LL_ASSERT_ERR(!ret);
 }
+#endif /* CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TICKER */
+
+#if defined(CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_SINGLE) || \
+	defined(CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_DUAL)
+static void *preempt_timer_param;
+
+static void preempt_timer_isr_cb(void)
+{
+	static memq_link_t link;
+	static struct mayfly mfy = {0, 0, &link, NULL, preempt};
+	uint32_t ret;
+
+	LL_ASSERT_ERR(preempt_ack != preempt_req);
+	preempt_ack = preempt_req;
+
+	mfy.param = preempt_timer_param;
+	ret = mayfly_enqueue(TICKER_USER_ID_ULL_HIGH, TICKER_USER_ID_LLL,
+			     0, &mfy);
+	LL_ASSERT_ERR(!ret);
+}
+
+static uint32_t preempt_timer_start(struct lll_event *first,
+				    struct lll_event *prev,
+				    struct lll_event *next)
+{
+	const struct lll_prepare_param *p;
+	uint32_t ticks_at_preempt_new;
+	static uint32_t ticks_at_preempt;
+	uint32_t preempt_anchor;
+	uint32_t preempt_to;
+	uint32_t ticks_now;
+	uint32_t delta_ticks;
+	uint32_t preempt_to_us;
+
+	/* Do not re-start if already pending with an earlier or equal timeout. */
+	if (preempt_req != preempt_ack) {
+		p = &first->prepare_param;
+		preempt_anchor = p->ticks_at_expire;
+		preempt_to = HAL_TICKER_US_TO_TICKS(EVENT_OVERHEAD_XTAL_US) -
+			     HAL_TICKER_US_TO_TICKS(EVENT_OVERHEAD_PREEMPT_MIN_US);
+		ticks_at_preempt_new = preempt_anchor + preempt_to;
+		ticks_at_preempt_new &= HAL_TICKER_CNTR_MASK;
+
+		/* If the new preempt time is not earlier, keep the current one. */
+		if (ticker_ticks_diff_get(ticks_at_preempt_new, ticks_at_preempt) <
+		    BIT(HAL_TICKER_CNTR_MSBIT)) {
+			return TICKER_STATUS_SUCCESS;
+		}
+
+		/* New preempt is earlier, stop current and restart. */
+		preempt_timer_stop();
+	}
+
+	p = &first->prepare_param;
+	preempt_anchor = p->ticks_at_expire;
+	preempt_to = HAL_TICKER_US_TO_TICKS(EVENT_OVERHEAD_XTAL_US) -
+		     HAL_TICKER_US_TO_TICKS(EVENT_OVERHEAD_PREEMPT_MIN_US);
+
+	ticks_at_preempt = preempt_anchor + preempt_to;
+	ticks_at_preempt &= HAL_TICKER_CNTR_MASK;
+
+	ticks_now = ticker_ticks_now_get();
+	delta_ticks = ticker_ticks_diff_get(ticks_at_preempt, ticks_now);
+	preempt_to_us = HAL_TICKER_TICKS_TO_US(delta_ticks);
+
+	preempt_req++;
+	preempt_timer_param = p->param;
+
+	radio_tmr_preempt_set(preempt_to_us, ticks_at_preempt);
+
+	return TICKER_STATUS_SUCCESS;
+}
+
+static void preempt_timer_stop(void)
+{
+	if (preempt_req == preempt_ack) {
+		return;
+	}
+
+	preempt_ack = preempt_req;
+
+	radio_tmr_preempt_clear();
+}
+#endif /* CONFIG_BT_CTLR_PREEMPT_TIMEOUT_TIMER_SINGLE || TIMER_DUAL */
 
 static void preempt(void *param)
 {
@@ -1361,7 +1529,7 @@ preempt_find_preemptor:
 			}
 
 			/* Start the preempt timeout for (short) ready event */
-			ret = preempt_ticker_start(ready, NULL, ready);
+			ret = preempt_timeout_start(ready, NULL, ready);
 			LL_ASSERT_ERR((ret == TICKER_STATUS_SUCCESS) ||
 				      (ret == TICKER_STATUS_BUSY));
 
@@ -1426,7 +1594,7 @@ preempt_find_preemptor:
 			}
 
 			/* Start the preempt timeout for next ready prepare */
-			ret = preempt_ticker_start(ready, NULL, ready);
+			ret = preempt_timeout_start(ready, NULL, ready);
 			LL_ASSERT_ERR((ret == TICKER_STATUS_SUCCESS) ||
 				      (ret == TICKER_STATUS_BUSY));
 
