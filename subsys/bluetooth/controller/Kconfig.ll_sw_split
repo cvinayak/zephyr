@@ -960,14 +960,16 @@ config BT_CTLR_PREEMPT_TIMEOUT_TIMER_SINGLE
 config BT_CTLR_PREEMPT_TIMEOUT_TIMER_DUAL
 	bool "Use dual NRF_TIMER for preempt timeout"
 	depends on !BT_CTLR_TIFS_HW && !BT_CTLR_SW_SWITCH_SINGLE_TIMER && \
-		   (SOC_COMPATIBLE_NRF52X || SOC_COMPATIBLE_NRF53X)
+		   (SOC_COMPATIBLE_NRF53X || \
+		    (SOC_COMPATIBLE_NRF52X && !BT_CTLR_PHY_CODED))
 	help
 	  Use the switch timer (SW_SWITCH_TIMER = NRF_TIMER1) with an additional
 	  compare channel for the event preempt timeout. Applicable on nRF52/53
 	  SoCs using the dual-timer tIFS switching design, where NRF_TIMER0 is
-	  the packet timer and NRF_TIMER1 is the switch timer. On nRF52 the
-	  preempt compare channel requires PHY_CODED to be disabled to have a
-	  free CC channel on NRF_TIMER1.
+	  the packet timer and NRF_TIMER1 is the switch timer. On nRF53 (which
+	  has 8 CC channels on TIMER1), CC4 is used. On nRF52 (which has only 4
+	  CC channels on TIMER1) CC2 is used, which requires PHY_CODED to be
+	  disabled to avoid a CC channel conflict.
 
 endchoice # BT_CTLR_PREEMPT_TIMEOUT
 
