@@ -202,3 +202,82 @@ void cntr_cmp_set(uint8_t cmp, uint32_t value)
 	nrf_rtc_cc_set(NRF_RTC, cmp, value);
 #endif /* !CONFIG_BT_CTLR_NRF_GRTC */
 }
+
+#if defined(CONFIG_BT_CTLR_PREEMPT_TIMEOUT_CNTR)
+void cntr_preempt_cmp_set(uint32_t value)
+{
+#if defined(CONFIG_BT_CTLR_NRF_GRTC)
+	uint32_t cntr_l, cntr_h, cntr_h_overflow, stale;
+
+	/* Disable compare before setting */
+	nrf_grtc_sys_counter_compare_event_disable(NRF_GRTC,
+						   HAL_CNTR_GRTC_CC_IDX_PREEMPT);
+
+	/* Read current syscounter value */
+	do {
+		cntr_h = nrf_grtc_sys_counter_high_get(NRF_GRTC);
+		cntr_l = nrf_grtc_sys_counter_low_get(NRF_GRTC);
+		cntr_h_overflow = nrf_grtc_sys_counter_high_get(NRF_GRTC);
+	} while ((cntr_h & GRTC_SYSCOUNTER_SYSCOUNTERH_BUSY_Msk) ||
+		 (cntr_h_overflow & GRTC_SYSCOUNTER_SYSCOUNTERH_OVERFLOW_Msk));
+
+	/* Set a stale value in capture value */
+	stale = cntr_l - 1U;
+	NRF_GRTC->CC[HAL_CNTR_GRTC_CC_IDX_PREEMPT].CCL = stale;
+
+	/* Trigger a capture */
+	nrf_grtc_task_trigger(NRF_GRTC,
+			      (NRF_GRTC_TASK_CAPTURE_0 +
+			       (HAL_CNTR_GRTC_CC_IDX_PREEMPT * sizeof(uint32_t))));
+
+	/* Wait to get a new L value */
+	do {
+		cntr_l = NRF_GRTC->CC[HAL_CNTR_GRTC_CC_IDX_PREEMPT].CCL;
+	} while (cntr_l == stale);
+
+	/* Read H value */
+	cntr_h = NRF_GRTC->CC[HAL_CNTR_GRTC_CC_IDX_PREEMPT].CCH;
+
+	/* Handle rollover between current and expected value */
+	if (value < cntr_l) {
+		cntr_h++;
+	}
+
+	/* Clear any pending event */
+	nrf_grtc_event_clear(NRF_GRTC, HAL_CNTR_GRTC_EVENT_COMPARE_PREEMPT);
+
+	/* Set compare register values */
+	nrf_grtc_sys_counter_cc_set(NRF_GRTC, HAL_CNTR_GRTC_CC_IDX_PREEMPT,
+				    ((((uint64_t)cntr_h & GRTC_CC_CCH_CCH_Msk) << 32) | value));
+
+	/* Enable compare and interrupt */
+	nrf_grtc_sys_counter_compare_event_enable(NRF_GRTC,
+						  HAL_CNTR_GRTC_CC_IDX_PREEMPT);
+	NRF_GRTC->INTENSET1 = HAL_CNTR_GRTC_INTENSET_COMPARE_PREEMPT_Msk;
+
+	/* Clear any pending event */
+	nrf_rtc_event_clear(NRF_RTC, NRF_RTC_EVENT_COMPARE_1);
+
+	/* Set compare value */
+	nrf_rtc_cc_set(NRF_RTC, HAL_CNTR_RTC_CC_IDX_PREEMPT, value);
+
+	/* Enable event routing and interrupt */
+	nrf_rtc_event_enable(NRF_RTC, RTC_EVTENSET_COMPARE1_Msk);
+	nrf_rtc_int_enable(NRF_RTC, RTC_INTENSET_COMPARE1_Msk);
+}
+
+void cntr_preempt_cmp_clear(void)
+{
+#if defined(CONFIG_BT_CTLR_NRF_GRTC)
+	/* Disable compare and interrupt */
+	NRF_GRTC->INTENCLR1 = HAL_CNTR_GRTC_INTENCLR_COMPARE_PREEMPT_Msk;
+	nrf_grtc_sys_counter_compare_event_disable(NRF_GRTC,
+						   HAL_CNTR_GRTC_CC_IDX_PREEMPT);
+	nrf_grtc_event_clear(NRF_GRTC, HAL_CNTR_GRTC_EVENT_COMPARE_PREEMPT);
+
+	/* Disable interrupt and event routing */
+	nrf_rtc_int_disable(NRF_RTC, RTC_INTENCLR_COMPARE1_Msk);
+	nrf_rtc_event_disable(NRF_RTC, RTC_EVTENCLR_COMPARE1_Msk);
+	nrf_rtc_event_clear(NRF_RTC, NRF_RTC_EVENT_COMPARE_1);
+}
+#endif /* CONFIG_BT_CTLR_PREEMPT_TIMEOUT_CNTR */
