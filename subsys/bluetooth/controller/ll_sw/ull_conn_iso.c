@@ -837,6 +837,68 @@ static uint32_t cig_offset_calc(struct ll_conn_iso_group *cig, struct ll_conn_is
 	return remainder_us + acl_to_cig_ref_point;
 }
 
+static uint32_t cis_instant_latency_apply(struct ll_conn_iso_group *cig,
+					  struct ll_conn_iso_stream *cis,
+					  uint32_t acl_latency_us,
+					  uint32_t iso_interval_us,
+					  uint32_t *ticks_at_expire,
+					  uint32_t remainder)
+{
+	uint32_t lost_cig_events;
+	uint32_t lost_payloads;
+	uint32_t cis_offset;
+
+	if (acl_latency_us > iso_interval_us) {
+		/* Latency is greater than the ISO interval - find the offset from
+		 * this ACL event to the next active ISO event, and adjust the event
+		 * counter accordingly.
+		 */
+		lost_cig_events = DIV_ROUND_UP(acl_latency_us - cis->offset,
+					       iso_interval_us);
+		cis_offset = cis->offset + (lost_cig_events * iso_interval_us) -
+			     acl_latency_us;
+	} else {
+		/* Latency is less than- or equal to one ISO interval - start at
+		 * next ISO event.
+		 */
+		lost_cig_events = 1U;
+		cis_offset = cis->offset + iso_interval_us - acl_latency_us;
+	}
+
+	/* Correct the cis_offset to next CIG event, if the ACL and CIG overlaps.
+	 * ACL radio event at the instant was skipped and a relative CIS offset at
+	 * the current ACL event has been calculated. But the current ACL event
+	 * is partially overlapping with the other of CISes (not yet established) in
+	 * the CIG event. Hence, lets establish the CIS at the next ISO interval so
+	 * as to have a positive CIG event offset.
+	 */
+	if (cis_offset < (cig->sync_delay - cis->sync_delay)) {
+		cis_offset += iso_interval_us;
+		lost_cig_events++;
+	}
+
+	cis->lll.event_count_prepare += lost_cig_events;
+	cis->event_expire += lost_cig_events;
+
+	if (lost_cig_events > (cis->lll.rx.ft - 1)) {
+		lost_payloads = (lost_cig_events - (cis->lll.rx.ft - 1)) *
+				cis->lll.rx.bn;
+	} else {
+		lost_payloads = 0U;
+	}
+	cis->lll.rx.payload_count += lost_payloads;
+
+	if (lost_cig_events > (cis->lll.tx.ft - 1)) {
+		lost_payloads = (lost_cig_events - (cis->lll.tx.ft - 1)) *
+				cis->lll.tx.bn;
+	} else {
+		lost_payloads = 0U;
+	}
+	cis->lll.tx.payload_count += lost_payloads;
+
+	return cig_offset_calc(cig, cis, cis_offset, ticks_at_expire, remainder);
+}
+
 void ull_conn_iso_start(struct ll_conn *conn, uint16_t cis_handle,
 			uint32_t ticks_at_expire, uint32_t remainder,
 			uint16_t instant_latency)
@@ -968,71 +1030,18 @@ void ull_conn_iso_start(struct ll_conn *conn, uint16_t cis_handle,
 			 * ACL event, taking latency into consideration. Adjust ticker periodicity
 			 * with increased window widening.
 			 */
-			uint32_t lost_cig_events;
-			uint32_t iso_interval_us;
 			uint32_t acl_latency_us;
-			uint32_t lost_payloads;
-			uint32_t cis_offset;
 
 			acl_latency_us = instant_latency * conn->lll.interval * CONN_INT_UNIT_US;
-			iso_interval_us = cig->iso_interval * ISO_INT_UNIT_US;
-
-			if (acl_latency_us > iso_interval_us) {
-				/* Latency is greater than the ISO interval - find the offset from
-				 * this ACL event to the next active ISO event, and adjust the event
-				 * counter accordingly.
-				 */
-				lost_cig_events = DIV_ROUND_UP(acl_latency_us - cis->offset,
-							       iso_interval_us);
-				cis_offset = cis->offset + (lost_cig_events * iso_interval_us) -
-					     acl_latency_us;
-			} else {
-				/* Latency is less than- or equal to one ISO interval - start at
-				 * next ISO event.
-				 */
-				lost_cig_events = 1U;
-				cis_offset = cis->offset + iso_interval_us - acl_latency_us;
-			}
-
-			/* Correct the cis_offset to next CIG event, if the ACL and CIG overlaps.
-			 * ACL radio event at the instant was skipped and a relative CIS offset at
-			 * the current ACL event has been calculated. But the current ACL event
-			 * is partially overlapping with the other of CISes (not yet established) in
-			 * the CIG event. Hence, lets establish the CIS at the next ISO interval so
-			 * as to have a positive CIG event offset.
-			 */
-			if (cis_offset < (cig->sync_delay - cis->sync_delay)) {
-				cis_offset += iso_interval_us;
-				lost_cig_events++;
-			}
-
-			cis->lll.event_count_prepare += lost_cig_events;
-			cis->event_expire += lost_cig_events;
-
-			if (lost_cig_events > (cis->lll.rx.ft - 1)) {
-				lost_payloads = (lost_cig_events - (cis->lll.rx.ft - 1)) *
-						cis->lll.rx.bn;
-			} else {
-				lost_payloads = 0U;
-			}
-			cis->lll.rx.payload_count += lost_payloads;
-
-			if (lost_cig_events > (cis->lll.tx.ft - 1)) {
-				lost_payloads = (lost_cig_events - (cis->lll.tx.ft - 1)) *
-						cis->lll.tx.bn;
-			} else {
-				lost_payloads = 0U;
-			}
-			cis->lll.tx.payload_count += lost_payloads;
+			cig_offset_us = cis_instant_latency_apply(cig, cis, acl_latency_us,
+								  cig->iso_interval * ISO_INT_UNIT_US,
+								  &ticks_at_expire, remainder);
 
 			/* Adjust for extra window widening */
 			iso_interval_us_frac = EVENT_US_TO_US_FRAC(cig->iso_interval *
 								   ISO_INT_UNIT_US);
 			iso_interval_us_frac -= cig->lll.window_widening_periodic_us_frac *
 						instant_latency;
-			/* Calculate new offset */
-			cig_offset_us = cig_offset_calc(cig, cis, cis_offset, &ticks_at_expire,
-							remainder);
 		}
 
 		ticks_periodic  = EVENT_US_FRAC_TO_TICKS(iso_interval_us_frac);
@@ -1054,65 +1063,10 @@ void ull_conn_iso_start(struct ll_conn *conn, uint16_t cis_handle,
 			/* Try to start the CIG late by finding the CIG event relative to current
 			 * ACL event, taking latency into consideration.
 			 */
-			uint32_t lost_cig_events;
-			uint32_t acl_latency_us;
-			uint32_t lost_payloads;
-			uint32_t cis_offset;
-
-			acl_latency_us = instant_latency * acl_interval_us;
-			iso_interval_us = cig->iso_interval * ISO_INT_UNIT_US;
-
-			if (acl_latency_us > iso_interval_us) {
-				/* Latency is greater than the ISO interval - find the offset from
-				 * this ACL event to the next active ISO event, and adjust the event
-				 * counter accordingly.
-				 */
-				lost_cig_events = DIV_ROUND_UP(acl_latency_us - cis->offset,
-							       iso_interval_us);
-				cis_offset = cis->offset + (lost_cig_events * iso_interval_us) -
-					     acl_latency_us;
-			} else {
-				/* Latency is less than- or equal to one ISO interval - start at
-				 * next ISO event.
-				 */
-				lost_cig_events = 1U;
-				cis_offset = cis->offset + iso_interval_us - acl_latency_us;
-			}
-
-			/* Correct the cis_offset to next CIG event, if the ACL and CIG overlaps.
-			 * ACL radio event at the instant was skipped and a relative CIS offset at
-			 * the current ACL event has been calculated. But the current ACL event
-			 * is partially overlapping with the other of CISes (not yet established) in
-			 * the CIG event. Hence, lets establish the CIS at the next ISO interval so
-			 * as to have a positive CIG event offset.
-			 */
-			if (cis_offset < (cig->sync_delay - cis->sync_delay)) {
-				cis_offset += iso_interval_us;
-				lost_cig_events++;
-			}
-
-			cis->lll.event_count_prepare += lost_cig_events;
-			cis->event_expire += lost_cig_events;
-
-			if (lost_cig_events > (cis->lll.rx.ft - 1)) {
-				lost_payloads = (lost_cig_events - (cis->lll.rx.ft - 1)) *
-						cis->lll.rx.bn;
-			} else {
-				lost_payloads = 0U;
-			}
-			cis->lll.rx.payload_count += lost_payloads;
-
-			if (lost_cig_events > (cis->lll.tx.ft - 1)) {
-				lost_payloads = (lost_cig_events - (cis->lll.tx.ft - 1)) *
-						cis->lll.tx.bn;
-			} else {
-				lost_payloads = 0U;
-			}
-			cis->lll.tx.payload_count += lost_payloads;
-
-			/* Calculate new offset */
-			cig_offset_us = cig_offset_calc(cig, cis, cis_offset, &ticks_at_expire,
-							remainder);
+			cig_offset_us = cis_instant_latency_apply(cig, cis,
+								  instant_latency * acl_interval_us,
+								  iso_interval_us,
+								  &ticks_at_expire, remainder);
 		}
 
 		ticks_periodic  = HAL_TICKER_US_TO_TICKS(iso_interval_us);
