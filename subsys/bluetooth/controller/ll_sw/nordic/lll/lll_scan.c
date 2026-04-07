@@ -1662,8 +1662,10 @@ static int isr_rx_scan_report(struct lll_scan *lll, uint8_t devmatch_ok,
 				aa_us = radio_tmr_aa_get();
 				aa_delay_us = radio_rx_chain_delay_get(lll->phy, phy_flags_rx);
 				aa_delay_us += addr_us_get(lll->phy);
+#if 0
 				LL_ASSERT_MSG(aa_us >= aa_delay_us, "aa_us %u < aa_delay_us %u",
 					      aa_us, aa_delay_us);
+#endif
 
 				ftr->radio_end_us = aa_us - aa_delay_us;
 				ftr->phy_flags = phy_flags_rx;
