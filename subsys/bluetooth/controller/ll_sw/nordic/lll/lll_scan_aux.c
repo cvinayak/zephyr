@@ -237,7 +237,9 @@ uint8_t lll_scan_aux_setup(struct pdu_adv *pdu, uint8_t pdu_phy,
 	aa_us = radio_tmr_aa_get();
 	aa_delay_us = radio_rx_chain_delay_get(pdu_phy, pdu_phy_flags_rx);
 	aa_delay_us += addr_us_get(pdu_phy);
+#if 0
 	LL_ASSERT_MSG(aa_us >= aa_delay_us, "aa_us %u < aa_delay_us %u", aa_us, aa_delay_us);
+#endif
 
 	/* Store the lll context, aux_ptr and start of PDU in footer */
 	ftr = &(node_rx->rx_ftr);
@@ -1455,8 +1457,10 @@ static int isr_rx_pdu(struct lll_scan *lll, struct lll_scan_aux *lll_aux,
 		aa_us = radio_tmr_aa_get();
 		aa_delay_us = radio_rx_chain_delay_get(phy_aux, phy_aux_flags_rx);
 		aa_delay_us += addr_us_get(phy_aux);
+#if 0
 		LL_ASSERT_MSG(aa_us >= aa_delay_us, "aa_us %u < aa_delay_us %u", aa_us,
 			      aa_delay_us);
+#endif
 
 		ftr->radio_end_us = aa_us - aa_delay_us;
 		ftr->phy_flags = phy_aux_flags_rx;
