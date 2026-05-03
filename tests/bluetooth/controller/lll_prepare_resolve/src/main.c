@@ -171,6 +171,9 @@ static int test_is_abort_cb(void *next, void *curr,
 	return -ECANCELED;
 }
 
+/* Counter used by the dequeue_iter_one_ready custom fake. */
+static int g_dequeue_iter_call_count;
+
 /* -------------------------------------------------------------------------
  * Helper: reset all mocks and internal state before each test.
  * -------------------------------------------------------------------------
@@ -201,8 +204,9 @@ static void before_each(void *data)
 	ticker_start_fake.return_val = TICKER_STATUS_SUCCESS;
 
 	/* Reset per-test counters. */
-	g_prepare_cb_call_count = 0;
-	g_abort_cb_call_count   = 0;
+	g_prepare_cb_call_count    = 0;
+	g_abort_cb_call_count      = 0;
+	g_dequeue_iter_call_count  = 0;
 
 	/* Set up a default prepare param pointing to a valid context. */
 	memset(&g_prepare_param, 0, sizeof(g_prepare_param));
@@ -235,7 +239,6 @@ static void *dequeue_iter_null(void **idx)
  * Return g_ready_event on the first call, NULL on subsequent calls.
  * Models a single ready event in the prepare pipeline.
  */
-static int g_dequeue_iter_call_count;
 static void *dequeue_iter_one_ready(void **idx)
 {
 	ARG_UNUSED(idx);
@@ -477,18 +480,6 @@ ZTEST(lll_prepare_resolve, test_execute_ready_same_event)
 	same_event.prepare_param = g_prepare_param; /* copy so fields match */
 
 	/*
-	 * We need ull_prepare_dequeue_iter to return &same_event and then
-	 * NULL.  Use a custom fake that checks: on first call, return the
-	 * same_event whose &prepare_param equals g_prepare_param.
-	 */
-	static struct lll_event *same_evt_ptr;
-
-	same_evt_ptr = &same_event;
-
-	/* Patch same_event so its prepare_param pointer equals g_prepare_param. */
-	same_event.prepare_param = g_prepare_param;
-
-	/*
 	 * The condition checked is:
 	 *   &ready->prepare_param != prepare_param
 	 * For same_event, &same_event.prepare_param != &g_prepare_param
@@ -498,15 +489,10 @@ ZTEST(lll_prepare_resolve, test_execute_ready_same_event)
 	 * diff) so the event is NOT considered "short" and ready_short = NULL.
 	 */
 	ticker_ticks_diff_get_fake.return_val = BIT(23); /* MSbit set = negative */
-	g_dequeue_iter_call_count = 0;
-
-	/* Return same_event on first dequeue, then NULL. */
-	static int local_call_cnt;
-
-	local_call_cnt = 0;
-	ull_prepare_dequeue_iter_fake.custom_fake = dequeue_iter_null;
 
 	/* For this test we simply start with an empty pipeline. */
+	ull_prepare_dequeue_iter_fake.custom_fake = dequeue_iter_null;
+
 	err = lll_prepare_resolve(test_is_abort_cb, test_abort_cb,
 				  test_prepare_cb, &g_prepare_param,
 				  0U, 0U);
@@ -579,13 +565,8 @@ ZTEST(lll_prepare_resolve, test_execute_with_next_in_pipeline)
 	 * NULL.  The second call (after prepare_cb) returns g_ready_event.
 	 * A third call returns NULL.
 	 *
-	 * We implement this with a stateful custom fake.
+	 * Use the FFF return_val_seq mechanism to sequence the return values.
 	 */
-	static int call_count;
-	static struct lll_event *evt;
-
-	call_count = 0;
-	evt = &g_ready_event;
 
 	/* Provide a custom fake that counts calls. */
 	ull_prepare_dequeue_iter_fake.custom_fake = NULL;
