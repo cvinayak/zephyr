@@ -1,0 +1,8 @@
+common:
+  tags: bluetooth
+tests:
+  bluetooth.controller.lll_prepare_resolve:
+    platform_allow:
+      - native_sim
+    integration_platforms:
+      - native_sim
