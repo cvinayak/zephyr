@@ -334,7 +334,7 @@ void z_arm_on_enter_cpu_idle_prepare(void)
 
 #if defined(CONFIG_SOC_NRF53_ANOMALY_160_WORKAROUND) || \
 	(defined(CONFIG_SOC_NRF53_RTC_PRETICK) && defined(CONFIG_SOC_NRF5340_CPUNET))
-bool z_arm_on_enter_cpu_idle(void)
+bool z_nrf53_on_enter_cpu_idle(void)
 {
 	bool ok_to_sleep = true;
 
@@ -385,6 +385,18 @@ bool z_arm_on_enter_cpu_idle(void)
 	* (CONFIG_SOC_NRF53_RTC_PRETICK && CONFIG_SOC_NRF5340_CPUNET)
 	*/
 
+#if defined(CONFIG_ARM_ON_ENTER_CPU_IDLE_HOOK) && !defined(CONFIG_NRF_CUSTOM_ON_ENTER_CPU_IDLE_HOOK)
+bool z_arm_on_enter_cpu_idle(void)
+{
+#if defined(CONFIG_SOC_NRF53_ANOMALY_160_WORKAROUND) || \
+	(defined(CONFIG_SOC_NRF53_RTC_PRETICK) && defined(CONFIG_SOC_NRF5340_CPUNET))
+	return z_nrf53_on_enter_cpu_idle();
+#endif /* CONFIG_SOC_NRF53_ANOMALY_160_WORKAROUND ||
+	* (CONFIG_SOC_NRF53_RTC_PRETICK && CONFIG_SOC_NRF5340_CPUNET)
+	*/
+}
+#endif
+
 #if CONFIG_SOC_NRF53_RTC_PRETICK
 #ifdef CONFIG_SOC_NRF5340_CPUAPP
 /* RTC pretick - application core part. */
@@ -399,10 +411,14 @@ static int rtc_pretick_cpuapp_init(void)
 	uint32_t task_ipc = nrf_ipc_task_address_get(NRF_IPC, ipc_task);
 	uint32_t evt_ipc = nrf_ipc_event_address_get(NRF_IPC, ipc_event);
 
+	nrf_ipc_publish_clear(NRF_IPC, ipc_event);
+	nrf_ipc_subscribe_clear(NRF_IPC, ipc_task);
+
 	nrf_ipc_receive_config_set(NRF_IPC, CONFIG_SOC_NRF53_RTC_PRETICK_IPC_CH_FROM_NET,
 				   BIT(CONFIG_SOC_NRF53_RTC_PRETICK_IPC_CH_FROM_NET));
 	nrf_ipc_send_config_set(NRF_IPC, CONFIG_SOC_NRF53_RTC_PRETICK_IPC_CH_TO_NET,
 				   BIT(CONFIG_SOC_NRF53_RTC_PRETICK_IPC_CH_TO_NET));
+
 	err = nrfx_gppi_conn_alloc(evt_ipc, task_ipc, &handle);
 	if (err < 0) {
 		return err;

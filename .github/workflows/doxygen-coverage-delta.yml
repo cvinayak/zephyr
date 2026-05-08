@@ -28,7 +28,7 @@ jobs:
     runs-on:
       group: zephyr-runner-v2-linux-x64-4xlarge
     container:
-      image: ghcr.io/zephyrproject-rtos/ci-repo-cache:v0.28.7.20251127
+      image: ghcr.io/zephyrproject-rtos/ci-repo-cache:v0.29.2.20260422
       options: '--entrypoint /bin/bash'
     timeout-minutes: 60
     env:
@@ -96,4 +96,5 @@ jobs:
             --strip-reference-prefix "$BASE_ROOT" \
             --strip-comparison-prefix "$PR_ROOT" \
             --warn-paths "include/zephyr/dt-bindings" \
+            --warn-paths "include/zephyr/posix" \
             --summary-file "$GITHUB_STEP_SUMMARY"

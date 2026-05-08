@@ -304,6 +304,31 @@ static int cmd_bypass(const struct shell *sh, size_t argc, char **argv)
 	return set_bypass(sh, bypass_cb);
 }
 
+static int cmd_demo_readline(const struct shell *sh, size_t argc, char **argv)
+{
+	uint8_t input_buf[256];
+	int ret;
+
+	shell_fprintf_normal(sh, "Input: ");
+
+	if (argc == 2 && strcmp(argv[1], "obscured") == 0) {
+		shell_obscure_set(sh, true);
+	}
+
+	ret = shell_readline(sh, input_buf, sizeof(input_buf), K_SECONDS(10));
+	shell_obscure_set(sh, false);
+
+	if (ret < 0) {
+		shell_error(sh, "Input error (%d)", ret);
+		return ret;
+	}
+
+	shell_print(sh, "Got %d characters:", ret);
+	shell_hexdump(sh, input_buf, ret);
+
+	return 0;
+}
+
 static int cmd_dict(const struct shell *sh, size_t argc, char **argv,
 		    void *data)
 {
@@ -325,6 +350,9 @@ SHELL_STATIC_SUBCMD_SET_CREATE(sub_demo,
 	SHELL_CMD(params, NULL, "Print params command.", cmd_demo_params),
 	SHELL_CMD(ping, NULL, "Ping command.", cmd_demo_ping),
 	SHELL_CMD(board, NULL, "Show board name command.", cmd_demo_board),
+	SHELL_COND_CMD_ARG(COND_CODE_1(CONFIG_SHELL_REMOTE_CLI, (0), (1)),
+			readline, NULL, SHELL_HELP("Read user input", "[obscured]"),
+		      cmd_demo_readline, 1, 1),
 #if defined CONFIG_SHELL_GETOPT
 	SHELL_CMD(getopt_thread_safe, NULL,
 		  "Cammand using getopt in thread safe way"
@@ -339,7 +367,8 @@ SHELL_CMD_REGISTER(demo, &sub_demo, "Demo commands", NULL);
 
 SHELL_CMD_ARG_REGISTER(version, NULL, "Show kernel version", cmd_version, 1, 0);
 
-SHELL_CMD_ARG_REGISTER(bypass, NULL, "Bypass shell", cmd_bypass, 1, 0);
+SHELL_COND_CMD_ARG_REGISTER(COND_CODE_1(CONFIG_SHELL_REMOTE_CLI, (0), (1)),
+			bypass, NULL, "Bypass shell", cmd_bypass, 1, 0);
 
 /* Create a set of commands. Commands to this set are added using @ref SHELL_SUBCMD_ADD
  * and @ref SHELL_SUBCMD_COND_ADD.

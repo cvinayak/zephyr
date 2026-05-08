@@ -511,6 +511,9 @@ DMA_STM32_EXPORT_API int dma_stm32_configure(const struct device *dev,
 #endif
 	LL_DMA_Init(dma, dma_stm32_id_to_stream(id), &DMA_InitStruct);
 
+	/* Always enable the transfer error interrupt */
+	LL_DMA_EnableIT_TE(dma, dma_stm32_id_to_stream(id));
+
 	/* Enable transfer complete ISR if in non-cyclic mode or a callback is requested */
 	if (!stream->cyclic || stream->dma_callback != NULL) {
 		LL_DMA_EnableIT_TC(dma, dma_stm32_id_to_stream(id));
@@ -660,11 +663,6 @@ static int dma_stm32_init(const struct device *dev)
 {
 	const struct dma_stm32_config *config = dev->config;
 	const struct device *const clk = DEVICE_DT_GET(STM32_CLOCK_CONTROL_NODE);
-
-	if (!device_is_ready(clk)) {
-		LOG_ERR("clock control device not ready");
-		return -ENODEV;
-	}
 
 	if (clock_control_on(clk,
 		(clock_control_subsys_t) &config->pclken) != 0) {

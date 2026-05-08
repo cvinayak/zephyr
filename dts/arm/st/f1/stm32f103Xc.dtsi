@@ -19,6 +19,7 @@
 		flash-controller@40022000 {
 			flash0: flash@8000000 {
 				reg = <0x08000000 DT_SIZE_K(256)>;
+				ranges = <0 0x8000000 DT_SIZE_K(256)>;
 				erase-block-size = <DT_SIZE_K(2)>;
 			};
 		};
@@ -108,9 +109,9 @@
 			compatible = "st,stm32-spi";
 			#address-cells = <1>;
 			#size-cells = <0>;
-			reg = <0X40003c00 0x400>;
+			reg = <0x40003c00 0x400>;
 			clocks = <&rcc STM32_CLOCK(APB1, 15)>;
-			interrupts = <51 5>;
+			interrupts = <51 0>;
 			st,spi-data-width = "limited-8-16-bit";
 			status = "disabled";
 		};
@@ -144,7 +145,7 @@
 		};
 
 		adc2: adc@40012800 {
-			compatible = "st,stm32-adc";
+			compatible = "st,stm32f1-adc", "st,stm32-adc";
 			reg = <0x40012800 0x400>;
 			clocks = <&rcc STM32_CLOCK(APB2, 10)>;
 			clock-names = "adcx";
@@ -156,11 +157,12 @@
 			st,adc-sequencer = "programmable";
 			st,adc-oversampler = "none";
 			st,adc-internal-regulator = "none";
+			st,adc-has-injected-support;
 			status = "disabled";
 		};
 
 		adc3: adc@40013c00 {
-			compatible = "st,stm32-adc";
+			compatible = "st,stm32f1-adc", "st,stm32-adc";
 			reg = <0x40013c00 0x400>;
 			clocks = <&rcc STM32_CLOCK(APB2, 15)>;
 			clock-names = "adcx";
@@ -171,6 +173,7 @@
 			st,adc-sequencer = "programmable";
 			st,adc-oversampler = "none";
 			st,adc-internal-regulator = "none";
+			st,adc-has-injected-support;
 			status = "disabled";
 		};
 

@@ -7,7 +7,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
-#include <unistd.h>
 #include <zephyr/types.h>
 #include <zephyr/kernel.h>
 #include <libmctp.h>
@@ -24,15 +23,23 @@ struct mctp *mctp_ctx;
 
 #define BUS_OWNER_ID 20
 
+static void rx_message_handler(struct k_work *work)
+{
+	ARG_UNUSED(work);
+
+	mctp_message_tx(mctp_ctx, BUS_OWNER_ID, false, 0, "pong", sizeof("pong"));
+
+	k_sem_give(&mctp_rx);
+}
+K_WORK_DEFINE(rx_message_work, rx_message_handler);
+
 static void rx_message(uint8_t eid, bool tag_owner, uint8_t msg_tag, void *data, void *msg,
 		       size_t len)
 {
 	LOG_INF("received message \"%s\" from endpoint %d, replying with \"pong\"", (char *)msg,
 		eid);
 
-	mctp_message_tx(mctp_ctx, BUS_OWNER_ID, false, 0, "pong", sizeof("pong"));
-
-	k_sem_give(&mctp_rx);
+	k_work_submit(&rx_message_work);
 }
 
 int main(void)

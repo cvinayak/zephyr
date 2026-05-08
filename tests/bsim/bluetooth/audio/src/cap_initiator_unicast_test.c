@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025 Nordic Semiconductor ASA
+ * Copyright (c) 2022-2026 Nordic Semiconductor ASA
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -11,6 +11,7 @@
 
 #include <zephyr/autoconf.h>
 #include <zephyr/bluetooth/addr.h>
+#include <zephyr/bluetooth/assigned_numbers.h>
 #include <zephyr/bluetooth/audio/audio.h>
 #include <zephyr/bluetooth/audio/bap_lc3_preset.h>
 #include <zephyr/bluetooth/audio/cap.h>
@@ -33,6 +34,7 @@
 #include <zephyr/sys/util.h>
 #include <zephyr/sys/util_macro.h>
 #include <zephyr/sys_clock.h>
+#include <zephyr/toolchain.h>
 
 #include "bap_stream_tx.h"
 #include "bap_stream_rx.h"
@@ -137,6 +139,9 @@ static void unicast_stream_configured(struct bt_bap_stream *stream,
 				      const struct bt_bap_qos_cfg_pref *pref)
 {
 	struct bt_cap_stream *cap_stream = cap_stream_from_bap_stream(stream);
+
+	ARG_UNUSED(pref);
+
 	printk("Configured stream %p\n", stream);
 
 	for (size_t i = 0U; i < ARRAY_SIZE(non_idle_streams); i++) {
@@ -247,6 +252,9 @@ static void cap_discovery_complete_cb(struct bt_conn *conn, int err,
 				      const struct bt_csip_set_coordinator_set_member *member,
 				      const struct bt_csip_set_coordinator_csis_inst *csis_inst)
 {
+	ARG_UNUSED(conn);
+	ARG_UNUSED(member);
+
 	if (err != 0) {
 		FAIL("Failed to discover CAS: %d", err);
 
@@ -349,12 +357,16 @@ static void print_remote_codec(const struct bt_audio_codec_cap *codec_cap, enum 
 static void pac_record_cb(struct bt_conn *conn, enum bt_audio_dir dir,
 			  const struct bt_audio_codec_cap *codec_cap)
 {
+	ARG_UNUSED(conn);
+
 	print_remote_codec(codec_cap, dir);
 	SET_FLAG(flag_codec_found);
 }
 
 static void discover_cb(struct bt_conn *conn, int err, enum bt_audio_dir dir)
 {
+	ARG_UNUSED(conn);
+
 	if (err != 0) {
 		FAIL("Discovery failed: %d\n", err);
 		return;
@@ -394,6 +406,10 @@ static struct bt_bap_unicast_client_cb unicast_client_cbs = {
 
 static void att_mtu_updated(struct bt_conn *conn, uint16_t tx, uint16_t rx)
 {
+	ARG_UNUSED(conn);
+	ARG_UNUSED(tx);
+	ARG_UNUSED(rx);
+
 	printk("MTU exchanged\n");
 	SET_FLAG(flag_mtu_exchanged);
 }
@@ -404,7 +420,6 @@ static struct bt_gatt_cb gatt_callbacks = {
 
 static bool check_audio_support_and_connect_cb(struct bt_data *data, void *user_data)
 {
-	char addr_str[BT_ADDR_LE_STR_LEN];
 	bt_addr_le_t *addr = user_data;
 	const struct bt_uuid *uuid;
 	uint16_t uuid_val;
@@ -427,8 +442,7 @@ static bool check_audio_support_and_connect_cb(struct bt_data *data, void *user_
 		return true; /* Continue parsing to next AD data type */
 	}
 
-	bt_addr_le_to_str(addr, addr_str, sizeof(addr_str));
-	printk("Device found: %s\n", addr_str);
+	printk("Device found: %s\n", bt_addr_le_str(addr));
 
 	printk("Stopping scan\n");
 	if (bt_le_scan_stop()) {
@@ -657,36 +671,36 @@ static bool unicast_group_foreach_stream_cb(struct bt_cap_stream *cap_stream, vo
 	err = bt_bap_ep_get_info(cap_stream->bap_stream.ep, &ep_info);
 	if (err != 0) {
 		FAIL("Failed to get EP info: %d\n", err);
-		return true;
+		return false;
 	}
 
 	err = bt_cap_unicast_group_get_info(unicast_group, &cap_info);
 	if (err != 0) {
 		FAIL("Failed to get CAP unicast group info: %d\n", err);
-		return true;
+		return false;
 	}
 
 	err = bt_bap_unicast_group_get_info(cap_info.unicast_group, &bap_info);
 	if (err != 0) {
 		FAIL("Failed to get BAP unicast group info: %d\n", err);
-		return true;
+		return false;
 	}
 
 	if (ep_info.dir == BT_AUDIO_DIR_SINK) {
 		if (bap_info.sink_pd != expected_pd) {
 			FAIL("Unexpected sink PD %u (expected %u)\n", bap_info.sink_pd,
 			     expected_pd);
-			return true;
+			return false;
 		}
 	} else {
 		if (bap_info.source_pd != expected_pd) {
 			FAIL("Unexpected source PD %u (expected %u)\n", bap_info.source_pd,
 			     expected_pd);
-			return true;
+			return false;
 		}
 	}
 
-	return false;
+	return true;
 }
 
 static void unicast_audio_start(struct bt_cap_unicast_group *unicast_group, bool wait)
@@ -818,6 +832,8 @@ static void cap_initiator_unicast_audio_stop(struct bt_cap_unicast_group *unicas
 	struct bt_cap_unicast_audio_stop_param param;
 	int err;
 
+	ARG_UNUSED(unicast_group);
+
 	param.type = BT_CAP_SET_TYPE_AD_HOC;
 	param.count = non_idle_streams_cnt;
 	param.streams = non_idle_streams;
@@ -928,6 +944,8 @@ static void test_main_cap_initiator_unicast(void)
 
 	WAIT_FOR_FLAG(flag_mtu_exchanged);
 
+	update_security(default_conn);
+
 	discover_cas(default_conn);
 	discover_cas(default_conn); /* test that we can discover twice */
 
@@ -981,6 +999,8 @@ static void test_main_cap_initiator_unicast_inval(void)
 
 	WAIT_FOR_FLAG(flag_mtu_exchanged);
 
+	update_security(default_conn);
+
 	discover_cas_inval(default_conn);
 	discover_cas(default_conn);
 
@@ -1019,6 +1039,8 @@ static void test_cap_initiator_unicast_timeout(void)
 	scan_and_connect();
 
 	WAIT_FOR_FLAG(flag_mtu_exchanged);
+
+	update_security(default_conn);
 
 	discover_cas(default_conn);
 
@@ -1083,6 +1105,8 @@ static void test_cap_initiator_unicast_ase_error(void)
 	scan_and_connect();
 
 	WAIT_FOR_FLAG(flag_mtu_exchanged);
+
+	update_security(default_conn);
 
 	discover_cas(default_conn);
 	discover_sink(default_conn);
@@ -1215,6 +1239,8 @@ static int cap_initiator_ac_cap_unicast_start(const struct cap_initiator_ac_para
 	size_t snk_ep_cnt = 0U;
 	size_t src_ep_cnt = 0U;
 
+	ARG_UNUSED(unicast_group);
+
 	for (size_t i = 0U; i < param->conn_cnt; i++) {
 		const uint8_t conn_index = bt_conn_index(connected_conns[i]);
 #if UNICAST_SINK_SUPPORTED
@@ -1273,9 +1299,10 @@ static int cap_initiator_ac_cap_unicast_start(const struct cap_initiator_ac_para
 		for (size_t j = 0U; j < param->snk_cnt[i]; j++) {
 			struct bt_cap_unicast_audio_start_stream_param *stream_param =
 				&stream_params[stream_cnt];
+			struct bt_audio_codec_cfg *codec_cfg = snk_codec_cfgs[snk_stream_cnt];
 
 			stream_param->member.member = connected_conns[i];
-			stream_param->codec_cfg = snk_codec_cfgs[snk_stream_cnt];
+			stream_param->codec_cfg = codec_cfg;
 			stream_param->ep = snk_eps[snk_stream_cnt];
 			stream_param->stream = snk_cap_streams[snk_stream_cnt];
 
@@ -1287,7 +1314,7 @@ static int cap_initiator_ac_cap_unicast_start(const struct cap_initiator_ac_para
 			 */
 			if (param->conn_cnt > 1U || param->snk_cnt[i] > 1U) {
 				const int err = bt_audio_codec_cfg_set_chan_allocation(
-					stream_param->codec_cfg, (enum bt_audio_location)BIT(i));
+					codec_cfg, (enum bt_audio_location)BIT(i));
 
 				if (err < 0) {
 					FAIL("Failed to set channel allocation: %d\n", err);
@@ -1299,9 +1326,10 @@ static int cap_initiator_ac_cap_unicast_start(const struct cap_initiator_ac_para
 		for (size_t j = 0U; j < param->src_cnt[i]; j++) {
 			struct bt_cap_unicast_audio_start_stream_param *stream_param =
 				&stream_params[stream_cnt];
+			struct bt_audio_codec_cfg *codec_cfg = src_codec_cfgs[src_stream_cnt];
 
 			stream_param->member.member = connected_conns[i];
-			stream_param->codec_cfg = src_codec_cfgs[src_stream_cnt];
+			stream_param->codec_cfg = codec_cfg;
 			stream_param->ep = src_eps[src_stream_cnt];
 			stream_param->stream = src_cap_streams[src_stream_cnt];
 
@@ -1313,7 +1341,7 @@ static int cap_initiator_ac_cap_unicast_start(const struct cap_initiator_ac_para
 			 */
 			if (param->conn_cnt > 1U || param->src_cnt[i] > 1U) {
 				const int err = bt_audio_codec_cfg_set_chan_allocation(
-					stream_param->codec_cfg, (enum bt_audio_location)BIT(i));
+					codec_cfg, (enum bt_audio_location)BIT(i));
 
 				if (err < 0) {
 					FAIL("Failed to set channel allocation: %d\n", err);
@@ -1474,6 +1502,8 @@ static void test_cap_initiator_ac(const struct cap_initiator_ac_param *param)
 	}
 
 	for (size_t i = 0U; i < param->conn_cnt; i++) {
+		update_security(connected_conns[i]);
+
 		discover_cas(connected_conns[i]);
 
 		if (param->snk_cnt[i] > 0U) {

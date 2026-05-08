@@ -16,6 +16,23 @@
 
 &flash0 {
 	reg = <0x08000000 DT_SIZE_K(512)>;
+	ranges = <0x0 0x08000000 DT_SIZE_K(512)>;
+};
+
+&gpioa {
+	ngpios = <11>;
+};
+
+&gpiob {
+	ngpios = <12>;
+};
+
+&gpioc {
+	ngpios = <14>;
+};
+
+&gpiod {
+	ngpios = <11>;
 };
 
 &sram0 {

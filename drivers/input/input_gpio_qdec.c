@@ -33,6 +33,7 @@ struct gpio_qdec_config {
 	uint32_t idle_timeout_ms;
 	uint16_t axis;
 	uint8_t steps_per_period;
+	bool invert_direction;
 };
 
 struct gpio_qdec_data {
@@ -224,6 +225,9 @@ static void gpio_qdec_event_worker(struct k_work *work)
 	irq_unlock(key);
 
 	if (acc != 0) {
+		if (cfg->invert_direction) {
+			acc = -acc;
+		}
 		input_report_rel(data->dev, cfg->axis, acc, true, K_FOREVER);
 	}
 }
@@ -355,7 +359,7 @@ static int gpio_qdec_pm_action(const struct device *dev,
 	struct gpio_qdec_data *data = dev->data;
 
 	switch (action) {
-	case PM_DEVICE_ACTION_SUSPEND:
+	case PM_DEVICE_ACTION_SUSPEND: {
 		struct k_work_sync sync;
 
 		atomic_set(&data->suspended, 1);
@@ -371,6 +375,7 @@ static int gpio_qdec_pm_action(const struct device *dev,
 		gpio_qdec_pin_suspend(dev, true);
 
 		break;
+	}
 	case PM_DEVICE_ACTION_RESUME:
 		atomic_set(&data->suspended, 0);
 
@@ -422,6 +427,7 @@ static int gpio_qdec_pm_action(const struct device *dev,
 		.idle_timeout_ms = DT_INST_PROP(n, idle_timeout_ms),		\
 		.steps_per_period = DT_INST_PROP(n, steps_per_period),		\
 		.axis = DT_INST_PROP(n, zephyr_axis),				\
+		.invert_direction = DT_INST_PROP(n, invert_direction),		\
 	};									\
 										\
 	static struct gpio_qdec_data gpio_qdec_data_##n;			\

@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2019, Linaro
- * Copyright 2025 NXP
+ * Copyright 2025-2026 NXP
  * SPDX-License-Identifier: Apache-2.0
  */
 
@@ -23,7 +23,7 @@
 
 LOG_MODULE_REGISTER(pwm_mcux, CONFIG_PWM_LOG_LEVEL);
 
-#define CHANNEL_COUNT 2
+#define CHANNEL_COUNT 3
 
 #ifdef CONFIG_PWM_CAPTURE
 struct pwm_mcux_capture_data {
@@ -55,7 +55,9 @@ struct pwm_mcux_config {
 };
 
 struct pwm_mcux_data {
+	uint32_t clock_freq;
 	uint32_t period_cycles[CHANNEL_COUNT];
+	uint32_t pulse_cycles[CHANNEL_COUNT];
 	pwm_signal_param_t channel[CHANNEL_COUNT];
 	struct k_mutex lock;
 #ifdef CONFIG_PWM_CAPTURE
@@ -71,6 +73,9 @@ static int mcux_pwm_set_cycles_internal(const struct device *dev, uint32_t chann
 	const struct pwm_mcux_config *config = dev->config;
 	struct pwm_mcux_data *data = dev->data;
 	pwm_level_select_t level;
+	uint32_t pwm_clk_freq;
+
+	pwm_clk_freq = data->clock_freq >> config->prescale;
 
 #ifdef CONFIG_PWM_CAPTURE
 	if (data->capture_active) {
@@ -87,15 +92,9 @@ static int mcux_pwm_set_cycles_internal(const struct device *dev, uint32_t chann
 
 	if (period_cycles != data->period_cycles[channel]
 	    || level != data->channel[channel].level) {
-		uint32_t clock_freq;
 		status_t status;
 
 		data->period_cycles[channel] = period_cycles;
-
-		if (clock_control_get_rate(config->clock_dev, config->clock_subsys,
-				&clock_freq)) {
-			return -EINVAL;
-		}
 
 		data->channel[channel].pwmchannelenable = true;
 
@@ -110,21 +109,45 @@ static int mcux_pwm_set_cycles_internal(const struct device *dev, uint32_t chann
 		 */
 		data->channel[channel].dutyCyclePercent = 0;
 		data->channel[channel].level = level;
+		data->pulse_cycles[channel] = pulse_cycles;
 
 		status = PWM_SetupPwm(config->base, config->index,
 				      &data->channel[channel], 1U,
-				      config->mode, clock_freq >> config->prescale, clock_freq);
+				      config->mode, pwm_clk_freq, data->clock_freq);
 		if (status != kStatus_Success) {
 			LOG_ERR("Could not set up pwm (%d)", status);
 			return -ENOTSUP;
 		}
 
+		if (channel == 2) {
+			/* For channels A/B, when the counter matches VAL2/VAL4 or VAL3/VAL5,
+			 * the output status changes. VAL2 and VAL4 are set to 0, so the channel
+			 * output is high at the beginning of the period, then becomes low when
+			 * the counter matches VAL3/VAL5 (pulse width).
+			 * Channel X only uses VAL0 for pulse width, so its polarity must be
+			 * handled differently.
+			 */
+			if (level == kPWM_HighTrue) {
+				config->base->SM[config->index].OCTRL |=
+					((uint16_t)1U << PWM_OCTRL_POLX_SHIFT);
+			} else {
+				config->base->SM[config->index].OCTRL &=
+					~((uint16_t)1U << PWM_OCTRL_POLX_SHIFT);
+			}
+		} else if (data->period_cycles[2] != 0U) {
+			/* When setting channel A/B, PWM_SetupPwm internally calls
+			 * PWM_SetDutycycleRegister which modifies VAL0. Since VAL0 controls
+			 * channel X's pulse width, we need to restore it to maintain channel X's
+			 * configured pulse cycles.
+			 */
+			config->base->SM[config->index].VAL0 = data->pulse_cycles[2];
+		} else {
+			/* No action required. */
+		}
+
 		/* Setup VALx values directly for edge aligned PWM */
 		if (channel == 0) {
 			/* Side A */
-			PWM_SetVALxValue(config->base, config->index,
-					 kPWM_ValueRegister_0,
-					 (uint16_t)(period_cycles / 2U));
 			PWM_SetVALxValue(config->base, config->index,
 					 kPWM_ValueRegister_1,
 					 (uint16_t)(period_cycles - 1U));
@@ -133,11 +156,8 @@ static int mcux_pwm_set_cycles_internal(const struct device *dev, uint32_t chann
 			PWM_SetVALxValue(config->base, config->index,
 					 kPWM_ValueRegister_3,
 					 (uint16_t)pulse_cycles);
-		} else {
+		} else if (channel == 1) {
 			/* Side B */
-			PWM_SetVALxValue(config->base, config->index,
-					 kPWM_ValueRegister_0,
-					 (uint16_t)(period_cycles / 2U));
 			PWM_SetVALxValue(config->base, config->index,
 					 kPWM_ValueRegister_1,
 					 (uint16_t)(period_cycles - 1U));
@@ -146,22 +166,36 @@ static int mcux_pwm_set_cycles_internal(const struct device *dev, uint32_t chann
 			PWM_SetVALxValue(config->base, config->index,
 					 kPWM_ValueRegister_5,
 					 (uint16_t)pulse_cycles);
+		} else {
+			/* Side X */
+			PWM_SetVALxValue(config->base, config->index,
+					 kPWM_ValueRegister_0,
+					 (uint16_t)pulse_cycles);
+			PWM_SetVALxValue(config->base, config->index,
+					 kPWM_ValueRegister_1,
+					 (uint16_t)(period_cycles - 1U));
 		}
 
 		PWM_SetPwmLdok(config->base, 1U << config->index, true);
 
 		PWM_StartTimer(config->base, 1U << config->index);
 	} else {
-		/* Wait for the registers to finish their previous load (LDOK cleared) */
+		uint64_t period_time_us =
+			(uint64_t)data->period_cycles[channel] * 1000000U / (pwm_clk_freq);
+		__ASSERT_NO_MSG(period_time_us <= 0xFFFFFFFFU);
+		/* Wait for the registers to finish their previous load (LDOK cleared).
+		 * The LDOK is cleared after one PWM period, so we wait period_time_us.
+		 * Keep 1 millisecond here for compatibility.
+		 */
 		bool ldok_got_cleared = WAIT_FOR(
 			!(config->base->MCTRL & PWM_MCTRL_LDOK(1U << config->index)),
-			1000, /* 1 millisecond timeout */
+			MAX(1000, (uint32_t)period_time_us),
 			k_busy_wait(1) /* busywait meanwhile */
 		);
 
 		if (!ldok_got_cleared) {
 			/*
-			 * LDOK didn't get cleared in a millisecond, which is extremely rare.
+			 * LDOK didn't get cleared in timeout, which is extremely rare.
 			 * We return with an error though, because setting the VALx values in
 			 * this state would do nothing
 			 */
@@ -176,12 +210,17 @@ static int mcux_pwm_set_cycles_internal(const struct device *dev, uint32_t chann
 			PWM_SetVALxValue(config->base, config->index,
 					 kPWM_ValueRegister_3,
 					 (uint16_t)pulse_cycles);
-		} else {
+		} else if (channel == 1) {
 			/* Side B */
 			PWM_SetVALxValue(config->base, config->index,
 					 kPWM_ValueRegister_4, 0U);
 			PWM_SetVALxValue(config->base, config->index,
 					 kPWM_ValueRegister_5,
+					 (uint16_t)pulse_cycles);
+		} else {
+			/* Side X */
+			PWM_SetVALxValue(config->base, config->index,
+					 kPWM_ValueRegister_0,
 					 (uint16_t)pulse_cycles);
 		}
 		PWM_SetPwmLdok(config->base, 1U << config->index, true);
@@ -224,13 +263,9 @@ static int mcux_pwm_get_cycles_per_sec(const struct device *dev,
 				       uint32_t channel, uint64_t *cycles)
 {
 	const struct pwm_mcux_config *config = dev->config;
-	uint32_t clock_freq;
+	struct pwm_mcux_data *data = dev->data;
 
-	if (clock_control_get_rate(config->clock_dev, config->clock_subsys,
-			&clock_freq)) {
-		return -EINVAL;
-	}
-	*cycles = clock_freq >> config->prescale;
+	*cycles = data->clock_freq >> config->prescale;
 
 	return 0;
 }
@@ -269,6 +304,36 @@ static int mcux_pwm_calc_ticks(uint16_t first_capture, uint16_t second_capture, 
 	return 0;
 }
 
+static void mcux_pwm_handle_capture(const struct device *dev, uint16_t first_edge_value,
+				    uint16_t second_edge_value, uint16_t modValue,
+				    int overflow_err)
+{
+	struct pwm_mcux_data *data = dev->data;
+	struct pwm_mcux_capture_data *capture = &data->capture;
+	uint32_t ticks = 0;
+	int err = overflow_err;
+
+	if (err != 0) {
+		LOG_ERR("overflow_count overflows.");
+	} else {
+		err = mcux_pwm_calc_ticks(first_edge_value, second_edge_value, modValue,
+				capture->overflow_count, &ticks);
+		LOG_DBG("First edge capture: %u, second edge capture: %u,"
+			" overflow: %u, ticks: %u", first_edge_value,
+			second_edge_value, capture->overflow_count, ticks);
+	}
+
+	if (capture->pulse_capture) {
+		capture->callback(dev, capture->capture_channel, 0, ticks, err,
+				capture->user_data);
+	} else {
+		capture->callback(dev, capture->capture_channel, ticks, 0, err,
+				capture->user_data);
+	}
+
+	capture->overflow_count = 0;
+}
+
 static void mcux_pwm_isr(const struct device *dev)
 {
 	const struct pwm_mcux_config *config = dev->config;
@@ -277,7 +342,6 @@ static void mcux_pwm_isr(const struct device *dev)
 	uint32_t status;
 	uint16_t first_edge_value;
 	uint16_t second_edge_value;
-	uint32_t ticks = 0;
 	int err = 0;
 
 	uint16_t modValue = config->base->SM[config->index].VAL1 -
@@ -290,32 +354,45 @@ static void mcux_pwm_isr(const struct device *dev)
 		err = u32_add_overflow(capture->overflow_count, 1, &capture->overflow_count);
 	}
 
-	if (status & kPWM_CaptureX0Flag) {
-		capture->overflow_count = 0;
-	}
+	if (capture->capture_channel == 0) {
+		/* Handle Channel A capture */
+		if (status & kPWM_CaptureA0Flag) {
+			capture->overflow_count = 0;
+		}
 
-	if (status & kPWM_CaptureX1Flag) {
-		if (err != 0) {
-			LOG_ERR("overflow_count overflows.");
-		} else {
+		if (status & kPWM_CaptureA1Flag) {
+			first_edge_value = config->base->SM[config->index].CVAL2;
+			second_edge_value = config->base->SM[config->index].CVAL3;
+			LOG_DBG("Channel A captured.");
+			mcux_pwm_handle_capture(dev, first_edge_value, second_edge_value,
+				modValue, err);
+		}
+	} else if (capture->capture_channel == 1) {
+		/* Handle Channel B capture */
+		if (status & kPWM_CaptureB0Flag) {
+			capture->overflow_count = 0;
+		}
+
+		if (status & kPWM_CaptureB1Flag) {
+			first_edge_value = config->base->SM[config->index].CVAL4;
+			second_edge_value = config->base->SM[config->index].CVAL5;
+			LOG_DBG("Channel B captured.");
+			mcux_pwm_handle_capture(dev, first_edge_value, second_edge_value,
+						modValue, err);
+		}
+	} else {
+		/* Handle Channel X capture */
+		if (status & kPWM_CaptureX0Flag) {
+			capture->overflow_count = 0;
+		}
+
+		if (status & kPWM_CaptureX1Flag) {
 			first_edge_value = config->base->SM[config->index].CVAL0;
 			second_edge_value = config->base->SM[config->index].CVAL1;
-			err = mcux_pwm_calc_ticks(first_edge_value, second_edge_value, modValue,
-					capture->overflow_count, &ticks);
-			LOG_DBG("First edge capture: %d, second edge capture: %d,"
-				"overflow: %d, ticks: %d", first_edge_value, second_edge_value,
-				capture->overflow_count, ticks);
+			LOG_DBG("Channel X captured.");
+			mcux_pwm_handle_capture(dev, first_edge_value, second_edge_value,
+						modValue, err);
 		}
-
-		if (capture->pulse_capture) {
-			capture->callback(dev, capture->capture_channel, 0, ticks, err,
-					capture->user_data);
-		} else {
-			capture->callback(dev, capture->capture_channel, ticks, 0, err,
-					capture->user_data);
-		}
-
-		capture->overflow_count = 0;
 	}
 }
 
@@ -429,11 +506,14 @@ static int mcux_pwm_configure_capture(const struct device *dev,
 	/* Setup input capture on channel */
 	PWM_SetupInputCapture(config->base, config->index, pwm_channel, &capture_config);
 
+#if defined(FSL_FEATURE_PWM_HAS_INPUT_FILTER_CAPTURE) && \
+	(FSL_FEATURE_PWM_HAS_INPUT_FILTER_CAPTURE == 1U)
 	/* Set capture filter */
 	PWM_SetFilterSampleCount(config->base, pwm_channel, config->index,
 		config->input_filter_count);
 	PWM_SetFilterSamplePeriod(config->base, pwm_channel, config->index,
 		config->input_filter_period);
+#endif
 
 	return 0;
 }
@@ -466,14 +546,20 @@ static int mcux_pwm_enable_capture(const struct device *dev, uint32_t channel)
 	 */
 	status = PWM_GetStatusFlags(config->base, config->index);
 	PWM_ClearStatusFlags(config->base, config->index, status);
-
+	/* Enable interrupt and clear the capture FIFOs by reading them */
 	if (channel == 0U) {
+		(void)config->base->SM[config->index].CVAL2;
+		(void)config->base->SM[config->index].CVAL3;
 		PWM_EnableInterrupts(config->base, config->index, kPWM_CaptureA0InterruptEnable |
 			kPWM_CaptureA1InterruptEnable | kPWM_ReloadInterruptEnable);
 	} else if (channel == 1U) {
+		(void)config->base->SM[config->index].CVAL4;
+		(void)config->base->SM[config->index].CVAL5;
 		PWM_EnableInterrupts(config->base, config->index, kPWM_CaptureB0InterruptEnable |
 			kPWM_CaptureB1InterruptEnable | kPWM_ReloadInterruptEnable);
 	} else {
+		(void)config->base->SM[config->index].CVAL0;
+		(void)config->base->SM[config->index].CVAL1;
 		PWM_EnableInterrupts(config->base, config->index, kPWM_CaptureX0InterruptEnable |
 			kPWM_CaptureX1InterruptEnable | kPWM_ReloadInterruptEnable);
 	}
@@ -531,6 +617,12 @@ static int pwm_mcux_init(const struct device *dev)
 		return -ENODEV;
 	}
 
+	if (clock_control_get_rate(config->clock_dev, config->clock_subsys,
+				   &data->clock_freq)) {
+		LOG_ERR("Could not get clock frequency");
+		return -EINVAL;
+	}
+
 	err = pinctrl_apply_state(config->pincfg, PINCTRL_STATE_DEFAULT);
 	if (err < 0) {
 		return err;
@@ -567,6 +659,8 @@ static int pwm_mcux_init(const struct device *dev)
 	data->channel[0].level = kPWM_HighTrue;
 	data->channel[1].pwmChannel = kPWM_PwmB;
 	data->channel[1].level = kPWM_HighTrue;
+	data->channel[2].pwmChannel = kPWM_PwmX;
+	data->channel[2].level = kPWM_HighTrue;
 
 #ifdef CONFIG_PWM_CAPTURE
 	if (config->irq_config_func) {

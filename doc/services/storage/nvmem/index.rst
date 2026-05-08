@@ -33,6 +33,7 @@ Configuration
 *************
 
 * :kconfig:option:`CONFIG_NVMEM`: Enables the NVMEM subsystem.
+* :kconfig:option:`CONFIG_NVMEM_BBRAM`: Enables NVMEM support for Battery Backed RAM.
 * :kconfig:option:`CONFIG_NVMEM_EEPROM`: Enables NVMEM support for EEPROM devices.
 * :kconfig:option-regex:`CONFIG_NVMEM_FLASH.*`: Configure NVMEM support for flash devices.
 * :kconfig:option-regex:`CONFIG_NVMEM_OTP.*`: Configure NVMEM support for OTP devices.
@@ -47,6 +48,13 @@ devicetree:
 .. literalinclude:: devicetree_bindings.txt
    :language: dts
 
+The reg property is an array containing:
+
+* The offset in the memory in which we are creating the cell,
+* The size of the cell, in bytes.
+
+``#nvmem-cell-cells`` describes the number of property items in the phandle,
+see :ref:`dt-bindings-cells`, typically set to zero.
 
 A consumer can then reference the NVMEM cells like this:
 

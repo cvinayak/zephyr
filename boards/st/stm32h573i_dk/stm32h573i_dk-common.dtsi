@@ -12,6 +12,7 @@
 #include <zephyr/dt-bindings/memory-attr/memory-attr-arm.h>
 #include <zephyr/dt-bindings/memory-controller/stm32-fmc-nor-psram.h>
 #include <zephyr/dt-bindings/mipi_dbi/mipi_dbi.h>
+#include <zephyr/dt-bindings/display/panel.h>
 
 / {
 	model = "STMicroelectronics STM32H573I DISCOVERY KIT board";
@@ -69,20 +70,13 @@
 
 	aliases {
 		led0 = &blue_led_0;
+		rtc = &rtc;
 		sw0 = &user_button;
 		watchdog0 = &iwdg;
 		die-temp0 = &die_temp;
 		die-temp1 = &digi_die_temp;
 		volt-sensor0 = &vref;
 		volt-sensor1 = &vbat;
-	};
-
-	ext_flash_mem: memory@90000000 {
-		compatible = "zephyr,memory-region";
-		reg = <0x90000000 DT_SIZE_M(64)>;
-		zephyr,memory-region = "EXT_FLASH";
-		/* DT_MEM_ARM_MPU_EXTMEM and DT_MEM_ARM_MPU_FLASH cause MPU issues */
-		zephyr,memory-attr = <DT_MEM_ARM_MPU_IO>;
 	};
 };
 
@@ -142,14 +136,14 @@
 					vdvs = <0x20>;
 					mdac = <0x00>;
 					gamma = <0x01>;
-					colmod = <0x05>;
+					pixel-format = <PANEL_PIXEL_FORMAT_RGB_565X>;
 					lcm = <0x2c>;
 					porch-param = [0c 0c 00 33 33];
 					cmd2en-param = [5a 69 02 00];
 					pwctrl1-param = [a4 a1];
-					pvgam-param = [D0 08 11 08 0C 15 39 33 50 36 13 14 29 2D];
-					nvgam-param = [D0 08 10 08 06 06 39 44 51 0B 16 14 2F 31];
-					ram-param = [00 F0];
+					pvgam-param = [d0 08 11 08 0c 15 39 33 50 36 13 14 29 2d];
+					nvgam-param = [d0 08 10 08 06 06 39 44 51 0b 16 14 2f 31];
+					ram-param = [00 f0];
 					rgb-param = [40 02 14];
 				};
 			};
@@ -261,10 +255,6 @@
 	status = "okay";
 };
 
-&rng {
-	status = "okay";
-};
-
 &mac {
 	status = "okay";
 	pinctrl-0 = <&eth_rxd0_pc4
@@ -316,11 +306,14 @@
 };
 
 &adc1 {
-	clocks = <&rcc STM32_CLOCK(AHB2, 10)>,
-		 <&rcc STM32_SRC_HCLK ADCDAC_SEL(0)>;
-	clock-names = "adcx", "adc_ker";
 	pinctrl-0 = <&adc1_inp6_pf12>; /* Arduino A5 */
 	pinctrl-names = "default";
+	st,adc-clock-source = "ASYNC";
+	st,adc-prescaler = <6>;
+	status = "okay";
+};
+
+&adc2 {
 	st,adc-clock-source = "ASYNC";
 	st,adc-prescaler = <6>;
 	status = "okay";
@@ -404,5 +397,9 @@ zephyr_udc0: &usb {
 };
 
 &vbat {
+	status = "okay";
+};
+
+&crc {
 	status = "okay";
 };

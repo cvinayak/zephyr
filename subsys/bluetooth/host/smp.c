@@ -31,7 +31,6 @@
 #include <zephyr/sys/__assert.h>
 #include <zephyr/sys/atomic.h>
 #include <zephyr/sys/byteorder.h>
-#include <zephyr/sys/check.h>
 #include <zephyr/sys/slist.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/sys/util_macro.h>
@@ -950,8 +949,7 @@ static void smp_pairing_br_complete(struct bt_smp_br *smp, uint8_t status)
 	/* For dualmode devices LE address is same as BR/EDR address
 	 * and is of public type.
 	 */
-	bt_addr_copy(&addr.a, &conn->br.dst);
-	addr.type = BT_ADDR_LE_PUBLIC;
+	bt_addr_le_copy_addr(&addr, &conn->br.dst, BT_ADDR_LE_PUBLIC);
 	keys = bt_keys_find_addr(conn->id, &addr);
 
 	if (status) {
@@ -1095,8 +1093,7 @@ static void smp_br_derive_ltk(struct bt_smp_br *smp)
 	 * For dualmode devices LE address is same as BR/EDR address and is of
 	 * public type.
 	 */
-	bt_addr_copy(&addr.a, &conn->br.dst);
-	addr.type = BT_ADDR_LE_PUBLIC;
+	bt_addr_le_copy_addr(&addr, &conn->br.dst, BT_ADDR_LE_PUBLIC);
 
 	keys = bt_keys_find_addr(conn->id, &addr);
 	if (keys != NULL) {
@@ -1197,8 +1194,7 @@ static void smp_br_distribute_keys(struct bt_smp_br *smp)
 	 * For dualmode devices LE address is same as BR/EDR address and is of
 	 * public type.
 	 */
-	bt_addr_copy(&addr.a, &conn->br.dst);
-	addr.type = BT_ADDR_LE_PUBLIC;
+	bt_addr_le_copy_addr(&addr, &conn->br.dst, BT_ADDR_LE_PUBLIC);
 
 	keys = bt_keys_get_addr(conn->id, &addr);
 	if (!keys) {
@@ -1223,7 +1219,7 @@ static void smp_br_distribute_keys(struct bt_smp_br *smp)
 		}
 
 		id_info = net_buf_add(buf, sizeof(*id_info));
-		memcpy(id_info->irk, bt_dev.irk[conn->id], 16);
+		memcpy(id_info->irk, bt_devs[0].irk[conn->id], 16);
 
 		smp_br_send(smp, buf, NULL);
 
@@ -1235,7 +1231,7 @@ static void smp_br_distribute_keys(struct bt_smp_br *smp)
 		}
 
 		id_addr_info = net_buf_add(buf, sizeof(*id_addr_info));
-		bt_addr_le_copy(&id_addr_info->addr, &bt_dev.id_addr[conn->id]);
+		bt_addr_le_copy(&id_addr_info->addr, &bt_devs[0].id_addr[conn->id]);
 
 		smp_br_send(smp, buf, smp_id_sent);
 	}
@@ -1287,8 +1283,7 @@ static bool smp_br_pairing_allowed(struct bt_smp_br *smp)
 
 	conn = smp->chan.chan.conn;
 
-	addr.type = BT_ADDR_LE_PUBLIC;
-	bt_addr_copy(&addr.a, &conn->br.dst);
+	bt_addr_le_copy_addr(&addr, &conn->br.dst, BT_ADDR_LE_PUBLIC);
 	le_keys = bt_keys_find_addr(BT_ID_DEFAULT, &addr);
 
 	key = bt_keys_find_link_key(&conn->br.dst);
@@ -1515,8 +1510,7 @@ static uint8_t smp_br_ident_info(struct bt_smp_br *smp, struct net_buf *buf)
 	 * For dualmode devices LE address is same as BR/EDR address and is of
 	 * public type.
 	 */
-	bt_addr_copy(&addr.a, &conn->br.dst);
-	addr.type = BT_ADDR_LE_PUBLIC;
+	bt_addr_le_copy_addr(&addr, &conn->br.dst, BT_ADDR_LE_PUBLIC);
 
 	keys = bt_keys_get_type(BT_KEYS_IRK, conn->id, &addr);
 	if (!keys) {
@@ -1567,8 +1561,7 @@ static uint8_t smp_br_ident_addr_info(struct bt_smp_br *smp,
 	 * address we fail.
 	 */
 
-	bt_addr_copy(&addr.a, &conn->br.dst);
-	addr.type = BT_ADDR_LE_PUBLIC;
+	bt_addr_le_copy_addr(&addr, &conn->br.dst, BT_ADDR_LE_PUBLIC);
 
 	if (!bt_addr_le_eq(&addr, &req->addr)) {
 		return BT_SMP_ERR_UNSPECIFIED;
@@ -1619,8 +1612,7 @@ static uint8_t smp_br_signing_info(struct bt_smp_br *smp, struct net_buf *buf)
 	 * For dualmode devices LE address is same as BR/EDR address and is of
 	 * public type.
 	 */
-	bt_addr_copy(&addr.a, &conn->br.dst);
-	addr.type = BT_ADDR_LE_PUBLIC;
+	bt_addr_le_copy_addr(&addr, &conn->br.dst, BT_ADDR_LE_PUBLIC);
 
 	keys = bt_keys_get_type(BT_KEYS_REMOTE_CSRK, conn->id, &addr);
 	if (!keys) {
@@ -1756,7 +1748,7 @@ static bool br_sc_supported(void)
 		return true;
 	}
 
-	return BT_FEAT_SC(bt_dev.features);
+	return BT_FEAT_SC(bt_devs[0].features);
 }
 
 static int bt_smp_br_accept(struct bt_conn *conn, struct bt_l2cap_chan **chan)
@@ -2337,7 +2329,7 @@ static uint8_t bt_smp_distribute_keys(struct bt_smp *smp)
 		}
 
 		id_info = net_buf_add(buf, sizeof(*id_info));
-		memcpy(id_info->irk, bt_dev.irk[conn->id], 16);
+		memcpy(id_info->irk, bt_devs[0].irk[conn->id], 16);
 
 		smp_send(smp, buf, NULL, NULL);
 
@@ -2349,7 +2341,7 @@ static uint8_t bt_smp_distribute_keys(struct bt_smp *smp)
 		}
 
 		id_addr_info = net_buf_add(buf, sizeof(*id_addr_info));
-		bt_addr_le_copy(&id_addr_info->addr, &bt_dev.id_addr[conn->id]);
+		bt_addr_le_copy(&id_addr_info->addr, &bt_devs[0].id_addr[conn->id]);
 
 		smp_send(smp, buf, smp_id_sent, NULL);
 	}
@@ -5809,9 +5801,8 @@ int bt_smp_auth_keypress_notify(struct bt_conn *conn, enum bt_conn_auth_keypress
 		return -EINVAL;
 	}
 
-	CHECKIF(!IN_RANGE(type,
-			  BT_CONN_AUTH_KEYPRESS_ENTRY_STARTED,
-			  BT_CONN_AUTH_KEYPRESS_ENTRY_COMPLETED)) {
+	if (!IN_RANGE(type, BT_CONN_AUTH_KEYPRESS_ENTRY_STARTED,
+		      BT_CONN_AUTH_KEYPRESS_ENTRY_COMPLETED)) {
 		LOG_ERR("Refusing to send unknown event type %u", type);
 		return -EINVAL;
 	}

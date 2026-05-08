@@ -94,7 +94,6 @@ struct ppp_driver_context {
 #endif
 
 	uint8_t mac_addr[6];
-	struct net_linkaddr ll_addr;
 
 	/* Flag that tells whether this instance is initialized or not */
 	atomic_t modem_init_done;
@@ -291,6 +290,14 @@ static void uart_recovery(struct k_work *work)
 				K_MSEC(CONFIG_NET_PPP_ASYNC_UART_RX_RECOVERY_TIMEOUT));
 	}
 }
+
+/* Wait for the previous asynchronous transfer to complete */
+static void wait_for_async_tx(void)
+{
+	k_sem_take(&uarte_tx_finished, K_FOREVER);
+}
+#else
+#define wait_for_async_tx(...)
 #endif
 
 static int ppp_save_byte(struct ppp_driver_context *ppp, uint8_t byte)
@@ -383,7 +390,7 @@ static void ppp_change_state(struct ppp_driver_context *ctx,
 	NET_ASSERT(new_state >= STATE_HDLC_FRAME_START &&
 		   new_state <= STATE_HDLC_FRAME_DATA);
 
-	NET_DBG("[%p] state %s (%d) => %s (%d)",
+	LOG_DBG("[%p] state %s (%d) => %s (%d)",
 		ctx, ppp_driver_state_str(ctx->state), ctx->state,
 		ppp_driver_state_str(new_state), new_state);
 
@@ -425,7 +432,13 @@ static int ppp_send_flush(struct ppp_driver_context *ppp, int off)
 				? CONFIG_NET_PPP_ASYNC_UART_TX_TIMEOUT * USEC_PER_MSEC
 				: SYS_FOREVER_US;
 
-	k_sem_take(&uarte_tx_finished, K_FOREVER);
+	if (off == 0) {
+		/* ppp_send_bytes() might've already flushed the buffer, so if
+		 * there's nothing else to send, just exit
+		 */
+		k_sem_give(&uarte_tx_finished);
+		return 0;
+	}
 
 	ret = uart_tx(ppp->dev, buf, off, timeout);
 	if (ret) {
@@ -444,13 +457,23 @@ static int ppp_send_flush(struct ppp_driver_context *ppp, int off)
 static int ppp_send_bytes(struct ppp_driver_context *ppp,
 			  const uint8_t *data, int len, int off)
 {
+	bool wait = false;
 	int i;
 
 	for (i = 0; i < len; i++) {
+		if (wait) {
+			/* Wait for the transfer to complete (in async mode),
+			 * before modifying the TX buffer again
+			 */
+			wait_for_async_tx();
+			wait = false;
+		}
+
 		ppp->send_buf[off++] = data[i];
 
 		if (off >= sizeof(ppp->send_buf)) {
 			off = ppp_send_flush(ppp, off);
+			wait = true;
 		}
 	}
 
@@ -482,6 +505,8 @@ static void ppp_handle_client(struct ppp_driver_context *ppp, uint8_t byte)
 	++ppp->client_index;
 	if (ppp->client_index >= (sizeof(CLIENT) - 1)) {
 		LOG_DBG("Received complete CLIENT string");
+		/* Wait for the previous transfer to complete before starting a new one. */
+		wait_for_async_tx();
 		offset = ppp_send_bytes(ppp, clientserver,
 					sizeof(CLIENTSERVER) - 1, 0);
 		(void)ppp_send_flush(ppp, offset);
@@ -839,6 +864,9 @@ static int ppp_send(const struct device *dev, struct net_pkt *pkt)
 		return -ENOMEM;
 	}
 
+	/* Wait for the previous transfer to complete before starting a new one. */
+	wait_for_async_tx();
+
 	/* Sync, Address & Control fields */
 	sync_addr_ctrl = sys_cpu_to_be32(0x7e << 24 | 0xff << 16 |
 					 0x7d << 8 | 0x23);
@@ -1005,10 +1033,8 @@ use_random_mac:
 	}
 
 	/* The MAC address is not really used, but the network interface expects to find one. */
-	(void)net_linkaddr_set(&ppp->ll_addr, ppp->mac_addr, sizeof(ppp->mac_addr));
 
-	net_if_set_link_addr(iface, ppp->ll_addr.addr, ppp->ll_addr.len,
-			     NET_LINK_ETHERNET);
+	net_if_set_link_addr(iface, ppp->mac_addr, sizeof(ppp->mac_addr), NET_LINK_ETHERNET);
 
 	if (IS_ENABLED(CONFIG_NET_PPP_CAPTURE)) {
 		static bool capture_setup_done;

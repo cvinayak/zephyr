@@ -68,6 +68,7 @@ struct mcux_flexcan_config {
 	uint32_t number_of_mb;
 	uint32_t rx_mb;
 	uint32_t tx_mb;
+	uint8_t max_filters;
 #ifdef CONFIG_CAN_MCUX_FLEXCAN_FD
 	bool flexcan_fd;
 #endif /* CONFIG_CAN_MCUX_FLEXCAN_FD */
@@ -133,9 +134,11 @@ static int mcux_flexcan_get_core_clock(const struct device *dev, uint32_t *rate)
 
 static int mcux_flexcan_get_max_filters(const struct device *dev, bool ide)
 {
+	const struct mcux_flexcan_config *config = dev->config;
+
 	ARG_UNUSED(ide);
 
-	return CONFIG_CAN_MCUX_FLEXCAN_MAX_FILTERS;
+	return config->max_filters;
 }
 
 static int mcux_flexcan_set_timing(const struct device *dev,
@@ -302,18 +305,7 @@ static int mcux_flexcan_start(const struct device *dev)
 	timing.rJumpwidth = data->timing.sjw - 1U;
 	timing.phaseSeg1 = data->timing.phase_seg1 - 1U;
 	timing.phaseSeg2 = data->timing.phase_seg2 - 1U;
-#if (defined(FSL_FEATURE_FLEXCAN_HAS_ENHANCED_BIT_TIMING_REG) && \
-	     FSL_FEATURE_FLEXCAN_HAS_ENHANCED_BIT_TIMING_REG)
-	if (UTIL_AND(IS_ENABLED(CONFIG_CAN_MCUX_FLEXCAN_FD), config->flexcan_fd)) {
-		/* No propagation segment configuration, so prop_seg must be 0 */
-		timing.propSeg = data->timing.prop_seg;
-	} else {
-		/* Use standard configuration for classic CAN mode */
-		timing.propSeg = data->timing.prop_seg - 1U;
-	}
-#else
 	timing.propSeg = data->timing.prop_seg - 1U;
-#endif
 	FLEXCAN_SetTimingConfig(base, &timing);
 
 #ifdef CONFIG_CAN_MCUX_FLEXCAN_FD
@@ -435,7 +427,7 @@ static int mcux_flexcan_set_mode(const struct device *dev, can_mode_t mode)
 	}
 
 	if ((mode & CAN_MODE_FD) != 0 && (mode & CAN_MODE_3_SAMPLES) != 0) {
-		LOG_ERR("triple samling is not supported in CAN FD mode");
+		LOG_ERR("triple sampling is not supported in CAN FD mode");
 		return -ENOTSUP;
 	}
 
@@ -1291,11 +1283,6 @@ static int mcux_flexcan_init(const struct device *dev)
 
 #ifdef CONFIG_CAN_MCUX_FLEXCAN_FD
 	if (config->flexcan_fd) {
-#if (defined(FSL_FEATURE_FLEXCAN_HAS_ENHANCED_BIT_TIMING_REG) && \
-	     FSL_FEATURE_FLEXCAN_HAS_ENHANCED_BIT_TIMING_REG)
-		/* No propagation segment configuration, so prop_seg must be 0 */
-		flexcan_config.timingConfig.propSeg = data->timing.prop_seg;
-#endif
 		flexcan_config.timingConfig.frJumpwidth = data->timing_data.sjw - 1U;
 		flexcan_config.timingConfig.fpropSeg = data->timing_data.prop_seg;
 		flexcan_config.timingConfig.fphaseSeg1 = data->timing_data.phase_seg1 - 1U;
@@ -1509,7 +1496,9 @@ static DEVICE_API(can, mcux_flexcan_fd_driver_api) = {
  * RX message buffers (filters) will take up the first N message
  * buffers. The rest are available for TX use.
  */
-#define FLEXCAN_INST_RX_MB(id) (CONFIG_CAN_MCUX_FLEXCAN_MAX_FILTERS + RX_START_IDX)
+#define FLEXCAN_INST_MAX_FILTERS(id) \
+	DT_INST_PROP_OR(id, max_filters, CONFIG_CAN_MCUX_FLEXCAN_MAX_FILTERS)
+#define FLEXCAN_INST_RX_MB(id) (FLEXCAN_INST_MAX_FILTERS(id) + RX_START_IDX)
 #define FLEXCAN_INST_TX_MB(id) (FLEXCAN_INST_NUMBER_OF_MB(id) - FLEXCAN_INST_RX_MB(id))
 
 #define FLEXCAN_CLK_SOURCE(id) DT_INST_PROP(id, clk_source)
@@ -1537,8 +1526,6 @@ static DEVICE_API(can, mcux_flexcan_fd_driver_api) = {
 			"FlexCAN instance " STRINGIFY(id) " clk-source without named clock")))
 
 #define FLEXCAN_CHECK_MAX_FILTER(id)						\
-	BUILD_ASSERT(CONFIG_CAN_MCUX_FLEXCAN_MAX_FILTERS > 0,			\
-		"Maximum number of RX filters should greater than 0");		\
 	BUILD_ASSERT(FLEXCAN_INST_NUMBER_OF_MB(id) > FLEXCAN_INST_RX_MB(id),	\
 		     "FlexCAN instance " STRINGIFY(id) " number-of-mb ("	\
 		     STRINGIFY(FLEXCAN_INST_NUMBER_OF_MB(id))			\
@@ -1555,10 +1542,10 @@ static DEVICE_API(can, mcux_flexcan_fd_driver_api) = {
 	static void mcux_flexcan_irq_disable_##id(void); \
 									\
 	static struct mcux_flexcan_rx_callback flexcan_rx_cbs_##id	\
-			[FLEXCAN_INST_RX_MB(id)] = {0};			\
+			[FLEXCAN_INST_RX_MB(id)];			\
 									\
 	static struct mcux_flexcan_tx_callback flexcan_tx_cbs_##id	\
-			[FLEXCAN_INST_TX_MB(id)] = {0};			\
+			[FLEXCAN_INST_TX_MB(id)];			\
 									\
 	static ATOMIC_DEFINE(flexcan_rx_allocs_##id, FLEXCAN_INST_RX_MB(id));	\
 									\
@@ -1571,6 +1558,7 @@ static DEVICE_API(can, mcux_flexcan_fd_driver_api) = {
 		.number_of_mb = FLEXCAN_INST_NUMBER_OF_MB(id),		\
 		.rx_mb = FLEXCAN_INST_RX_MB(id),			\
 		.tx_mb = FLEXCAN_INST_TX_MB(id),			\
+		.max_filters = FLEXCAN_INST_MAX_FILTERS(id),		\
 		IF_ENABLED(CONFIG_CAN_MCUX_FLEXCAN_FD, (		\
 			.flexcan_fd = DT_INST_NODE_HAS_COMPAT(id, FLEXCAN_FD_DRV_COMPAT), \
 		))							\

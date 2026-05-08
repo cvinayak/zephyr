@@ -12,6 +12,7 @@
 #include <zephyr/dt-bindings/interrupt-controller/arm-gic.h>
 #include <zephyr/dt-bindings/clock/renesas_rztn_clock.h>
 #include <zephyr/dt-bindings/gpio/renesas-rztn-gpio.h>
+#include <zephyr/dt-bindings/dma/renesas_rz_dma.h>
 
 / {
 	#address-cells = <1>;
@@ -79,6 +80,9 @@
 		xspi0_cs0: memory@60000000 {
 			compatible = "mmio-sram";
 			reg = <0x60000000 DT_SIZE_M(64)>;
+			ranges = <0x0 0x60000000 DT_SIZE_M(64)>;
+			#address-cells = <1>;
+			#size-cells = <1>;
 
 			partitions {
 				compatible = "fixed-partitions";
@@ -87,19 +91,19 @@
 
 				loader_param: partition@0 {
 					label = "loader-param";
-					reg = <0x00000000 0x4C>;
+					reg = <0x00000000 0x4c>;
 					read-only;
 				};
 
-				loader_program: partition@4C {
+				loader_program: partition@4c {
 					label = "loader-program";
-					reg = <0x0000004C (DT_SIZE_K(56) - 0x4C)>;
+					reg = <0x0000004c (DT_SIZE_K(56) - 0x4C)>;
 					read-only;
 				};
 
-				slot0_partition: partition@E000 {
+				slot0_partition: partition@e000 {
 					label = "image-0";
-					reg = <0x0000E000 (DT_SIZE_M(64) - DT_SIZE_K(56))>;
+					reg = <0x0000e000 (DT_SIZE_M(64) - DT_SIZE_K(56))>;
 					read-only;
 				};
 			};
@@ -218,7 +222,7 @@
 			interrupt-names = "scanend";
 			#io-channel-cells = <1>;
 			vref-mv = <1800>;
-			channel-available-mask = <0xF>;
+			channel-available-mask = <0xf>;
 			status = "disabled";
 		};
 
@@ -230,7 +234,7 @@
 			interrupt-names = "scanend";
 			#io-channel-cells = <1>;
 			vref-mv = <1800>;
-			channel-available-mask = <0xFF>;
+			channel-available-mask = <0xff>;
 			status = "disabled";
 		};
 
@@ -1368,6 +1372,7 @@
 		xspi0: xspi@80220000 {
 			compatible = "renesas,rz-xspi";
 			reg = <0x80220000 0x1000>;
+			unit = <0>;
 			interrupts = <GIC_SPI 339 IRQ_TYPE_LEVEL IRQ_DEFAULT_PRIORITY>,
 				     <GIC_SPI 340 IRQ_TYPE_LEVEL IRQ_DEFAULT_PRIORITY>;
 			#address-cells = <1>;
@@ -1378,6 +1383,7 @@
 		xspi1: xspi@80221000 {
 			compatible = "renesas,rz-xspi";
 			reg = <0x80221000 0x1000>;
+			unit = <1>;
 			interrupts = <GIC_SPI 341 IRQ_TYPE_LEVEL IRQ_DEFAULT_PRIORITY>,
 				     <GIC_SPI 342 IRQ_TYPE_LEVEL IRQ_DEFAULT_PRIORITY>;
 			#address-cells = <1>;

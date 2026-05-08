@@ -413,6 +413,7 @@ int i3c_sec_get_basic_info(const struct device *dev, uint8_t dynamic_addr, uint8
 	/* First try to look up if this is a known device in the list by PID */
 	ret = i3c_ccc_do_getpid(&temp_desc, &getpid);
 	if (ret != 0) {
+		i3c_detach_i3c_device(&temp_desc);
 		return ret;
 	}
 
@@ -424,6 +425,7 @@ int i3c_sec_get_basic_info(const struct device *dev, uint8_t dynamic_addr, uint8
 		/* device was not found so allocate a descriptor */
 		desc = i3c_device_desc_alloc();
 		if (!desc) {
+			i3c_detach_i3c_device(&temp_desc);
 			return -ENOMEM;
 		}
 		desc->pid = id.pid;
@@ -475,13 +477,15 @@ int i3c_sec_i2c_attach(const struct device *dev, uint8_t static_addr, uint8_t lv
 static void i3c_sec_bus_reset(const struct device *dev)
 {
 	struct i3c_device_desc *i3c_desc;
+	struct i3c_device_desc *i3c_desc_safe;
 	struct i3c_i2c_device_desc *i3c_i2c_desc;
+	struct i3c_i2c_device_desc *i3c_i2c_desc_safe;
 
-	I3C_BUS_FOR_EACH_I3CDEV(dev, i3c_desc) {
+	I3C_BUS_FOR_EACH_I3CDEV_SAFE(dev, i3c_desc, i3c_desc_safe) {
 		i3c_detach_i3c_device(i3c_desc);
 	}
 
-	I3C_BUS_FOR_EACH_I2CDEV(dev, i3c_i2c_desc) {
+	I3C_BUS_FOR_EACH_I2CDEV_SAFE(dev, i3c_i2c_desc, i3c_i2c_desc_safe) {
 		i3c_detach_i2c_device(i3c_i2c_desc);
 	}
 }
@@ -948,6 +952,7 @@ bool i3c_bus_has_sec_controller(const struct device *dev)
 #ifdef CONFIG_I3C_CONTROLLER
 int i3c_bus_rstdaa_all(const struct device *dev)
 {
+	struct i3c_driver_data *data = (struct i3c_driver_data *)dev->data;
 	struct i3c_device_desc *desc;
 	int ret;
 
@@ -957,10 +962,20 @@ int i3c_bus_rstdaa_all(const struct device *dev)
 		return ret;
 	}
 
-	/* reset all devices' DA */
+	/* RSTDAA has cleared every target's dynamic address in hardware.
+	 * Sync software state: clear the cached dynamic_addr and return
+	 * each DA to the address-slot pool so it can be reassigned by
+	 * a subsequent DAA.
+	 */
+
 	I3C_BUS_FOR_EACH_I3CDEV(dev, desc) {
-		desc->dynamic_addr = 0;
-		LOG_DBG("%s: Reset dynamic address for device %s", dev->name, desc->dev->name);
+		if (desc->dynamic_addr != 0U) {
+			i3c_addr_slots_mark_free(&data->attached_dev.addr_slots,
+						 desc->dynamic_addr);
+			desc->dynamic_addr = 0;
+			LOG_DBG("%s: Reset dynamic address for device %s",
+					dev->name, desc->dev->name);
+		}
 	}
 
 	return ret;
@@ -1182,6 +1197,7 @@ int i3c_bus_setmrl(struct i3c_device_desc *desc, uint16_t mrl, uint8_t ibi_len)
 	int ret;
 
 	mrl_cmd.len = mrl;
+	mrl_cmd.ibi_len = ibi_len;
 
 	ret = i3c_ccc_do_setmrl(desc, &mrl_cmd);
 	if (ret != 0) {
@@ -1536,11 +1552,19 @@ int i3c_bus_init(const struct device *dev, const struct i3c_dev_list *dev_list)
 	/*
 	 * Only re-enable Hot-Join from targets.
 	 * Target interrupts will be enabled when IBI is enabled.
+	 * Skip if disabled by controller flags.
 	 */
-	i3c_events.events = I3C_CCC_EVT_HJ;
-	ret = i3c_ccc_do_events_all_set(dev, true, &i3c_events);
-	if (ret != 0) {
-		LOG_DBG("Broadcast ENEC was NACK.");
+	{
+		const struct i3c_driver_config *common =
+			(const struct i3c_driver_config *)dev->config;
+
+		if (!(common->flags & I3C_CONTROLLER_FLAG_DISABLE_HJ_AT_INIT)) {
+			i3c_events.events = I3C_CCC_EVT_HJ;
+			ret = i3c_ccc_do_events_all_set(dev, true, &i3c_events);
+			if (ret != 0) {
+				LOG_DBG("Broadcast ENEC was NACK.");
+			}
+		}
 	}
 
 err_out:

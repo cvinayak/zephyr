@@ -12,6 +12,7 @@ LOG_MODULE_REGISTER(net_sock, CONFIG_NET_SOCKETS_LOG_LEVEL);
 
 #include <zephyr/kernel.h>
 #include <zephyr/tracing/tracing.h>
+#include <zephyr/net/net_log.h>
 #include <zephyr/net/socket.h>
 #include <zephyr/internal/syscall_handler.h>
 
@@ -391,16 +392,22 @@ static inline ssize_t z_vrfy_zsock_sendmsg(int sock,
 					   int flags)
 {
 	struct net_msghdr msg_copy;
+	size_t msg_iov_size;
 	size_t i;
 	int ret;
+
+	if (size_mul_overflow(msg->msg_iovlen, sizeof(struct net_iovec),
+			      &msg_iov_size)) {
+		errno = EFAULT;
+		return -1;
+	}
 
 	K_OOPS(k_usermode_from_copy(&msg_copy, (void *)msg, sizeof(msg_copy)));
 
 	msg_copy.msg_name = NULL;
 	msg_copy.msg_control = NULL;
 
-	msg_copy.msg_iov = k_usermode_alloc_from_copy(msg->msg_iov,
-				       msg->msg_iovlen * sizeof(struct net_iovec));
+	msg_copy.msg_iov = k_usermode_alloc_from_copy(msg->msg_iov, msg_iov_size);
 	if (!msg_copy.msg_iov) {
 		errno = ENOMEM;
 		goto fail;
@@ -544,6 +551,7 @@ ssize_t z_impl_zsock_recvmsg(int sock, struct net_msghdr *msg, int flags)
 ssize_t z_vrfy_zsock_recvmsg(int sock, struct net_msghdr *msg, int flags)
 {
 	struct net_msghdr msg_copy;
+	size_t msg_iov_size;
 	size_t iovlen;
 	size_t i;
 	int ret;
@@ -558,6 +566,12 @@ ssize_t z_vrfy_zsock_recvmsg(int sock, struct net_msghdr *msg, int flags)
 		return -1;
 	}
 
+	if (size_mul_overflow(msg->msg_iovlen, sizeof(struct net_iovec),
+			      &msg_iov_size)) {
+		errno = EFAULT;
+		return -1;
+	}
+
 	K_OOPS(k_usermode_from_copy(&msg_copy, (void *)msg, sizeof(msg_copy)));
 
 	k_usermode_from_copy(&iovlen, &msg->msg_iovlen, sizeof(iovlen));
@@ -565,8 +579,7 @@ ssize_t z_vrfy_zsock_recvmsg(int sock, struct net_msghdr *msg, int flags)
 	msg_copy.msg_name = NULL;
 	msg_copy.msg_control = NULL;
 
-	msg_copy.msg_iov = k_usermode_alloc_from_copy(msg->msg_iov,
-				       msg->msg_iovlen * sizeof(struct net_iovec));
+	msg_copy.msg_iov = k_usermode_alloc_from_copy(msg->msg_iov, msg_iov_size);
 	if (!msg_copy.msg_iov) {
 		errno = ENOMEM;
 		goto fail;
@@ -576,7 +589,7 @@ ssize_t z_vrfy_zsock_recvmsg(int sock, struct net_msghdr *msg, int flags)
 	 * next loop fails, we do not try to free non allocated memory
 	 * in fail branch.
 	 */
-	memset(msg_copy.msg_iov, 0, msg->msg_iovlen * sizeof(struct net_iovec));
+	memset(msg_copy.msg_iov, 0, msg_iov_size);
 
 	for (i = 0; i < iovlen; i++) {
 		/* TODO: In practice we do not need to copy the actual data
@@ -635,6 +648,7 @@ ssize_t z_vrfy_zsock_recvmsg(int sock, struct net_msghdr *msg, int flags)
 			K_OOPS(k_usermode_to_copy(msg->msg_name,
 						  msg_copy.msg_name,
 						  msg_copy.msg_namelen));
+			msg->msg_namelen = msg_copy.msg_namelen;
 		}
 
 		if (msg->msg_controllen > 0 &&
@@ -786,7 +800,8 @@ static inline int z_vrfy_zsock_ioctl_impl(int sock, unsigned long request, va_li
 	case ZFD_IOCTL_FIONBIO:
 		break;
 
-	case ZFD_IOCTL_FIONREAD: {
+	case ZFD_IOCTL_FIONREAD:
+	case ZFD_IOCTL_FIONWRITE: {
 		int *avail;
 
 		avail = va_arg(args, int *);
@@ -1013,3 +1028,141 @@ static inline int z_vrfy_zsock_getsockname(int sock, struct net_sockaddr *addr,
 }
 #include <zephyr/syscalls/zsock_getsockname_mrsh.c>
 #endif /* CONFIG_USERSPACE */
+
+int zsock_send_all(int sock, const void *buf, size_t len, int flags, k_timeout_t timeout,
+		   size_t *sent_len)
+{
+	k_timepoint_t end;
+	int ret, opt;
+
+	if (sent_len != NULL) {
+		*sent_len = 0;
+	}
+
+	/* This function is only meaningful for stream sockets. */
+	ret = zsock_getsockopt(sock, ZSOCK_SOL_SOCKET, ZSOCK_SO_TYPE,
+			       &opt, &(net_socklen_t){ sizeof(opt) });
+	if (ret < 0) {
+		return -errno;
+	}
+
+	if (opt != NET_SOCK_STREAM) {
+		return -EOPNOTSUPP;
+	}
+
+	end = sys_timepoint_calc(timeout);
+
+	while (len > 0) {
+		ssize_t out_len = zsock_send(sock, buf, len, ZSOCK_MSG_DONTWAIT | flags);
+
+		if ((out_len == 0) || (out_len < 0 && errno == EAGAIN)) {
+			k_ticks_t req_timeout_ticks = sys_timepoint_timeout(end).ticks;
+			int req_timeout_ms = k_ticks_to_ms_floor32(req_timeout_ticks);
+			struct zsock_pollfd pfd;
+			int pollres;
+
+			pfd.fd = sock;
+			pfd.events = ZSOCK_POLLOUT;
+
+			pollres = zsock_poll(&pfd, 1, req_timeout_ms);
+			if (pollres == 0) {
+				return -ETIMEDOUT;
+			} else if (pollres > 0) {
+				continue;
+			} else {
+				return -errno;
+			}
+		} else if (out_len < 0) {
+			return -errno;
+		}
+
+		__ASSERT_NO_MSG(out_len <= len);
+
+		buf = (const char *)buf + out_len;
+		len -= out_len;
+
+		if (sent_len != NULL) {
+			*sent_len += out_len;
+		}
+	}
+
+	return 0;
+}
+
+int zsock_sendmsg_all(int sock, const struct net_msghdr *message, int flags,
+		      k_timeout_t timeout, size_t *sent_len)
+{
+	size_t total_len = 0;
+	size_t offset = 0;
+	k_timepoint_t end;
+	int ret, i, opt;
+
+	if (sent_len != NULL) {
+		*sent_len = 0;
+	}
+
+	/* This function is only meaningful for stream sockets. */
+	ret = zsock_getsockopt(sock, ZSOCK_SOL_SOCKET, ZSOCK_SO_TYPE,
+			       &opt, &(net_socklen_t){ sizeof(opt) });
+	if (ret < 0) {
+		return -errno;
+	}
+
+	if (opt != NET_SOCK_STREAM) {
+		return -EOPNOTSUPP;
+	}
+
+	for (i = 0; i < message->msg_iovlen; i++) {
+		total_len += message->msg_iov[i].iov_len;
+	}
+
+	end = sys_timepoint_calc(timeout);
+
+	while (offset < total_len) {
+		ret = zsock_sendmsg(sock, message, ZSOCK_MSG_DONTWAIT | flags);
+		if ((ret == 0) || (ret < 0 && errno == EAGAIN)) {
+			k_ticks_t req_timeout_ticks = sys_timepoint_timeout(end).ticks;
+			int req_timeout_ms = k_ticks_to_ms_floor32(req_timeout_ticks);
+			struct zsock_pollfd pfd;
+			int pollres;
+
+			pfd.fd = sock;
+			pfd.events = ZSOCK_POLLOUT;
+
+			pollres = zsock_poll(&pfd, 1, req_timeout_ms);
+			if (pollres == 0) {
+				return -ETIMEDOUT;
+			} else if (pollres > 0) {
+				continue;
+			} else {
+				return -errno;
+			}
+		} else if (ret < 0) {
+			return -errno;
+		}
+
+		if (sent_len != NULL) {
+			*sent_len += ret;
+		}
+
+		offset += ret;
+		if (offset >= total_len) {
+			break;
+		}
+
+		/* Update msghdr for the next iteration. */
+		for (i = 0; i < message->msg_iovlen; i++) {
+			if (ret < message->msg_iov[i].iov_len) {
+				message->msg_iov[i].iov_len -= ret;
+				message->msg_iov[i].iov_base =
+					(uint8_t *)message->msg_iov[i].iov_base + ret;
+				break;
+			}
+
+			ret -= message->msg_iov[i].iov_len;
+			message->msg_iov[i].iov_len = 0;
+		}
+	}
+
+	return 0;
+}

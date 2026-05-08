@@ -20,6 +20,7 @@ from twisterlib.statuses import TwisterStatus
 from twisterlib.testinstance import TestInstance
 from twisterlib.testplan import TestConfiguration, TestPlan, change_skip_to_error_if_integration
 from twisterlib.testsuite import TestSuite
+from twisterlib.testsuitedata import RequiredApplication
 
 
 def mock_twister_env():
@@ -292,7 +293,7 @@ def test_apply_changes_for_required_applications(testplan_with_one_instance: Tes
     testinstance_req = next(iter(plan.instances.values()))
 
     testsuite = get_testsuite_for_given_test(plan, 'test_a.check_1')
-    testsuite.required_applications = [{'name': 'sample_test.app'}]
+    testsuite.required_applications = [RequiredApplication(name='sample_test.app')]
     platform = plan.get_platform("demo_board_1")
     testinstance = TestInstance(testsuite, platform, 'zephyr', plan.env.outdir)
     plan.add_instances([testinstance])
@@ -307,7 +308,7 @@ def test_apply_changes_for_required_applications_missing_app(testplan_with_one_i
     plan = testplan_with_one_instance
     testsuite = get_testsuite_for_given_test(plan, 'test_a.check_1')
     # Set a required application that does not exist
-    testsuite.required_applications = [{'name': 'nonexistent_app'}]
+    testsuite.required_applications = [RequiredApplication(name='nonexistent_app')]
     platform = plan.get_platform("demo_board_1")
     testinstance = TestInstance(testsuite, platform, 'zephyr', plan.env.outdir)
     plan.add_instances([testinstance])
@@ -323,7 +324,7 @@ def test_apply_changes_for_required_applications_wrong_platform(testplan_with_on
     """ Test apply_changes_for_required_applications with not matched platform """
     plan = testplan_with_one_instance
     testsuite = get_testsuite_for_given_test(plan, 'test_a.check_1')
-    testsuite.required_applications = [{'name': 'sample_test.app', 'platform': 'demo_board_2'}]
+    testsuite.required_applications = [RequiredApplication(name='sample_test.app', platform='demo_board_2')]
     platform = plan.get_platform("demo_board_2")
     testinstance = TestInstance(testsuite, platform, 'zephyr', plan.env.outdir)
     plan.add_instances([testinstance])
@@ -343,7 +344,7 @@ def test_apply_changes_for_required_applications_in_outdir(testplan_with_one_ins
     req_app_in_outdir = "prebuilt_sample_test.app"
 
     testsuite = get_testsuite_for_given_test(plan, 'test_a.check_1')
-    testsuite.required_applications = [{'name': req_app_in_outdir}]
+    testsuite.required_applications = [RequiredApplication(name=req_app_in_outdir)]
     platform = plan.get_platform("demo_board_1")
     testinstance = TestInstance(testsuite, platform, 'zephyr', plan.env.outdir)
     plan.add_instances([testinstance])
@@ -641,9 +642,9 @@ def test_testplan_find_subtests(
 
 
 TESTDATA_3 = [
-    (0, 0, [], False, [], TwisterRuntimeError, []),
-    (1, 1, [], False, [], TwisterRuntimeError, []),
-    (1, 0, [], True, [], TwisterRuntimeError, ['No quarantine list given to be verified']),
+    (0, 0, [], False, [], SystemExit, []),
+    (1, 1, [], False, [], SystemExit, []),
+    (1, 0, [], True, [], SystemExit, ['No quarantine list given to be verified']),
     (1, 0, ['qfile.yaml'], False, ['- platforms:\n  - demo_board_3\n  comment: "board_3"'], None, []),
 ]
 
@@ -714,10 +715,10 @@ TESTDATA_4 = [
 ]
 
 @pytest.mark.parametrize(
-    'report_suffix, only_failed, load_tests, test_only, subset,' \
-    ' exception, expected_selected_platforms, expected_generate_subset_args',
+    'report_suffix, only_failed, load_tests, test_only, subset, ' \
+    'exception, expected_selected_platforms, expected_generate_subset_args',
     TESTDATA_4,
-    ids=['apply_filters only', 'only failed', 'load tests', 'test only']
+    ids=['apply-filters-only', 'only-failed', 'load-tests', 'test-only']
 )
 def test_testplan_load(
     tmp_path,
@@ -1219,6 +1220,7 @@ def test_testplan_add_configurations(
     env.board_roots = [tmp_path / 'boards']
     env.soc_roots = [tmp_path]
     env.arch_roots = [tmp_path]
+    env.hwm = mock.Mock(duts=[])
     testplan = TestPlan(env=env)
     testplan.test_config = mock.Mock()
     testplan.test_config.override_default_platforms = override_default_platforms

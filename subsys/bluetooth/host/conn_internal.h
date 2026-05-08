@@ -318,7 +318,7 @@ struct bt_conn {
 	 */
 	sys_slist_t		l2cap_data_ready;
 
-	/* Node for putting this connection in a data-ready mode for the bt_dev.
+	/* Node for putting this connection in a data-ready mode for the bt_devs[0].
 	 * This will be used by the TX processor to then fetch HCI frags from it.
 	 */
 	sys_snode_t		_conn_ready;
@@ -516,7 +516,7 @@ void bt_conn_set_state(struct bt_conn *conn, bt_conn_state_t state);
 
 void bt_conn_connected(struct bt_conn *conn);
 
-void bt_conn_role_changed(struct bt_conn *conn, uint8_t status);
+void bt_conn_br_role_changed(struct bt_conn *conn, uint8_t status);
 
 int bt_conn_le_conn_update(struct bt_conn *conn,
 			   const struct bt_le_conn_param *param);

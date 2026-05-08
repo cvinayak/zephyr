@@ -16,7 +16,7 @@
 #include "r_dmac_b.h"
 #endif
 #ifdef CONFIG_SPI_RTIO
-#include <zephyr/drivers/spi/rtio.h>
+#include "spi_rtio.h"
 #include <zephyr/rtio/rtio.h>
 #endif
 #include <zephyr/logging/log.h>
@@ -646,6 +646,7 @@ static int spi_rz_rspi_init(const struct device *dev)
 		.channel_scheduling = DMAC_B_CHANNEL_SCHEDULING_FIXED,                             \
 		.p_callback = g_spi##n##_##dir##_transfer_callback,                                \
 		.p_context = NULL,                                                                 \
+		.p_reg = (void *)DT_REG_ADDR(DT_INST_DMAS_CTLR_BY_NAME(n, dir)),                   \
 	};                                                                                         \
 	const transfer_cfg_t g_transfer##n##_##dir##_cfg = {                                       \
 		.p_info = &g_transfer##n##_##dir##_info,                                           \
@@ -717,6 +718,7 @@ static int spi_rz_rspi_init(const struct device *dev)
 		.ssl_level_keep = RSPI_SSL_LEVEL_KEEP_DISABLE,                                     \
 		.rx_trigger_level = RSPI_RX_TRIGGER_24,                                            \
 		.tx_trigger_level = RSPI_TX_TRIGGER_4,                                             \
+		.p_reg = (void *)DT_INST_REG_ADDR(n),                                              \
 	};                                                                                         \
 	IF_ENABLED(CONFIG_SPI_RENESAS_RZ_RSPI_DMAC,                                           \
 				    (RSPI_DMA_RZG_DEFINE(n, tx, TI, DT_INST_PROP(n, channel))))    \
@@ -756,6 +758,10 @@ static int spi_rz_rspi_init(const struct device *dev)
 		SPI_CONTEXT_INIT_SYNC(spi_rz_rspi_data_##n, ctx),                                  \
 		SPI_CONTEXT_CS_GPIOS_INITIALIZE(DT_DRV_INST(n), ctx).fsp_ctrl = &g_spi##n##_ctrl,  \
 		.fsp_config = &g_spi_##n##_config,                                                 \
+		.fsp_extend_config =                                                               \
+			{                                                                          \
+				.p_reg = (void *)DT_INST_REG_ADDR(n),                              \
+			},                                                                         \
 		IF_ENABLED(CONFIG_SPI_RTIO, \
 					 (.rtio_ctx = &spi_rz_rspi_rtio_##n,)) };                  \
 	static int spi_rz_rspi_init_##n(const struct device *dev)                                  \

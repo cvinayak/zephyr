@@ -474,7 +474,7 @@ static void map_memory_range(const uint32_t start, const uint32_t end,
 	}
 }
 
-void xtensa_init_page_tables(void)
+static void xtensa_init_page_tables(void)
 {
 	volatile uint8_t entry;
 	static bool already_inited;
@@ -516,6 +516,45 @@ void xtensa_init_page_tables(void)
 	if (IS_ENABLED(PAGE_TABLE_IS_CACHED)) {
 		sys_cache_data_flush_all();
 	}
+}
+
+__weak void arch_xtensa_mmu_post_init(bool is_core0)
+{
+	ARG_UNUSED(is_core0);
+}
+
+void xtensa_mmu_init(void)
+{
+	xtensa_init_page_tables();
+
+	xtensa_mmu_init_paging();
+
+	/*
+	 * This is used to determine whether we are faulting inside double
+	 * exception if this is not zero. Sometimes SoC starts with this not
+	 * being set to zero. So clear it during boot.
+	 */
+	XTENSA_WSR(ZSR_DEPC_SAVE_STR, 0);
+
+	arch_xtensa_mmu_post_init(_current_cpu->id == 0);
+}
+
+void xtensa_mmu_reinit(void)
+{
+	/* First initialize the hardware */
+	xtensa_mmu_init_paging();
+
+#ifdef CONFIG_USERSPACE
+	struct k_thread *thread = _current_cpu->current;
+	struct arch_mem_domain *domain =
+			&(thread->mem_domain_info.mem_domain->arch);
+
+
+	/* Set the page table for current context */
+	xtensa_mmu_set_paging(domain);
+#endif /* CONFIG_USERSPACE */
+
+	arch_xtensa_mmu_post_init(_current_cpu->id == 0);
 }
 
 #ifdef CONFIG_ARCH_HAS_RESERVED_PAGE_FRAMES
@@ -982,7 +1021,21 @@ static ALWAYS_INLINE void l2_page_tables_counter_inc(uint32_t *l2_table)
 static ALWAYS_INLINE void l2_page_tables_counter_dec(uint32_t *l2_table)
 {
 	if (is_l2_table_inside_array(l2_table)) {
-		l2_page_tables_counter[l2_table_to_counter_pos(l2_table)]--;
+		int pos = l2_table_to_counter_pos(l2_table);
+
+		l2_page_tables_counter[pos]--;
+
+		/* When the L2 table is no longer being referenced,
+		 * we should mark all PTEs to be illegal just to be
+		 * safe.
+		 */
+		if (l2_page_tables_counter[pos] == 0) {
+			init_page_table(l2_table, L2_PAGE_TABLE_NUM_ENTRIES, PTE_L2_ILLEGAL);
+		}
+
+		if (IS_ENABLED(PAGE_TABLE_IS_CACHED)) {
+			sys_cache_data_flush_and_invd_range((void *)l2_table, L2_PAGE_TABLE_SIZE);
+		}
 	}
 }
 
@@ -1275,6 +1328,66 @@ err:
 	k_spin_unlock(&xtensa_mmu_lock, key);
 
 	return ret;
+}
+
+/**
+ * @brief Find the L1 table tracking index from L1 table pointer.
+ *
+ * @param[in] l1_table Pointer to L1 table.
+ *
+ * @note This does not check if the incoming L1 table pointer is a valid
+ *       L1 table.
+ *
+ * @return Index to the L1 table counter array.
+ */
+static inline int l1_table_to_track_pos(uint32_t *l1_table)
+{
+	return (l1_table - (uint32_t *)l1_page_tables) / (L1_PAGE_TABLE_NUM_ENTRIES);
+}
+
+int arch_mem_domain_deinit(struct k_mem_domain *domain)
+{
+	k_spinlock_key_t key;
+	uint32_t *l1_table = domain->arch.ptables;
+	uint32_t *l2_table;
+
+	if (l1_table == NULL) {
+		return -EINVAL;
+	}
+
+	key = k_spin_lock(&xtensa_mmu_lock);
+
+	for (uint32_t l1_pos = 0; l1_pos < L1_PAGE_TABLE_NUM_ENTRIES; l1_pos++) {
+		if (!is_pte_illegal(l1_table[l1_pos])) {
+			/* Since the L1 PTE points to a valid L2 table,
+			 * we need to decrement the usage counter for
+			 * that L2 table.
+			 */
+			l2_table = (uint32_t *)PTE_PPN_GET(l1_table[l1_pos]);
+
+			l2_page_tables_counter_dec(l2_table);
+		}
+
+		l1_table[l1_pos] = PTE_L1_ILLEGAL;
+	}
+
+	if (IS_ENABLED(PAGE_TABLE_IS_CACHED)) {
+		sys_cache_data_flush_range((void *)l1_table, L1_PAGE_TABLE_SIZE);
+	}
+
+	atomic_clear_bit(l1_page_tables_track, l1_table_to_track_pos(l1_table));
+
+	domain->arch.ptables = NULL;
+
+	sys_slist_find_and_remove(&xtensa_domain_list, &domain->arch.node);
+
+	k_spin_unlock(&xtensa_mmu_lock, key);
+
+	K_SPINLOCK(&xtensa_counter_lock) {
+		calc_l2_page_tables_usage();
+	}
+
+	return 0;
 }
 
 /**
@@ -1622,14 +1735,56 @@ int arch_buffer_validate(const void *addr, size_t size, int write)
 	return mem_buffer_validate(addr, size, write, RING_USER);
 }
 
-void xtensa_exc_dtlb_multihit_handle(void)
+void xtensa_exc_dtlb_multihit_handle(void *vaddr)
 {
-	/* For some unknown reasons, using xtensa_dtlb_probe() would result in
-	 * QEMU raising privileged instruction exception. So for now, just
-	 * invalidate all auto-refilled DTLBs.
-	 */
+	uint8_t way, i;
+	const uint8_t num_entries = BIT(XCHAL_DTLB_ARF_ENTRIES_LOG2);
 
-	xtensa_dtlb_autorefill_invalidate();
+	/* Each auto-refill way has a number of entries (4 or 8 depending on
+	 * configuration). So we need to ignore the lowest bits of
+	 * the virtual page number (VPN) to match the truncated VPN in
+	 * each TLB entry.
+	 */
+	const uint32_t excvaddr =
+		(uint32_t)vaddr & (XTENSA_MMU_PTE_VPN_MASK << XCHAL_DTLB_ARF_ENTRIES_LOG2);
+
+	for (way = 0; way < XTENSA_MMU_NUM_TLB_AUTOREFILL_WAYS; way++) {
+		for (i = 0; i < num_entries; i++) {
+			uint32_t entry = way + (i << XTENSA_MMU_PTE_PPN_SHIFT);
+			uint32_t tlb_vaddr = (uint32_t)xtensa_dtlb_vaddr_read(entry);
+
+			if (tlb_vaddr == excvaddr) {
+				xtensa_dtlb_entry_invalidate(entry);
+			}
+		}
+	}
+	__asm__ volatile("isync");
+}
+
+void xtensa_exc_itlb_multihit_handle(void *vaddr)
+{
+	uint8_t way, i;
+	const uint8_t num_entries = BIT(XCHAL_ITLB_ARF_ENTRIES_LOG2);
+
+	/* Each auto-refill way has a number of entries (4 or 8 depending on
+	 * configuration). So we need to ignore the lowest bits of
+	 * the virtual page number (VPN) to match the truncated VPN in
+	 * each TLB entry.
+	 */
+	const uint32_t excvaddr =
+		(uint32_t)vaddr & (XTENSA_MMU_PTE_VPN_MASK << XCHAL_ITLB_ARF_ENTRIES_LOG2);
+
+	for (way = 0; way < XTENSA_MMU_NUM_TLB_AUTOREFILL_WAYS; way++) {
+		for (i = 0; i < num_entries; i++) {
+			uint32_t entry = way + (i << XTENSA_MMU_PTE_PPN_SHIFT);
+			uint32_t tlb_vaddr = (uint32_t)xtensa_itlb_vaddr_read(entry);
+
+			if (tlb_vaddr == excvaddr) {
+				xtensa_itlb_entry_invalidate(entry);
+			}
+		}
+	}
+	__asm__ volatile("isync");
 }
 
 bool xtensa_exc_load_store_ring_error_check(void *bsa_p)

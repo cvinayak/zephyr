@@ -20,6 +20,9 @@
 #include <zephyr/sys/slist.h>
 #include <zephyr/sys_clock.h>
 
+/* Forward declaration, full definition in hci_core.h */
+struct bt_dev;
+
 enum bt_iso_cig_state {
 	BT_ISO_CIG_STATE_IDLE,
 	BT_ISO_CIG_STATE_CONFIGURED,
@@ -92,32 +95,29 @@ typedef void (*bt_iso_buf_rx_freed_cb_t)(void);
 void bt_iso_buf_rx_freed_cb_set(bt_iso_buf_rx_freed_cb_t cb);
 
 /* Process CIS Established event */
-void hci_le_cis_established(struct net_buf *buf);
-void hci_le_cis_established_v2(struct net_buf *buf);
+void hci_le_cis_established(struct bt_dev *hdev, struct net_buf *buf);
+void hci_le_cis_established_v2(struct bt_dev *hdev, struct net_buf *buf);
 
 /* Process CIS Request event */
-void hci_le_cis_req(struct net_buf *buf);
+void hci_le_cis_req(struct bt_dev *hdev, struct net_buf *buf);
 
 /** Process BIG complete event */
-void hci_le_big_complete(struct net_buf *buf);
+void hci_le_big_complete(struct bt_dev *hdev, struct net_buf *buf);
 
 /** Process BIG terminate event */
-void hci_le_big_terminate(struct net_buf *buf);
+void hci_le_big_terminate(struct bt_dev *hdev, struct net_buf *buf);
 
 /** Process BIG sync established event */
-void hci_le_big_sync_established(struct net_buf *buf);
+void hci_le_big_sync_established(struct bt_dev *hdev, struct net_buf *buf);
 
 /** Process BIG sync lost event */
-void hci_le_big_sync_lost(struct net_buf *buf);
+void hci_le_big_sync_lost(struct bt_dev *hdev, struct net_buf *buf);
 
 /* Notify ISO channels of a new connection */
 void bt_iso_connected(struct bt_conn *iso);
 
 /* Notify ISO channels of a disconnect event */
 void bt_iso_disconnected(struct bt_conn *iso);
-
-/* Notify ISO connected channels of security changed */
-void bt_iso_security_changed(struct bt_conn *acl, uint8_t hci_status);
 
 #if defined(CONFIG_BT_ISO_LOG_LEVEL_DBG)
 void bt_iso_chan_set_state_debug(struct bt_iso_chan *chan,

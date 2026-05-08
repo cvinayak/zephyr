@@ -37,6 +37,10 @@
 	};
 };
 
+&aes {
+	status = "okay";
+};
+
 &flx6 {
 	mchp,flexcom-mode = <SAM_FLEXCOM_MODE_USART>;
 	status = "okay";
@@ -90,4 +94,8 @@
 
 &pit64b0 {
 	clock-frequency = <DT_FREQ_M(10)>;
+};
+
+&rtc {
+	status = "okay";
 };

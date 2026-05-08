@@ -9,6 +9,7 @@
 #include "openthread/platform/udp.h"
 #include "openthread_border_router.h"
 #include "sockets_internal.h"
+#include <assert.h>
 #include <common/code_utils.hpp>
 #include <errno.h>
 #include <openthread.h>
@@ -49,10 +50,6 @@ otError udp_plat_init(otInstance *ot_instance, struct net_if *ail_iface, struct 
 	ot_iface_index = (uint32_t)net_if_get_by_iface(ot_iface);
 	ail_iface_index = (uint32_t)net_if_get_by_iface(ail_iface);
 
-	for (uint8_t i = 0; i < CONFIG_OPENTHREAD_ZEPHYR_BORDER_ROUTER_MAX_UDP_SERVICES; i++) {
-		sockfd_udp[i].fd = -1;
-	}
-
 	return OT_ERROR_NONE;
 }
 
@@ -82,13 +79,14 @@ otError otPlatUdpSocket(otUdpSocket *aUdpSocket)
 	sock = zsock_socket(NET_AF_INET6, NET_SOCK_DGRAM, NET_IPPROTO_UDP);
 	VerifyOrExit(sock >= 0, error = OT_ERROR_FAILED);
 
-#if defined(CONFIG_NET_IPV4) && defined(CONFIG_NET_IPV4_MAPPING_TO_IPV6)
-	int off = 0;
+	if (IS_ENABLED(CONFIG_OPENTHREAD_ZEPHYR_BORDER_ROUTER_IPV4) &&
+	    IS_ENABLED(CONFIG_NET_IPV4_MAPPING_TO_IPV6)) {
+		int off = 0;
 
-	VerifyOrExit(zsock_setsockopt(sock, NET_IPPROTO_IPV6, ZSOCK_IPV6_V6ONLY,
-				      &off, sizeof(off)) == 0,
-		     error = OT_ERROR_FAILED);
-#endif
+		VerifyOrExit(zsock_setsockopt(sock, NET_IPPROTO_IPV6, ZSOCK_IPV6_V6ONLY,
+					      &off, sizeof(off)) == 0,
+			     error = OT_ERROR_FAILED);
+	}
 
 	aUdpSocket->mHandle = INT_TO_POINTER(sock);
 
@@ -228,10 +226,12 @@ otError otPlatUdpConnect(otUdpSocket *aUdpSocket)
 		memcpy(&addr.sin6_addr, &aUdpSocket->mPeerName.mAddress, sizeof(otIp6Address));
 		addr.sin6_port = net_htons(aUdpSocket->mPeerName.mPort);
 
-		VerifyOrExit(zsock_connect(sock, (struct net_sockaddr *)&addr, sizeof(addr)) == 0,
-			     error = OT_ERROR_FAILED);
+	} else {
+		addr.sin6_family = NET_AF_UNSPEC;
 	}
 
+	VerifyOrExit(zsock_connect(sock, (struct net_sockaddr *)&addr, sizeof(addr)) == 0,
+		     error = OT_ERROR_FAILED);
 exit:
 	return error;
 }

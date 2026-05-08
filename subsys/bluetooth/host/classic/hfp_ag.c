@@ -871,15 +871,17 @@ static void bt_ag_notify_work(struct k_work *work)
 
 	bt_ag_tx_free(tx);
 
+	state = ag->state;
+
 	if (err < 0) {
-		state = ag->state;
 		if ((state != BT_HFP_DISCONNECTED) && (state != BT_HFP_DISCONNECTING)) {
 			bt_hfp_ag_set_state(ag, BT_HFP_DISCONNECTING);
 			bt_rfcomm_dlc_disconnect(&ag->rfcomm_dlc);
 		}
 	}
 
-	if (cb != NULL) {
+	/* If the AG connection has been disconnected, ignore the callback of tx node. */
+	if ((state != BT_HFP_DISCONNECTED) && (cb != NULL)) {
 		cb(ag, user_data);
 	}
 
@@ -4174,7 +4176,7 @@ static struct bt_hfp_ag *hfp_ag_create(struct bt_conn *conn)
 
 	/* Set the supported features*/
 	ag->ag_features = BT_HFP_AG_SUPPORTED_FEATURES;
-	ag->ag_features |= BT_FEAT_SC(bt_dev.features) ? BT_HFP_AG_FEATURE_ESCO_S4 : 0;
+	ag->ag_features |= BT_FEAT_SC(bt_devs[0].features) ? BT_HFP_AG_FEATURE_ESCO_S4 : 0;
 
 	/* Set the default HF infrmation */
 	ag->hf_sdp_features = 0;
@@ -5165,7 +5167,7 @@ int bt_hfp_ag_audio_connect(struct bt_hfp_ag *ag, uint8_t id)
 	}
 
 	if (atomic_ptr_get(&ag->sco_conn) != NULL) {
-		LOG_ERR("Audio conenction has been connected");
+		LOG_ERR("Audio connection has been connected");
 		hfp_ag_unlock(ag);
 		return -ECONNREFUSED;
 	}

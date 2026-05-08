@@ -31,9 +31,11 @@
 #include <stdint.h>
 #include <string.h>
 
+#include <zephyr/device.h>
 #include <zephyr/bluetooth/gap.h>
 #include <zephyr/bluetooth/addr.h>
 #include <zephyr/bluetooth/crypto.h>
+#include <zephyr/bluetooth/data.h>
 #include <zephyr/bluetooth/hci_types.h>
 #include <zephyr/bluetooth/classic/classic.h>
 #include <zephyr/net_buf.h>
@@ -41,6 +43,8 @@
 #include <zephyr/sys/util.h>
 #include <zephyr/sys/util_macro.h>
 #include <zephyr/toolchain.h>
+
+struct k_poll_signal;
 
 #ifdef __cplusplus
 extern "C" {
@@ -84,10 +88,16 @@ extern "C" {
 			* BT_HCI_LE_BYTES_PER_FEATURE_PAGE),        \
 		(0U)))
 
-/** Opaque type representing an advertiser. */
+/**
+ * @struct bt_le_ext_adv
+ * @brief Opaque type representing an advertiser.
+ */
 struct bt_le_ext_adv;
 
-/** Opaque type representing an periodic advertising sync. */
+/**
+ * @struct bt_le_per_adv_sync
+ * @brief Opaque type representing a periodic advertising sync.
+ */
 struct bt_le_per_adv_sync;
 
 /* Don't require everyone to include conn.h */
@@ -265,7 +275,7 @@ struct bt_le_ext_adv_cb {
 	bool (*rpa_expired)(struct bt_le_ext_adv *adv);
 #endif /* defined(CONFIG_BT_PRIVACY) */
 
-#if defined(CONFIG_BT_PER_ADV_RSP)
+#if defined(CONFIG_BT_PER_ADV_RSP) || defined(__DOXYGEN__)
 	/**
 	 * @brief The Controller indicates it is ready to transmit one or more PAwR subevents.
 	 *
@@ -274,6 +284,8 @@ struct bt_le_ext_adv_cb {
 	 *
 	 * @param adv     The advertising set object.
 	 * @param request Information about the upcoming subevents.
+	 *
+	 * @kconfig_dep{CONFIG_BT_PER_ADV_RSP}
 	 */
 	void (*pawr_data_request)(struct bt_le_ext_adv *adv,
 				  const struct bt_le_per_adv_data_request *request);
@@ -285,6 +297,8 @@ struct bt_le_ext_adv_cb {
 	 * @param info Information about the responses received.
 	 * @param buf  The received data. NULL if the controller reported
 	 *             that it did not receive any response.
+	 *
+	 * @kconfig_dep{CONFIG_BT_PER_ADV_RSP}
 	 */
 	void (*pawr_response)(struct bt_le_ext_adv *adv, struct bt_le_per_adv_response_info *info,
 			      struct net_buf_simple *buf);
@@ -320,6 +334,49 @@ typedef void (*bt_ready_cb_t)(int err);
  * @return Zero on success or (negative) error code otherwise.
  */
 int bt_enable(bt_ready_cb_t cb);
+
+/**
+ * @brief Default HCI device from devicetree chosen node.
+ *
+ * This is the device referenced by the zephyr,bt-hci chosen property.
+ * bt_enable() is a wrapper for bt_dev_enable(BT_HCI_DEFAULT, ...).
+ */
+#define BT_HCI_DEFAULT DEVICE_DT_GET(DT_CHOSEN(zephyr_bt_hci))
+
+/**
+ * @brief Enable a specific HCI controller
+ *
+ * Enable an HCI controller. The default controller is enabled via
+ * bt_enable(), which internally calls bt_dev_enable(BT_HCI_DEFAULT, ...).
+ * Additional controllers are enabled explicitly by the application:
+ *
+ *     struct k_poll_signal ready;
+ *     k_poll_signal_init(&ready);
+ *     bt_dev_enable(hci1, &ready);
+ *
+ * When @p ready is non-NULL, initialization proceeds asynchronously and
+ * the signal is raised with the result code (0 on success, negative errno
+ * on failure). When @p ready is NULL, initialization is synchronous.
+ *
+ * @param dev    HCI device to enable (must implement the bt_hci device API)
+ * @param ready  Poll signal to raise on completion, or NULL for synchronous
+ *
+ * @return Zero on success or (negative) error code otherwise.
+ */
+int bt_dev_enable(const struct device *dev, struct k_poll_signal *ready);
+
+/**
+ * @brief Disable a specific HCI controller
+ *
+ * Disable an HCI controller that was previously enabled with
+ * bt_dev_enable(). The default controller should be disabled
+ * with bt_disable() instead.
+ *
+ * @param dev  HCI device to disable
+ *
+ * @return Zero on success or (negative) error code otherwise.
+ */
+int bt_dev_disable(const struct device *dev);
 
 /**
  * @brief Disable Bluetooth
@@ -514,94 +571,6 @@ int bt_id_reset(uint8_t id, bt_addr_le_t *addr, uint8_t *irk);
  * @return 0 in case of success, or a negative error code on failure.
  */
 int bt_id_delete(uint8_t id);
-
-/**
- * @brief Bluetooth data serialized size.
- *
- * Get the size of a serialized @ref bt_data given its data length.
- *
- * Size of 'AD Structure'->'Length' field, equal to 1.
- * Size of 'AD Structure'->'Data'->'AD Type' field, equal to 1.
- * Size of 'AD Structure'->'Data'->'AD Data' field, equal to data_len.
- *
- * See Core Specification Version 5.4 Vol. 3 Part C, 11, Figure 11.1.
- */
-#define BT_DATA_SERIALIZED_SIZE(data_len) ((data_len) + 2)
-
-/**
- * @brief Bluetooth data.
- *
- * @details Description of different AD Types that can be encoded into advertising data. Used to
- * form arrays that are passed to the @ref bt_le_adv_start function. The @ref BT_DATA define can
- * be used as a helpter to declare the elements of an @ref bt_data array.
- */
-struct bt_data {
-	/** Type of scan response data or advertisement data. */
-	uint8_t type;
-	/** Length of scan response data or advertisement data. */
-	uint8_t data_len;
-	/** Pointer to Scan response or advertisement data. */
-	const uint8_t *data;
-};
-
-/**
- * @brief Helper to declare elements of bt_data arrays
- *
- * This macro is mainly for creating an array of struct bt_data
- * elements which is then passed to e.g. @ref bt_le_adv_start function.
- *
- * @param _type Type of advertising data field
- * @param _data Pointer to the data field payload
- * @param _data_len Number of octets behind the _data pointer
- */
-#define BT_DATA(_type, _data, _data_len) \
-	{ \
-		.type = (_type), \
-		.data_len = (_data_len), \
-		.data = (const uint8_t *)(_data), \
-	}
-
-/**
- * @brief Helper to declare elements of bt_data arrays
- *
- * This macro is mainly for creating an array of struct bt_data
- * elements which is then passed to e.g. @ref bt_le_adv_start function.
- *
- * @param _type Type of advertising data field
- * @param _bytes Variable number of single-byte parameters
- */
-#define BT_DATA_BYTES(_type, _bytes...) \
-	BT_DATA(_type, ((uint8_t []) { _bytes }), \
-		sizeof((uint8_t []) { _bytes }))
-
-/**
- * @brief Get the total size (in octets) of a given set of @ref bt_data
- * structures.
- *
- * The total size includes the length (1 octet) and type (1 octet) fields for each element, plus
- * their respective data lengths.
- *
- * @param[in] data Array of @ref bt_data structures.
- * @param[in] data_count Number of @ref bt_data structures in @p data.
- *
- * @return Size of the concatenated data, built from the @ref bt_data structure set.
- */
-size_t bt_data_get_len(const struct bt_data data[], size_t data_count);
-
-/**
- * @brief Serialize a @ref bt_data struct into an advertising structure (a flat array).
- *
- * The data are formatted according to the Bluetooth Core Specification v. 5.4,
- * vol. 3, part C, 11.
- *
- * @param[in]  input Single @ref bt_data structure to read from.
- * @param[out] output Buffer large enough to store the advertising structure in
- *             @p input. The size of it must be at least the size of the
- *             `input->data_len + 2` (for the type and the length).
- *
- * @return Number of octets written in @p output.
- */
-size_t bt_data_serialize(const struct bt_data *input, uint8_t *output);
 
 /**
  * @brief Local Bluetooth LE controller features and capabilities.
@@ -855,8 +824,6 @@ enum bt_le_adv_opt {
 	 * This is an advanced feature; most users will want to enable
 	 * @kconfig{CONFIG_BT_EXT_ADV} instead.
 	 *
-	 * @note Not implemented when @kconfig{CONFIG_BT_PRIVACY}.
-	 *
 	 * @note Mutually exclusive with BT_LE_ADV_OPT_USE_IDENTITY.
 	 */
 	BT_LE_ADV_OPT_USE_NRPA = BIT(19),
@@ -940,8 +907,10 @@ struct bt_le_adv_param {
 	 * Advertising Interval. The Minimum Advertising Interval and Maximum Advertising Interval
 	 * aren't recommended to be the same value to enable the Controller to determine the best
 	 * advertising interval given other activities.
-	 * (See Bluetooth Core Spec 6.0, Vol 4, Part E, section 7.8.5)
-	 * Range: 0x0020 to 0x4000
+	 * (See Bluetooth Core Spec 6.2, Vol 4, Part E, section 7.8.5)
+	 * Range for legacy advertising: 0x0020 to 0x4000
+	 * (See Bluetooth Core Spec 6.2, Vol 4, Part E, section 7.8.53)
+	 * Range for extended advertising: 0x0020 to 0xFFFFFF
 	 */
 	uint32_t interval_min;
 
@@ -952,8 +921,10 @@ struct bt_le_adv_param {
 	 * Advertising Interval. The Minimum Advertising Interval and Maximum Advertising Interval
 	 * aren't recommended to be the same value to enable the Controller to determine the best
 	 * advertising interval given other activities.
-	 * (See Bluetooth Core Spec 6.0, Vol 4, Part E, section 7.8.5)
-	 * Range: 0x0020 to 0x4000
+	 * (See Bluetooth Core Spec 6.2, Vol 4, Part E, section 7.8.5)
+	 * Range for legacy advertising: 0x0020 to 0x4000
+	 * (See Bluetooth Core Spec 6.2, Vol 4, Part E, section 7.8.53)
+	 * Range for extended advertising: 0x0020 to 0xFFFFFF
 	 */
 	uint32_t interval_max;
 
@@ -1028,14 +999,16 @@ struct bt_le_per_adv_param {
 	 */
 	uint16_t interval_max;
 
-	/** Bit-field of periodic advertising options, see the @ref bt_le_adv_opt field. */
+	/** Bit-field of periodic advertising options, see the @ref bt_le_per_adv_opt field. */
 	uint32_t options;
 
-#if defined(CONFIG_BT_PER_ADV_RSP)
+#if defined(CONFIG_BT_PER_ADV_RSP) || defined(__DOXYGEN__)
 	/**
 	 * @brief Number of subevents
 	 *
 	 * If zero, the periodic advertiser will be a broadcaster, without responses.
+	 *
+	 * @kconfig_dep{CONFIG_BT_PER_ADV_RSP}
 	 */
 	uint8_t num_subevents;
 
@@ -1043,6 +1016,8 @@ struct bt_le_per_adv_param {
 	 * @brief Interval between subevents (N * 1.25 ms)
 	 *
 	 * Shall be between 7.5ms and 318.75 ms.
+	 *
+	 * @kconfig_dep{CONFIG_BT_PER_ADV_RSP}
 	 */
 	uint8_t subevent_interval;
 
@@ -1050,6 +1025,7 @@ struct bt_le_per_adv_param {
 	 * @brief Time between the advertising packet in a subevent and the
 	 * first response slot (N * 1.25 ms)
 	 *
+	 * @kconfig_dep{CONFIG_BT_PER_ADV_RSP}
 	 */
 	uint8_t response_slot_delay;
 
@@ -1057,6 +1033,8 @@ struct bt_le_per_adv_param {
 	 * @brief Time between response slots (N * 0.125 ms)
 	 *
 	 * Shall be between 0.25 and 31.875 ms.
+	 *
+	 * @kconfig_dep{CONFIG_BT_PER_ADV_RSP}
 	 */
 	uint8_t response_slot_spacing;
 
@@ -1064,6 +1042,8 @@ struct bt_le_per_adv_param {
 	 * @brief Number of subevent response slots
 	 *
 	 * If zero, response_slot_delay and response_slot_spacing are ignored.
+	 *
+	 * @kconfig_dep{CONFIG_BT_PER_ADV_RSP}
 	 */
 	uint8_t num_response_slots;
 #endif /* CONFIG_BT_PER_ADV_RSP */
@@ -2415,6 +2395,16 @@ struct bt_le_scan_param {
 	 * Set zero to use same as LE 1M PHY scan window.
 	 */
 	uint16_t window_coded;
+
+	/**
+	 * @brief HCI device for scanning
+	 *
+	 * Pointer to the HCI controller device to use for scanning.
+	 * Set to NULL to use the default controller.
+	 *
+	 * @note Only meaningful when @kconfig{CONFIG_BT_HCI_MAX_DEV} > 1.
+	 */
+	const struct device *hci_dev;
 };
 
 /** LE advertisement and scan response packet information */
@@ -2468,6 +2458,14 @@ struct bt_le_scan_recv_info {
 
 	/** Secondary advertising channel PHY. */
 	uint8_t secondary_phy;
+
+	/**
+	 * @brief HCI device
+	 *
+	 * Pointer to the HCI controller device that received this
+	 * advertisement. Corresponds to @ref bt_le_scan_param.hci_dev.
+	 */
+	const struct device *hci_dev;
 };
 
 /** Listener context for (LE) scanning. */

@@ -96,7 +96,7 @@ typedef struct {
  * This is used to pass compile for targets not supporting this device.
  * Related code should be unreachable.
  */
-#if defined(CONFIG_SOC_SERIES_M2L31X)
+#if defined(CONFIG_SOC_SERIES_M2L31X) || defined(CONFIG_SOC_SERIES_M335X)
 
 BUILD_ASSERT(DT_NUM_INST_STATUS_OKAY(nuvoton_numaker_hsusbd) == 0,
 	     "The SoC series should have no HSUSBD");
@@ -168,8 +168,10 @@ typedef struct {
 #define HSUSBD_GINTEN_EPAIEN_Pos        0
 #define HSUSBD_GINTEN_USBIEN_Msk        0
 #define HSUSBD_GINTSTS_EPAIF_Pos        0
+#define HSUSBD_GINTSTS_CEPIF_Msk        0
 #define HSUSBD_BUSINTEN_RESUMEIEN_Msk   0
 #define HSUSBD_BUSINTEN_RSTIEN_Msk      0
+#define HSUSBD_BUSINTEN_SOFIEN_Msk      0
 #define HSUSBD_BUSINTEN_SUSPENDIEN_Msk  0
 #define HSUSBD_BUSINTEN_VBUSDETIEN_Msk  0
 #define HSUSBD_BUSINTSTS_RESUMEIF_Msk   0

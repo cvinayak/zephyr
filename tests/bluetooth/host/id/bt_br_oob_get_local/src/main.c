@@ -17,7 +17,7 @@ DEFINE_FFF_GLOBALS;
 
 static void fff_reset_rule_before(const struct ztest_unit_test *test, void *fixture)
 {
-	memset(&bt_dev, 0x00, sizeof(struct bt_dev));
+	memset(&bt_devs[0], 0x00, sizeof(struct bt_dev));
 }
 
 ZTEST_RULE(fff_reset_rule, fff_reset_rule_before, NULL);
@@ -38,11 +38,11 @@ ZTEST(bt_br_oob_get_local, test_get_local_out_of_band_information)
 	int err;
 	struct bt_br_oob oob;
 
-	bt_addr_le_copy(&bt_dev.id_addr[0], BT_RPA_LE_ADDR);
+	bt_addr_le_copy(&bt_devs[0].id_addr[0], BT_RPA_LE_ADDR);
 
 	err = bt_br_oob_get_local(&oob);
 
 	zassert_ok(err, "Unexpected error code '%d' was returned", err);
-	zassert_mem_equal(&oob.addr, &BT_RPA_LE_ADDR->a, sizeof(bt_addr_t),
+	zassert_mem_equal(&oob.addr, BT_RPA_ADDR, sizeof(bt_addr_t),
 			  "Incorrect address was set");
 }

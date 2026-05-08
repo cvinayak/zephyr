@@ -489,8 +489,8 @@ function(ExternalZephyrVariantProject_Add)
     )
   endif()
 
-  get_target_property(ZBUILD_BOARD ${DEFAULT_IMAGE} BOARD)
-  get_target_property(ZBUILD_SOURCE_DIR ${DEFAULT_IMAGE} APP_SOURCE_DIR)
+  get_target_property(ZBUILD_BOARD ${ZBUILD_SOURCE_APP} BOARD)
+  get_target_property(ZBUILD_SOURCE_DIR ${ZBUILD_SOURCE_APP} APP_SOURCE_DIR)
   get_property(var_type CACHE ${ZBUILD_SOURCE_APP}_${shared_var} PROPERTY TYPE)
 
   set_property(
@@ -542,6 +542,11 @@ function(ExternalZephyrVariantProject_Add)
       )
     endif()
   endforeach()
+
+  # Add the variant image CMake module path to replace the normal Zephyr module path
+  list(APPEND shared_cmake_vars_argument
+    "-DCMAKE_MODULE_PATH:PATH=${CMAKE_SOURCE_DIR}/cmake/zephyr/variant"
+  )
 
   set(list_separator ",")
 

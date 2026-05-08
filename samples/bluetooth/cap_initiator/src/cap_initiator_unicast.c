@@ -10,6 +10,7 @@
 #include <stdint.h>
 
 #include <zephyr/bluetooth/addr.h>
+#include <zephyr/bluetooth/assigned_numbers.h>
 #include <zephyr/bluetooth/att.h>
 #include <zephyr/bluetooth/audio/audio.h>
 #include <zephyr/bluetooth/audio/bap_lc3_preset.h>
@@ -37,7 +38,7 @@
 
 LOG_MODULE_REGISTER(cap_initiator_unicast, LOG_LEVEL_INF);
 
-#define SEM_TIMEOUT K_SECONDS(5)
+#define SEM_TIMEOUT K_SECONDS(5U)
 
 /* We use the same config for both sink and source streams
  * For simplicity we use the mandatory configuration 16_2_1
@@ -71,10 +72,10 @@ struct peer_config {
 /* TODO: Expand to multiple ACL connections */
 static struct peer_config peer;
 
-static K_SEM_DEFINE(sem_proc, 0, 1);
-static K_SEM_DEFINE(sem_state_change, 0, 1);
-static K_SEM_DEFINE(sem_mtu_exchanged, 0, 1);
-static K_SEM_DEFINE(sem_security_changed, 0, 1);
+static K_SEM_DEFINE(sem_proc, 0U, 1U);
+static K_SEM_DEFINE(sem_state_change, 0U, 1U);
+static K_SEM_DEFINE(sem_mtu_exchanged, 0U, 1U);
+static K_SEM_DEFINE(sem_security_changed, 0U, 1U);
 
 static bool is_tx_stream(struct bt_bap_stream *stream)
 {
@@ -494,12 +495,8 @@ static void start_scan(void)
 
 static void connected_cb(struct bt_conn *conn, uint8_t err)
 {
-	char addr[BT_ADDR_LE_STR_LEN];
-
-	(void)bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
-
 	if (err != 0) {
-		LOG_ERR("Failed to connect to %s: %u", addr, err);
+		LOG_ERR("Failed to connect to %s: %u", bt_conn_dst_str(conn), err);
 
 		bt_conn_unref(peer.conn);
 		peer.conn = NULL;
@@ -512,21 +509,18 @@ static void connected_cb(struct bt_conn *conn, uint8_t err)
 		return;
 	}
 
-	LOG_INF("Connected: %s", addr);
+	LOG_INF("Connected: %s", bt_conn_dst_str(conn));
 	k_sem_give(&sem_state_change);
 }
 
 static void disconnected_cb(struct bt_conn *conn, uint8_t reason)
 {
-	char addr[BT_ADDR_LE_STR_LEN];
-
 	if (conn != peer.conn) {
 		return;
 	}
 
-	(void)bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
-
-	LOG_INF("Disconnected: %s, reason 0x%02x %s", addr, reason, bt_hci_err_to_str(reason));
+	LOG_INF("Disconnected: %s, reason 0x%02x %s", bt_conn_dst_str(conn),
+		reason, bt_hci_err_to_str(reason));
 
 	bt_conn_unref(peer.conn);
 	peer.conn = NULL;
@@ -564,7 +558,6 @@ BT_CONN_CB_DEFINE(conn_callbacks) = {
 
 static bool check_audio_support_and_connect_cb(struct bt_data *data, void *user_data)
 {
-	char addr_str[BT_ADDR_LE_STR_LEN];
 	bt_addr_le_t *addr = user_data;
 	const struct bt_uuid *uuid;
 	uint16_t uuid_val;
@@ -588,8 +581,7 @@ static bool check_audio_support_and_connect_cb(struct bt_data *data, void *user_
 		return true; /* Continue parsing to next AD data type */
 	}
 
-	bt_addr_le_to_str(addr, addr_str, sizeof(addr_str));
-	LOG_INF("Attempt to connect to %s", addr_str);
+	LOG_INF("Attempt to connect to %s", bt_addr_le_str(addr));
 
 	err = bt_le_scan_stop();
 	if (err != 0) {

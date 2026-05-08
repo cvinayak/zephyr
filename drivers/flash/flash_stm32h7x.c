@@ -319,7 +319,7 @@ bool flash_stm32_valid_range(const struct device *dev, off_t offset, uint32_t le
 		 * Locations beyond bank2 are caught by flash_stm32_range_exists
 		 */
 		if ((offset < BANK2_OFFSET) && (offset + len > REAL_FLASH_SIZE_KB / 2)) {
-			LOG_ERR("Range ovelaps flash bank discontinuity");
+			LOG_ERR("Range overlaps flash bank discontinuity");
 			return false;
 		}
 	}
@@ -933,11 +933,6 @@ static int stm32h7_flash_init(const struct device *dev)
 	/* Only stm32h7 dual core devices have the clocks property */
 	struct flash_stm32_priv *p = FLASH_STM32_PRIV(dev);
 	const struct device *const clk = DEVICE_DT_GET(STM32_CLOCK_CONTROL_NODE);
-
-	if (!device_is_ready(clk)) {
-		LOG_ERR("clock control device not ready");
-		return -ENODEV;
-	}
 
 	/* enable clock : enable the RCC_AHB3ENR_FLASHEN bit */
 	if (clock_control_on(clk, (clock_control_subsys_t)&p->pclken) != 0) {

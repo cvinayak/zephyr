@@ -97,6 +97,7 @@
 		volt-sensor0 = &vref;
 		volt-sensor1 = &vbat;
 		spi-flash0 = &mx66uw1g45;
+		rtc = &rtc;
 	};
 
 	ext_flash_mem: memory@70000000 {
@@ -170,6 +171,20 @@
 	status = "okay";
 };
 
+&gpdma1 {
+	status = "okay";
+};
+
+&hpdma1 {
+	status = "okay";
+};
+
+&rtc {
+	clocks = <&rcc STM32_CLOCK(APB4, 16)>,
+		 <&rcc STM32_SRC_LSE RTC_SEL(1)>;
+	status = "okay";
+};
+
 &timers2 {
 	st,prescaler = <10000>;
 	status = "okay";
@@ -197,10 +212,6 @@
 };
 
 &iwdg {
-	status = "okay";
-};
-
-&wwdg {
 	status = "okay";
 };
 
@@ -304,6 +315,7 @@ st_cam_i2c: &i2c1 {
 		write-latency = <1>;
 		burst-length = <0>;
 		st,csbound = <11>;
+		st,refresh = <129>;
 		status = "okay";
 	};
 };
@@ -360,6 +372,20 @@ st_cam_i2c: &i2c1 {
 	status = "okay";
 };
 
+&iocell {
+	status = "okay";
+
+	vddxspi1 {
+		hslv-mode = "on";
+		compensation-enabled;
+	};
+
+	vddxspi2 {
+		hslv-mode = "on";
+		compensation-enabled;
+	};
+};
+
 usb2: &usbotg_fs {
 	pinctrl-0 = <&usb_otg_fs_dm_pm12 &usb_otg_fs_dp_pm11>;
 	pinctrl-names = "default";
@@ -412,4 +438,8 @@ st_cam_dvp: &dcmipp {
 		     &dcmipp_pixclk_pd5 &dcmipp_hsync_pg3 &dcmipp_vsync_pb7>;
 
 	pinctrl-names = "default";
+};
+
+&crc {
+	status = "okay";
 };

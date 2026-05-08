@@ -1,5 +1,5 @@
 /*
- * Copyright 2020,2023-2025 NXP
+ * Copyright 2020,2023-2026 NXP
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -23,8 +23,12 @@
 #include <zephyr/drivers/gpio.h>
 #endif
 
-#define NOR_WRITE_SIZE	1
 #define NOR_ERASE_VALUE	0xff
+
+#define FLEXSPI_NOR_SOC_NV_FLASH_COMPAT(node_id) \
+	COND_CODE_1(DT_NODE_HAS_COMPAT(node_id, soc_nv_flash), (node_id), ())
+#define FLEXSPI_NOR_SOC_NV_FLASH_NODE(node_id) \
+	DT_INST_FOREACH_CHILD_STATUS_OKAY(node_id, FLEXSPI_NOR_SOC_NV_FLASH_COMPAT)
 
 #ifdef CONFIG_FLASH_MCUX_FLEXSPI_NOR_WRITE_BUFFER
 static uint8_t nor_write_buf[SPI_NOR_PAGE_SIZE];
@@ -304,7 +308,7 @@ static int flash_flexspi_nor_page_program(struct flash_flexspi_nor_data *data,
 		.dataSize = len,
 	};
 
-	LOG_DBG("Page programming %d bytes to 0x%08zx", len, (ssize_t) offset);
+	LOG_DBG("Page programming %zu bytes to 0x%08zx", len, (ssize_t) offset);
 
 	return memc_flexspi_transfer(&data->controller, &transfer);
 }
@@ -336,10 +340,12 @@ static int flash_flexspi_nor_wait_bus_busy(struct flash_flexspi_nor_data *data)
 	return 0;
 }
 
-static int flash_flexspi_nor_read(const struct device *dev, off_t offset,
-		void *buffer, size_t len)
+static int flash_flexspi_nor_read(const struct device *dev, off_t offset, void *buffer, size_t len)
 {
 	struct flash_flexspi_nor_data *data = dev->data;
+	int ret;
+	unsigned int key = 0U;
+	bool xip;
 
 	if (len == 0) {
 		return 0;
@@ -353,15 +359,54 @@ static int flash_flexspi_nor_read(const struct device *dev, off_t offset,
 		return -EINVAL;
 	}
 
-	uint8_t *src = memc_flexspi_get_ahb_address(&data->controller,
-						    data->port,
-						    offset);
+	xip = memc_flexspi_is_running_xip(&data->controller);
 
-	memcpy(buffer, src, len);
+	if (xip) {
+		key = irq_lock();
+		memc_flexspi_wait_bus_idle(&data->controller);
+	}
+
+	uint8_t *dst = (uint8_t *)buffer;
+	size_t remaining = len;
+	off_t current_offset = offset;
+	uint8_t ip_read_buf[SPI_NOR_PAGE_SIZE];
+
+	while (remaining > 0U) {
+		off_t aligned_offset = ROUND_DOWN(current_offset, sizeof(uint32_t));
+		size_t byte_offset = current_offset - aligned_offset;
+		size_t required = MIN(remaining + byte_offset, sizeof(ip_read_buf));
+		size_t read_size = MAX(ROUND_UP(required, sizeof(uint32_t)), sizeof(uint32_t));
+		size_t copy_size = MIN(remaining, read_size - byte_offset);
+		flexspi_transfer_t transfer = {
+			.deviceAddress = aligned_offset,
+			.port = data->port,
+			.cmdType = kFLEXSPI_Read,
+			.SeqNumber = 1,
+			.seqIndex = READ,
+			.data = (uint32_t *)ip_read_buf,
+			.dataSize = read_size,
+		};
+
+		ret = memc_flexspi_transfer(&data->controller, &transfer);
+		if (ret < 0) {
+			if (xip) {
+				irq_unlock(key);
+			}
+			return ret;
+		}
+
+		memcpy(dst, &ip_read_buf[byte_offset], copy_size);
+		dst += copy_size;
+		current_offset += copy_size;
+		remaining -= copy_size;
+	}
+
+	if (xip) {
+		irq_unlock(key);
+	}
 
 	return 0;
 }
-
 static int flash_flexspi_nor_write(const struct device *dev, off_t offset,
 		const void *buffer, size_t len)
 {
@@ -434,7 +479,7 @@ static int flash_flexspi_nor_write(const struct device *dev, off_t offset,
 	}
 
 #ifdef CONFIG_HAS_MCUX_CACHE
-	DCACHE_InvalidateByRange((uint32_t) dst, size);
+	DCACHE_InvalidateByRange((uintptr_t)dst, size);
 #endif
 
 	return 0;
@@ -527,7 +572,7 @@ static int flash_flexspi_nor_erase(const struct device *dev, off_t offset,
 	}
 
 #ifdef CONFIG_HAS_MCUX_CACHE
-	DCACHE_InvalidateByRange((uint32_t) dst, size);
+	DCACHE_InvalidateByRange((uintptr_t)dst, size);
 #endif
 
 	return 0;
@@ -1021,6 +1066,12 @@ static int flash_flexspi_nor_config_flash(struct flash_flexspi_nor_data *data,
 					kFLEXSPI_Command_SDR, kFLEXSPI_1PAD,
 					SPI_NOR_CMD_BE, kFLEXSPI_Command_RADDR_SDR,
 					kFLEXSPI_1PAD, addr_width);
+			/* Update LUT for page program to use 32 bit addr and 4byte page program
+			 * command.
+			 */
+			flexspi_lut[PAGE_PROGRAM][0] = FLEXSPI_LUT_SEQ(
+				kFLEXSPI_Command_SDR, kFLEXSPI_1PAD, SPI_NOR_CMD_PP_4B,
+				kFLEXSPI_Command_RADDR_SDR, kFLEXSPI_1PAD, addr_width);
 		}
 	}
 	/* Extract the read command.
@@ -1055,6 +1106,25 @@ static int flash_flexspi_nor_config_flash(struct flash_flexspi_nor_data *data,
 			flexspi_lut[READ][2] =
 				FLEXSPI_LUT_SEQ(kFLEXSPI_Command_READ_SDR, kFLEXSPI_8PAD, 0x04,
 						kFLEXSPI_Command_STOP, kFLEXSPI_1PAD, 0x0);
+
+			if (addr_width == 32) {
+				/* Update LUT for page program with 1S-8S-8S command */
+				flexspi_lut[PAGE_PROGRAM][0] = FLEXSPI_LUT_SEQ(
+					kFLEXSPI_Command_SDR, kFLEXSPI_1PAD,
+					SPI_NOR_CMD_PP_1_8_8_4B, kFLEXSPI_Command_RADDR_SDR,
+					kFLEXSPI_8PAD, addr_width);
+				flexspi_lut[PAGE_PROGRAM][1] = FLEXSPI_LUT_SEQ(
+					kFLEXSPI_Command_WRITE_SDR, kFLEXSPI_8PAD, 0x4,
+					kFLEXSPI_Command_STOP, kFLEXSPI_1PAD, 0x0);
+			} else {
+				/* Update LUT for page program with 1S-8S-8S command */
+				flexspi_lut[PAGE_PROGRAM][0] = FLEXSPI_LUT_SEQ(
+					kFLEXSPI_Command_SDR, kFLEXSPI_1PAD, SPI_NOR_CMD_PP_1_8_8,
+					kFLEXSPI_Command_RADDR_SDR, kFLEXSPI_8PAD, addr_width);
+				flexspi_lut[PAGE_PROGRAM][1] = FLEXSPI_LUT_SEQ(
+					kFLEXSPI_Command_WRITE_SDR, kFLEXSPI_8PAD, 0x4,
+					kFLEXSPI_Command_STOP, kFLEXSPI_1PAD, 0x0);
+			}
 			return 0;
 		}
 	}
@@ -1272,9 +1342,11 @@ static int flash_flexspi_nor_check_jedec(struct flash_flexspi_nor_data *data,
 	case 0x16609d: /* IS25LP032 */
 	case 0x17609d: /* IS25LP064 */
 	case 0x18609d: /* IS25LP128 */
+	case 0x19609d: /* IS25LP256 */
 	case 0x16709d: /* IS25WP032 */
 	case 0x17709d: /* IS25WP064 */
 	case 0x18709d: /* IS25WP128 */
+	case 0x19709d: /* IS25WP256 */
 		/*
 		 * We can support this flash with the JEDEC probe, but we need to
 		 * ensure Dummy Cycles are at the default value
@@ -1291,6 +1363,7 @@ static int flash_flexspi_nor_check_jedec(struct flash_flexspi_nor_data *data,
 		}
 		/* Still return an error- we want the JEDEC configuration to run */
 		return -ENOTSUP;
+	case 0x1940ef: /* W25Q256JV-IQ/IN flash, uses identical LUT than W25Q512JV*/
 	case 0x2040ef:
 		/* W25Q512JV-IQ/IN flash, use 4 byte read/write */
 		flexspi_lut[READ][0] = FLEXSPI_LUT_SEQ(
@@ -1769,8 +1842,9 @@ static DEVICE_API(flash, flash_flexspi_nor_api) = {
 			.pages_size = SPI_NOR_SECTOR_SIZE,		\
 		},))							\
 		.flash_parameters = {					\
-			.write_block_size = DT_INST_PROP_OR(n,		\
-				write_block_size, NOR_WRITE_SIZE),	\
+			.write_block_size = DT_PROP(			\
+				FLEXSPI_NOR_SOC_NV_FLASH_NODE(n),\
+				write_block_size),		\
 			.erase_value = NOR_ERASE_VALUE,			\
 		},							\
 	};								\

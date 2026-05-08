@@ -15,6 +15,7 @@ import threading
 import time
 import xml.etree.ElementTree as ET
 from collections import OrderedDict
+from dataclasses import asdict
 from enum import Enum
 from string import Template
 
@@ -24,10 +25,12 @@ from pytest import ExitCode
 from twisterlib.constants import SUPPORTED_SIMS_IN_PYTEST
 from twisterlib.environment import PYTEST_PLUGIN_INSTALLED, ZEPHYR_BASE
 from twisterlib.error import ConfigurationError, StatusAttributeError
-from twisterlib.handlers import Handler, terminate_process
+from twisterlib.handlers import DeviceHandler, Handler, terminate_process
+from twisterlib.harnessconfig import TWISTER_PYTEST_CONFIG_FILE, HarnessPytestConfig
 from twisterlib.reports import ReportStatus
 from twisterlib.statuses import TwisterStatus
 from twisterlib.testinstance import TestInstance
+from twisterlib.testsuitedata import HarnessConfig
 
 logger = logging.getLogger('twister')
 
@@ -376,8 +379,9 @@ class Pytest(Harness):
         self.source_dir = instance.testsuite.source_dir
         self.report_file = os.path.join(self.running_dir, 'report.xml')
         self.pytest_log_file_path = os.path.join(self.running_dir, 'twister_harness.log')
-        self.reserved_dut = None
         self._output = []
+        self.pytest_config_file = os.path.join(self.running_dir, TWISTER_PYTEST_CONFIG_FILE)
+        self.pytest_params = HarnessPytestConfig(platform=instance.platform.name)
 
     def pytest_run(self, timeout):
         try:
@@ -390,131 +394,87 @@ class Pytest(Harness):
         finally:
             self.instance.record(self.recording)
             self._update_test_status()
-            if self.reserved_dut:
-                self.instance.handler.make_dut_available(self.reserved_dut)
 
     def generate_command(self):
-        config = self.instance.testsuite.harness_config
+        config: HarnessConfig = self.instance.testsuite.harness_config
         handler: Handler = self.instance.handler
-        pytest_root = config.get('pytest_root', ['pytest']) if config else ['pytest']
-        pytest_args_yaml = config.get('pytest_args', []) if config else []
-        pytest_dut_scope = config.get('pytest_dut_scope', None) if config else None
         command = [
-            'pytest',
-            '--twister-harness',
-            '-s', '-v',
-            f'--build-dir={self.running_dir}',
+            'pytest', '-s', '-v',
+            '--log-cli-level=DEBUG',
+            '--log-cli-format=%(levelname)s: %(message)s',
             f'--junit-xml={self.report_file}',
-            f'--platform={self.instance.platform.name}'
+            f'--twister-config={self.pytest_config_file}'
         ]
 
-        command.extend([os.path.normpath(os.path.join(
-            self.source_dir, os.path.expanduser(os.path.expandvars(src)))) for src in pytest_root])
+        if config.pytest_dut_scope:
+            command.append(f'--dut-scope={config.pytest_dut_scope}')
 
-        if pytest_dut_scope:
-            command.append(f'--dut-scope={pytest_dut_scope}')
+        command.extend(
+            [
+                os.path.normpath(
+                    os.path.join(self.source_dir, os.path.expanduser(os.path.expandvars(src)))
+                )
+                for src in config.pytest_root
+            ]
+        )
 
-        # Always pass output from the pytest test and the test image up to Twister log.
-        command.extend([
-            '--log-cli-level=DEBUG',
-            '--log-cli-format=%(levelname)s: %(message)s'
-        ])
+        self.pytest_params.device_type = self._get_pytest_device_type(handler.type_str)
 
         # Use the test timeout as the base timeout for pytest
         base_timeout = handler.get_test_timeout()
-        command.append(f'--base-timeout={base_timeout}')
+        self.pytest_params.base_timeout = base_timeout
 
         if handler.type_str == 'device':
-            command.extend(
-                self._generate_parameters_for_hardware(handler)
-            )
-        elif handler.type_str in SUPPORTED_SIMS_IN_PYTEST:
-            command.append(f'--device-type={handler.type_str}')
-        elif handler.type_str == 'build':
-            command.append('--device-type=custom')
+            self._generate_parameters_for_hardware(handler)
         else:
-            raise PytestHarnessException(
-                f'Support for handler {handler.type_str} not implemented yet'
-            )
-
-        for req_build in self.instance.required_build_dirs:
-            command.append(f'--required-build={req_build}')
-
-        if handler.type_str != 'device':
             for fixture in handler.options.fixture:
-                command.append(f'--twister-fixture={fixture}')
+                self.pytest_params.twister_fixtures.append(fixture)
+
+        self.pytest_params.duts = self.instance.reserved_duts
+        self.pytest_params.required_builds = self.instance.required_build_dirs
 
         if handler.options.extra_test_args and handler.type_str == 'native':
-            command.append(f'--extra-test-args={shlex.join(handler.options.extra_test_args)}')
+            self.pytest_params.extra_test_args = shlex.join(handler.options.extra_test_args)
 
-        command.extend(pytest_args_yaml)
-
+        # Add any additional pytest args from YAML or CLI
+        command.extend(config.pytest_args)
         if handler.options.pytest_args:
             command.extend(handler.options.pytest_args)
 
+        # Save test parameters to YAML file for pytest-harness
+        self.pytest_params.save_to_yaml(self.pytest_config_file)
+
         return command
 
-    def _generate_parameters_for_hardware(self, handler: Handler):
-        command = ['--device-type=hardware']
-        hardware = handler.get_hardware()
-        if not hardware:
-            raise PytestHarnessException('Hardware is not available')
-        # update the instance with the device id to have it in the summary report
-        self.instance.dut = hardware.id
-
-        self.reserved_dut = hardware
-        if hardware.serial_pty:
-            command.append(f'--device-serial-pty={hardware.serial_pty}')
+    def _get_pytest_device_type(self, handler_name: str) -> str:
+        """Map handler name to pytest device type."""
+        if handler_name == 'device':
+            return 'hardware'
+        elif handler_name in SUPPORTED_SIMS_IN_PYTEST:
+            return handler_name
+        elif handler_name == 'build':
+            return 'custom'
         else:
-            command.extend([
-                f'--device-serial={hardware.serial}',
-                f'--device-serial-baud={hardware.serial_baud}'
-            ])
-            for extra_serial in handler.get_more_serials_from_device(hardware):
-                command.append(f'--device-serial={extra_serial}')
+            raise PytestHarnessException(
+                f'Support for handler {handler_name} not implemented yet'
+            )
 
-        if hardware.flash_timeout:
-            command.append(f'--flash-timeout={hardware.flash_timeout}')
-
+    def _generate_parameters_for_hardware(self, handler: DeviceHandler):
         options = handler.options
-        if runner := hardware.runner or options.west_runner:
-            command.append(f'--runner={runner}')
-
-        if hardware.runner_params:
-            for param in hardware.runner_params:
-                command.append(f'--runner-params={param}')
+        if options.west_runner:
+            self.pytest_params.runner = options.west_runner
 
         if options.west_flash and options.west_flash != []:
-            command.append(f'--west-flash-extra-args={options.west_flash}')
+            self.pytest_params.west_flash_extra_args = str(options.west_flash)
+
+        if options.west_flash_cmd:
+            self.pytest_params.west_flash_cmd = options.west_flash_cmd
 
         if options.flash_command:
-            command.append(f'--flash-command={options.flash_command}')
+            self.pytest_params.flash_command = str(options.flash_command)
 
-        if board_id := hardware.probe_id or hardware.id:
-            command.append(f'--device-id={board_id}')
-
-        if hardware.product:
-            command.append(f'--device-product={hardware.product}')
-
-        if hardware.pre_script:
-            command.append(f'--pre-script={hardware.pre_script}')
-
-        if hardware.post_flash_script:
-            command.append(f'--post-flash-script={hardware.post_flash_script}')
-
-        if hardware.post_script:
-            command.append(f'--post-script={hardware.post_script}')
-
-        # Check flash_before from both hardware map and platform (board YAML)
         # Platform flash_before is intended for boards with USB reset issues during flashing
-        flash_before = hardware.flash_before or self.instance.platform.flash_before
-        if flash_before:
-            command.append(f'--flash-before={flash_before}')
-
-        for fixture in hardware.fixtures:
-            command.append(f'--twister-fixture={fixture}')
-
-        return command
+        self.pytest_params.flash_before = self.instance.platform.flash_before
 
     def run_command(self, cmd, timeout):
         cmd, env = self._update_command_with_env_dependencies(cmd)
@@ -684,7 +644,7 @@ class Shell(Pytest):
         if shell_commands := harness_config.get('shell_commands'):
             test_shell_file = os.path.join(self.running_dir, 'test_shell.yml')
             with open(test_shell_file, 'w') as f:
-                yaml.dump(shell_commands, f)
+                yaml.dump([asdict(cmd) for cmd in shell_commands], f)
             return test_shell_file
 
         test_shell_file = harness_config.get('shell_commands_file', 'test_shell.yml')
@@ -711,7 +671,10 @@ class Power(Pytest):
 class Gtest(Harness):
     ANSI_ESCAPE = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
     _NAME_PATTERN = "[a-zA-Z_][a-zA-Z0-9_]*"
-    _SUITE_TEST_NAME_PATTERN = f"(?P<suite_name>{_NAME_PATTERN})\\.(?P<test_name>{_NAME_PATTERN})"
+    _SUITE_TEST_NAME_PATTERN = (
+            f"(?P<suite_name>{_NAME_PATTERN})(\\.|/)(?P<test_name>"
+            f"{_NAME_PATTERN})(/)?(?P<parametrized_test>[0-9]*\\.[a-zA-Z_]*)?"
+            )
     TEST_START_PATTERN = f".*\\[ RUN      \\] {_SUITE_TEST_NAME_PATTERN}"
     TEST_PASS_PATTERN = f".*\\[       OK \\] {_SUITE_TEST_NAME_PATTERN}"
     TEST_SKIP_PATTERN = f".*\\[ DISABLED \\] {_SUITE_TEST_NAME_PATTERN}"
@@ -743,6 +706,8 @@ class Gtest(Harness):
 
             # Generate the internal name of the test
             name = "{}.{}.{}".format(self.id, suite_name, test_start_match.group("test_name"))
+            if test_start_match.group("parametrized_test"):
+                name += f".{test_start_match.group('parametrized_test')}"
 
             # Assert that we don't already have a running test
             assert (
@@ -798,25 +763,31 @@ class Gtest(Harness):
     def _check_result(self, line):
         test_pass_match = re.search(self.TEST_PASS_PATTERN, line)
         if test_pass_match:
-            return TwisterStatus.PASS, \
-                   "{}.{}.{}".format(
+            test_name = "{}.{}.{}".format(
                         self.id, test_pass_match.group("suite_name"),
                         test_pass_match.group("test_name")
                     )
+            if test_pass_match.group("parametrized_test"):
+                test_name += f".{test_pass_match.group('parametrized_test')}"
+            return TwisterStatus.PASS, test_name
         test_skip_match = re.search(self.TEST_SKIP_PATTERN, line)
         if test_skip_match:
-            return TwisterStatus.SKIP, \
-                   "{}.{}.{}".format(
-                       self.id, test_skip_match.group("suite_name"),
-                       test_skip_match.group("test_name")
+            test_name = "{}.{}.{}".format(
+                        self.id, test_skip_match.group("suite_name"),
+                        test_skip_match.group("test_name")
                     )
+            if test_skip_match.group("parametrized_test"):
+                test_name += f".{test_skip_match.group('parametrized_test')}"
+            return TwisterStatus.SKIP, test_name
         test_fail_match = re.search(self.TEST_FAIL_PATTERN, line)
         if test_fail_match:
-            return TwisterStatus.FAIL, \
-                   "{}.{}.{}".format(
-                       self.id, test_fail_match.group("suite_name"),
-                       test_fail_match.group("test_name")
+            test_name = "{}.{}.{}".format(
+                        self.id, test_fail_match.group("suite_name"),
+                        test_fail_match.group("test_name")
                     )
+            if test_fail_match.group("parametrized_test"):
+                test_name += f".{test_fail_match.group('parametrized_test')}"
+            return TwisterStatus.FAIL, test_name
         return None, None
 
 

@@ -22,6 +22,7 @@
 #include <zephyr/fff.h>
 #include <zephyr/sys/slist.h>
 #include <zephyr/sys/util.h>
+#include <zephyr/toolchain.h>
 #include <zephyr/ztest_assert.h>
 #include <zephyr/ztest_test.h>
 #include <sys/errno.h>
@@ -335,9 +336,11 @@ static bool unicast_group_foreach_stream_cb(struct bt_cap_stream *cap_stream, vo
 {
 	size_t *cnt = user_data;
 
+	ARG_UNUSED(cap_stream);
+
 	(*cnt)++;
 
-	return false;
+	return true;
 }
 
 static ZTEST_F(cap_initiator_test_unicast_group, test_initiator_unicast_group_foreach_stream)
@@ -371,9 +374,11 @@ static bool unicast_group_foreach_stream_return_early_cb(struct bt_cap_stream *s
 {
 	size_t *cnt = user_data;
 
+	ARG_UNUSED(stream);
+
 	(*cnt)++;
 
-	return true;
+	return false;
 }
 
 static ZTEST_F(cap_initiator_test_unicast_group,

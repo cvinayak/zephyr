@@ -553,9 +553,9 @@ static void fifo_work_handler(struct k_work *work)
 
 static void mspi_dw_isr(const struct device *dev)
 {
-#if defined(CONFIG_MSPI_DMA)
-	struct mspi_dw_data *dev_data = dev->data;
+	struct mspi_dw_data __maybe_unused *dev_data = dev->data;
 
+#if defined(CONFIG_MSPI_DMA)
 	if (dev_data->xfer.xfer_mode == MSPI_DMA) {
 		if (vendor_specific_read_dma_irq(dev)) {
 			set_imr(dev, 0);
@@ -567,7 +567,6 @@ static void mspi_dw_isr(const struct device *dev)
 #endif
 
 #if defined(CONFIG_MSPI_DW_HANDLE_FIFOS_IN_SYSTEM_WORKQUEUE)
-	struct mspi_dw_data *dev_data = dev->data;
 	int rc;
 
 	dev_data->imr = read_imr(dev);
@@ -663,6 +662,8 @@ static bool apply_io_mode(struct mspi_dw_data *dev_data,
 
 static bool apply_cmd_length(struct mspi_dw_data *dev_data, uint32_t cmd_length)
 {
+	dev_data->spi_ctrlr0 &= ~SPI_CTRLR0_INST_L_MASK;
+
 	switch (cmd_length) {
 	case 0:
 		dev_data->spi_ctrlr0 |= FIELD_PREP(SPI_CTRLR0_INST_L_MASK,
@@ -692,6 +693,7 @@ static bool apply_addr_length(struct mspi_dw_data *dev_data,
 		return false;
 	}
 
+	dev_data->spi_ctrlr0 &= ~SPI_CTRLR0_ADDR_L_MASK;
 	dev_data->spi_ctrlr0 |= FIELD_PREP(SPI_CTRLR0_ADDR_L_MASK,
 					   addr_length * 2);
 
@@ -1147,8 +1149,6 @@ static int start_next_packet(const struct device *dev)
 			--data_frames;
 		}
 
-		dev_data->spi_ctrlr0 &= ~SPI_CTRLR0_ADDR_L_MASK;
-
 		if (!apply_addr_length(dev_data, addr_length)) {
 			return -EINVAL;
 		}
@@ -1489,14 +1489,6 @@ static int _api_transceive(const struct device *dev,
 	struct mspi_dw_data *dev_data = dev->data;
 	int rc;
 
-	dev_data->spi_ctrlr0 &= ~SPI_CTRLR0_INST_L_MASK
-			     &  ~SPI_CTRLR0_ADDR_L_MASK;
-
-	if (!apply_cmd_length(dev_data, req->cmd_length) ||
-	    !apply_addr_length(dev_data, req->addr_length)) {
-		return -EINVAL;
-	}
-
 	if (dev_data->standard_spi) {
 		if (req->tx_dummy) {
 			LOG_ERR("TX dummy cycles unsupported in single line mode");
@@ -1511,6 +1503,24 @@ static int _api_transceive(const struct device *dev,
 		LOG_ERR("Unsupported RX (%u) or TX (%u) dummy cycles",
 			req->rx_dummy, req->tx_dummy);
 		return -EINVAL;
+	}
+
+	/* In PIO mode, the SPI_CTRLR0 register is intended for enhanced SPI modes only,
+	 * however some implementations continue to process the INST_L and ADDR_L
+	 * fields in standard mode. On those platforms the controller sends its own
+	 * instruction/address phase in addition to what the driver sends. This results
+	 * in a malformed SPI transaction with extra bytes on the wire. Mask these
+	 * fields to ensure this does not happen.
+	 */
+	if (!(IS_ENABLED(CONFIG_MSPI_DMA) && req->xfer_mode == MSPI_DMA) &&
+	    dev_data->standard_spi) {
+		dev_data->spi_ctrlr0 &= ~SPI_CTRLR0_INST_L_MASK
+				     &  ~SPI_CTRLR0_ADDR_L_MASK;
+	} else {
+		if (!apply_cmd_length(dev_data, req->cmd_length) ||
+		    !apply_addr_length(dev_data, req->addr_length)) {
+			return -EINVAL;
+		}
 	}
 
 	dev_data->xfer = *req;

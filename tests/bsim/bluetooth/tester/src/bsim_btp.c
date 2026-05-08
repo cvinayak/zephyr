@@ -1670,6 +1670,8 @@ static bool is_valid_tbs_packet_len(const struct btp_hdr *hdr, struct net_buf_si
 		return buf_simple->len == 0U;
 	case BTP_TBS_SET_SIGNAL_STRENGTH:
 		return buf_simple->len == 0U;
+	case BTP_TBS_REGISTER_BEARER:
+		return buf_simple->len == sizeof(struct btp_tbs_register_bearer_rp);
 
 	/* No events */
 	default:
@@ -1729,8 +1731,15 @@ static bool is_valid_pbp_packet_len(const struct btp_hdr *hdr, struct net_buf_si
 
 	/* events */
 	case BTP_PBP_EV_PUBLIC_BROADCAST_ANNOUNCEMENT_FOUND:
-		return buf_simple->len ==
-		       sizeof(struct btp_pbp_ev_public_broadcast_announcement_found_ev);
+		if (hdr->len >= sizeof(struct btp_pbp_ev_public_broadcast_announcement_found_ev)) {
+			const struct btp_pbp_ev_public_broadcast_announcement_found_ev *ev;
+
+			ev = net_buf_simple_pull_mem(buf_simple, sizeof(*ev));
+
+			return ev->broadcast_name_len == buf_simple->len;
+		} else {
+			return false;
+		}
 	default:
 		LOG_ERR("Unhandled opcode 0x%02X", hdr->opcode);
 		return false;

@@ -13,8 +13,12 @@
 #include <zephyr/dt-bindings/pinctrl/bl60x-pinctrl.h>
 #elif defined(CONFIG_SOC_SERIES_BL61X)
 #include <zephyr/dt-bindings/pinctrl/bl61x-pinctrl.h>
+#elif defined(CONFIG_SOC_SERIES_BL808)
+#include <zephyr/dt-bindings/pinctrl/bl808-pinctrl.h>
 #elif defined(CONFIG_SOC_SERIES_BL70X)
 #include <zephyr/dt-bindings/pinctrl/bl70x-pinctrl.h>
+#elif defined(CONFIG_SOC_SERIES_BL70XL)
+#include <zephyr/dt-bindings/pinctrl/bl70xl-pinctrl.h>
 #else
 #error "Unsupported Platform"
 #endif

@@ -4,25 +4,6 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-include(${ZEPHYR_BASE}/boards/common/xsdb.board.cmake)
-set(SUPPORTED_EMU_PLATFORMS qemu)
-set(QEMU_ARCH xilinx-aarch64)
-set(QEMU_CPU_TYPE_${ARCH} cortexa78)
-
-set(QEMU_FLAGS_${ARCH}
-  -machine arm-generic-fdt
-  -hw-dtb ${PROJECT_BINARY_DIR}/${BOARD}-qemu.dtb
-  -device loader,addr=0xEC200300,data=0x3EE,data-len=4
-  -device loader,addr=0xEC200300,data=0x3EE,data-len=4
-  -nographic
-  -m 2g
-)
-
-# Add SMP support if configured maxcpus parameter value is aligned with QEMU DT
-if(CONFIG_SMP AND CONFIG_MP_MAX_NUM_CPUS GREATER 1)
-  list(APPEND QEMU_SMP_FLAGS -smp maxcpus=20)
-endif()
-
 # Set TF-A platform for ARM Trusted Firmware builds
 if(CONFIG_BUILD_WITH_TFA)
   set(TFA_PLAT "versal_net")
@@ -36,9 +17,8 @@ if(CONFIG_BUILD_WITH_TFA)
   else()
     set(BUILD_FOLDER "release")
   endif()
+  set(XSDB_BL31_PATH ${PROJECT_BINARY_DIR}/../tfa/versal_net/${BUILD_FOLDER}/bl31/bl31.elf)
+  board_runner_args(xsdb "--bl31=${XSDB_BL31_PATH}")
 endif()
 
-set(QEMU_KERNEL_OPTION
-  -device loader,cpu-num=0,file=${PROJECT_BINARY_DIR}/../tfa/versal_net/${BUILD_FOLDER}/bl31/bl31.elf
-  -device loader,file=\$<TARGET_FILE:\${logical_target_for_zephyr_elf}>
-)
+include(${ZEPHYR_BASE}/boards/common/xsdb.board.cmake)

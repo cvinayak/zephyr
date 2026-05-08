@@ -200,7 +200,7 @@ config NET_LOOPBACK_SIMULATE_PACKET_DROP
 
 config NET_LOOPBACK_MTU
 	int "MTU for loopback interface"
-	default 576
+	default 1500
 	help
 	  This option sets the MTU for loopback interface.
 
@@ -249,6 +249,7 @@ menuconfig NET_NATIVE_OFFLOADED_SOCKETS
 	depends on ARCH_POSIX
 	depends on NET_SOCKETS_OFFLOAD
 	select NATIVE_USE_NSI_ERRNO
+	select NATIVE_USE_NSI_FCNTL
 	help
 	  Offloaded sockets for Native Simulator utilize host BSD sockets API (like socket(),
 	  connect(), send(), recvfrom(), etc.) in order to provide networking capability.

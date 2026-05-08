@@ -17,7 +17,24 @@
 };
 
 &flash0 {
-	reg = <0x00000000 DT_SIZE_K(512)>;
+	reg = <0x0 DT_SIZE_K(512)>;
+	ranges = <0x0 0x0 DT_SIZE_K(512)>;
+};
+
+&gpioa {
+	ngpios = <9>;
+};
+
+&gpiob {
+	ngpios = <5>;
+};
+
+&gpioc {
+	ngpios = <7>;
+};
+
+&gpiod {
+	ngpios = <4>;
 };
 
 &hfxo {

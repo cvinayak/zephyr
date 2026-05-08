@@ -153,7 +153,7 @@ static int i2c_stm32_transfer(const struct device *dev, struct i2c_msg *msgs,
 	/*
 	 * If a message has no STOP flag and next has no RESTART flag, set private flag
 	 * I2C_MSG_STM32_USE_RELOAD_MODE in message flag to force STM32 v2 driver to enable
-	 * reload mode for the message so that there is no Stop or Start conditions emited
+	 * reload mode for the message so that there is no Stop or Start conditions emitted
 	 * in between. This means that flags shall not be used by the generic I2C framework.
 	 */
 	if ((msgs[0].flags & I2C_MSG_STM32_USE_RELOAD_MODE) != 0U) {
@@ -232,11 +232,6 @@ static int i2c_stm32_init(const struct device *dev)
 
 	i2c_rtio_init(data->ctx, dev);
 
-	if (!device_is_ready(clk)) {
-		LOG_ERR("clock control device not ready");
-		return -ENODEV;
-	}
-
 	i2c_stm32_activate(dev);
 
 	if (IS_ENABLED(I2C_STM32_DOMAIN_CLOCK_SUPPORT) && (cfg->pclk_len > 1)) {
@@ -252,7 +247,7 @@ static int i2c_stm32_init(const struct device *dev)
 #if defined(CONFIG_SOC_SERIES_STM32F1X)
 	/*
 	 * Force i2c reset for STM32F1 series.
-	 * So that they can enter master mode properly.
+	 * So that they can enter controller mode properly.
 	 * Issue described in ES096 2.14.7
 	 */
 	I2C_TypeDef *i2c = cfg->i2c;

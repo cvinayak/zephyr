@@ -18,6 +18,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/net/http/service.h>
 #include <zephyr/net/net_ip.h>
+#include <zephyr/net/net_log.h>
 #include <zephyr/net/socket.h>
 #include <zephyr/net/tls_credentials.h>
 #include <zephyr/zvfs/eventfd.h>
@@ -28,6 +29,9 @@ LOG_MODULE_REGISTER(net_http_server, CONFIG_NET_HTTP_SERVER_LOG_LEVEL);
 
 #include "../../ip/net_private.h"
 #include "headers/server_internal.h"
+
+BUILD_ASSERT(CONFIG_HTTP_SERVER_VERSION > 0,
+	     "HTTP server requires at least HTTP/1.x or HTTP/2 support");
 
 #if defined(CONFIG_NET_TC_THREAD_COOPERATIVE)
 /* Lowest priority cooperative thread */
@@ -182,13 +186,6 @@ int http_server_init(struct http_server_ctx *ctx)
 			if (zsock_setsockopt(fd, ZSOCK_SOL_TLS, ZSOCK_TLS_SEC_TAG_LIST,
 					     svc->sec_tag_list,
 					     svc->sec_tag_list_size) < 0) {
-				LOG_ERR("setsockopt: %d", errno);
-				zsock_close(fd);
-				continue;
-			}
-
-			if (zsock_setsockopt(fd, ZSOCK_SOL_TLS, ZSOCK_TLS_HOSTNAME, "localhost",
-					     sizeof("localhost")) < 0) {
 				LOG_ERR("setsockopt: %d", errno);
 				zsock_close(fd);
 				continue;
@@ -461,11 +458,13 @@ static int handle_http_preface(struct http_client_ctx *client)
 		client->header_capture_ctx.status = HTTP_HEADER_STATUS_OK;
 	}
 
-	if (strncmp(client->cursor, HTTP2_PREFACE, sizeof(HTTP2_PREFACE) - 1) != 0) {
+	if (IS_ENABLED(CONFIG_HTTP_SERVER_VERSION_1) &&
+	    strncmp(client->cursor, HTTP2_PREFACE, sizeof(HTTP2_PREFACE) - 1) != 0) {
 		return enter_http1_request(client);
 	}
 
-	return enter_http2_request(client);
+	return IS_ENABLED(CONFIG_HTTP_SERVER_VERSION_2) ?
+		enter_http2_request(client) : -ENOTSUP;
 }
 
 static int handle_http_done(struct http_client_ctx *client)
@@ -495,40 +494,51 @@ static int handle_http_request(struct http_client_ctx *client)
 	do {
 		switch (client->server_state) {
 		case HTTP_SERVER_FRAME_DATA_STATE:
-			ret = handle_http_frame_data(client);
+			ret = IS_ENABLED(CONFIG_HTTP_SERVER_VERSION_2) ?
+				handle_http_frame_data(client) : -ENOTSUP;
 			break;
 		case HTTP_SERVER_PREFACE_STATE:
 			ret = handle_http_preface(client);
 			break;
 		case HTTP_SERVER_REQUEST_STATE:
-			ret = handle_http1_request(client);
+			ret = IS_ENABLED(CONFIG_HTTP_SERVER_VERSION_1) ?
+				handle_http1_request(client) : -ENOTSUP;
 			break;
 		case HTTP_SERVER_FRAME_HEADER_STATE:
-			ret = handle_http_frame_header(client);
+			ret = IS_ENABLED(CONFIG_HTTP_SERVER_VERSION_2) ?
+				handle_http_frame_header(client) : -ENOTSUP;
 			break;
 		case HTTP_SERVER_FRAME_HEADERS_STATE:
-			ret = handle_http_frame_headers(client);
+			ret = IS_ENABLED(CONFIG_HTTP_SERVER_VERSION_2) ?
+				handle_http_frame_headers(client) : -ENOTSUP;
 			break;
 		case HTTP_SERVER_FRAME_CONTINUATION_STATE:
-			ret = handle_http_frame_continuation(client);
+			ret = IS_ENABLED(CONFIG_HTTP_SERVER_VERSION_2) ?
+				handle_http_frame_continuation(client) : -ENOTSUP;
 			break;
 		case HTTP_SERVER_FRAME_SETTINGS_STATE:
-			ret = handle_http_frame_settings(client);
+			ret = IS_ENABLED(CONFIG_HTTP_SERVER_VERSION_2) ?
+				handle_http_frame_settings(client) : -ENOTSUP;
 			break;
 		case HTTP_SERVER_FRAME_WINDOW_UPDATE_STATE:
-			ret = handle_http_frame_window_update(client);
+			ret = IS_ENABLED(CONFIG_HTTP_SERVER_VERSION_2) ?
+				handle_http_frame_window_update(client) : -ENOTSUP;
 			break;
 		case HTTP_SERVER_FRAME_RST_STREAM_STATE:
-			ret = handle_http_frame_rst_stream(client);
+			ret = IS_ENABLED(CONFIG_HTTP_SERVER_VERSION_2) ?
+				handle_http_frame_rst_stream(client) : -ENOTSUP;
 			break;
 		case HTTP_SERVER_FRAME_GOAWAY_STATE:
-			ret = handle_http_frame_goaway(client);
+			ret = IS_ENABLED(CONFIG_HTTP_SERVER_VERSION_2) ?
+				handle_http_frame_goaway(client) : -ENOTSUP;
 			break;
 		case HTTP_SERVER_FRAME_PRIORITY_STATE:
-			ret = handle_http_frame_priority(client);
+			ret = IS_ENABLED(CONFIG_HTTP_SERVER_VERSION_2) ?
+				handle_http_frame_priority(client) : -ENOTSUP;
 			break;
 		case HTTP_SERVER_FRAME_PADDING_STATE:
-			ret = handle_http_frame_padding(client);
+			ret = IS_ENABLED(CONFIG_HTTP_SERVER_VERSION_2) ?
+				handle_http_frame_padding(client) : -ENOTSUP;
 			break;
 		case HTTP_SERVER_DONE_STATE:
 			ret = handle_http_done(client);

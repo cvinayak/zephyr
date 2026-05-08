@@ -7,6 +7,7 @@
  */
 
 #include <errno.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
@@ -14,6 +15,7 @@
 
 #include <zephyr/autoconf.h>
 #include <zephyr/bluetooth/addr.h>
+#include <zephyr/bluetooth/assigned_numbers.h>
 #include <zephyr/bluetooth/audio/audio.h>
 #include <zephyr/bluetooth/audio/bap.h>
 #include <zephyr/bluetooth/audio/cap.h>
@@ -36,9 +38,9 @@
 
 LOG_MODULE_REGISTER(cap_acceptor_broadcast, LOG_LEVEL_INF);
 
-#define NAME_LEN                          sizeof(CONFIG_SAMPLE_TARGET_BROADCAST_NAME) + 1
-#define PA_SYNC_INTERVAL_TO_TIMEOUT_RATIO 20 /* Set the timeout relative to interval */
-#define PA_SYNC_SKIP                      5
+#define NAME_LEN                          sizeof(CONFIG_SAMPLE_TARGET_BROADCAST_NAME) + 1U
+#define PA_SYNC_INTERVAL_TO_TIMEOUT_RATIO 20U /* Set the timeout relative to interval */
+#define PA_SYNC_SKIP                      5U
 
 enum broadcast_flag {
 	FLAG_BROADCAST_SYNC_REQUESTED,
@@ -260,7 +262,7 @@ static void sink_started_cb(struct bt_bap_broadcast_sink *sink)
 	LOG_INF("Broadcast sink started");
 
 	/* Clear requested BIS sync */
-	broadcast_sink.requested_bis_sync = 0;
+	broadcast_sink.requested_bis_sync = 0U;
 	atomic_clear_bit(flags, FLAG_BROADCAST_SYNC_REQUESTED);
 }
 
@@ -601,7 +603,6 @@ static bool scan_check_and_sync_broadcast(struct bt_data *data, void *user_data)
 {
 	const struct bt_le_scan_recv_info *info = user_data;
 	struct bt_le_per_adv_sync_param param = {0};
-	char le_addr[BT_ADDR_LE_STR_LEN];
 	struct bt_uuid_16 adv_uuid;
 	uint32_t broadcast_id;
 	int err;
@@ -624,10 +625,8 @@ static bool scan_check_and_sync_broadcast(struct bt_data *data, void *user_data)
 
 	broadcast_id = sys_get_le24(data->data + BT_UUID_SIZE_16);
 
-	bt_addr_le_to_str(info->addr, le_addr, sizeof(le_addr));
-
 	LOG_INF("Found broadcaster with ID 0x%06X and addr %s and sid 0x%02X\n", broadcast_id,
-		le_addr, info->sid);
+		bt_addr_le_str(info->addr), info->sid);
 
 	bt_addr_le_copy(&param.addr, info->addr);
 	param.options = BT_LE_PER_ADV_SYNC_OPT_FILTER_DUPLICATE;
@@ -665,7 +664,7 @@ static bool is_substring(const char *substr, const char *str)
 		return false;
 	}
 
-	for (size_t pos = 0; pos < str_len; pos++) {
+	for (size_t pos = 0U; pos < str_len; pos++) {
 		if (pos + sub_str_len > str_len) {
 			return false;
 		}

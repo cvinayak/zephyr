@@ -18,6 +18,8 @@
 #include "eth.h"
 #include "eth_stm32_hal_priv.h"
 
+#define DT_DRV_COMPAT st_stm32_ethernet
+
 LOG_MODULE_DECLARE(eth_stm32_hal, CONFIG_ETHERNET_LOG_LEVEL);
 
 #define ETH_DMA_TX_TIMEOUT_MS	20U  /* transmit timeout in milliseconds */
@@ -154,7 +156,7 @@ int eth_stm32_tx(const struct device *dev, struct net_pkt *pkt)
 	size_t remaining_read;
 	struct eth_stm32_tx_context *ctx = NULL;
 	struct eth_stm32_tx_buffer_header *buf_header = NULL;
-	HAL_StatusTypeDef hal_ret = HAL_OK;
+	HAL_StatusTypeDef hal_ret;
 
 #if defined(CONFIG_PTP_CLOCK_STM32_HAL)
 	bool timestamped_frame;
@@ -259,7 +261,7 @@ int eth_stm32_tx(const struct device *dev, struct net_pkt *pkt)
 	size_t remaining_read;
 	struct eth_stm32_tx_context *ctx = NULL;
 	struct eth_stm32_tx_buffer_header *buf_header = NULL;
-	HAL_StatusTypeDef hal_ret = HAL_OK;
+	HAL_StatusTypeDef hal_ret;
 #if defined(CONFIG_PTP_CLOCK_STM32_HAL)
 	bool timestamped_frame;
 #endif /* CONFIG_PTP_CLOCK_STM32_HAL */
@@ -582,7 +584,7 @@ int eth_stm32_hal_init(const struct device *dev)
 {
 	struct eth_stm32_hal_dev_data *dev_data = dev->data;
 	ETH_HandleTypeDef *heth = &dev_data->heth;
-	HAL_StatusTypeDef hal_ret = HAL_OK;
+	HAL_StatusTypeDef hal_ret;
 	__maybe_unused uint8_t *desc_uncached_addr;
 
 #if DT_HAS_COMPAT_STATUS_OKAY(st_stm32n6_ethernet)
@@ -605,16 +607,19 @@ int eth_stm32_hal_init(const struct device *dev)
 #endif
 
 	hal_ret = HAL_ETH_Init(heth);
-	if (hal_ret == HAL_TIMEOUT) {
-		/* HAL Init time out. This could be linked to */
-		/* a recoverable error. Log the issue and continue */
-		/* driver initialisation */
-		LOG_ERR("HAL_ETH_Init Timed out");
-	} else if (hal_ret != HAL_OK) {
+	if (hal_ret != HAL_OK) {
 		LOG_ERR("HAL_ETH_Init failed: %d", hal_ret);
 		return -EINVAL;
 	}
 
+#if defined(CONFIG_SOC_SERIES_STM32F4X) || defined(CONFIG_SOC_SERIES_STM32F7X)
+	/* Workaround for F4x and F7x as the HAL_ETH_Init function
+	 * does not set back the MDIO clock range after resetting
+	 * the MAC for these series.
+	 */
+	HAL_ETH_SetMDIOClockRange(heth);
+
+#endif /* CONFIG_SOC_SERIES_STM32F4X || CONFIG_SOC_SERIES_STM32F7X */
 #if defined(CONFIG_PTP_CLOCK_STM32_HAL)
 	/* Enable timestamping of RX packets. We enable all packets to be
 	 * timestamped to cover both IEEE 1588 and gPTP.
@@ -649,7 +654,7 @@ void eth_stm32_set_mac_config(const struct device *dev, struct phy_link_state *s
 {
 	struct eth_stm32_hal_dev_data *dev_data = dev->data;
 	ETH_HandleTypeDef *heth = &dev_data->heth;
-	HAL_StatusTypeDef hal_ret = HAL_OK;
+	HAL_StatusTypeDef hal_ret;
 	ETH_MACConfigTypeDef mac_config = {0};
 
 	hal_ret = HAL_ETH_GetMACConfig(heth, &mac_config);
@@ -707,11 +712,11 @@ void eth_stm32_setup_mac_filter(ETH_HandleTypeDef *heth)
 	k_sleep(K_MSEC(1));
 }
 
-int eth_stm32_hal_start(const struct device *dev)
+int eth_stm32_hal_start(const struct device *dev, struct net_if *iface __unused)
 {
 	struct eth_stm32_hal_dev_data *dev_data = dev->data;
 	ETH_HandleTypeDef *heth = &dev_data->heth;
-	HAL_StatusTypeDef hal_ret = HAL_OK;
+	HAL_StatusTypeDef hal_ret;
 
 	LOG_DBG("Starting ETH HAL driver");
 
@@ -724,11 +729,11 @@ int eth_stm32_hal_start(const struct device *dev)
 	return 0;
 }
 
-int eth_stm32_hal_stop(const struct device *dev)
+int eth_stm32_hal_stop(const struct device *dev, struct net_if *iface __unused)
 {
 	struct eth_stm32_hal_dev_data *dev_data = dev->data;
 	ETH_HandleTypeDef *heth = &dev_data->heth;
-	HAL_StatusTypeDef hal_ret = HAL_OK;
+	HAL_StatusTypeDef hal_ret;
 
 	LOG_DBG("Stopping ETH HAL driver");
 
@@ -743,8 +748,9 @@ int eth_stm32_hal_stop(const struct device *dev)
 }
 
 int eth_stm32_hal_set_config(const struct device *dev,
-				    enum ethernet_config_type type,
-				    const struct ethernet_config *config)
+			     struct net_if *iface __unused,
+			     enum ethernet_config_type type,
+			     const struct ethernet_config *config)
 {
 	struct eth_stm32_hal_dev_data *dev_data = dev->data;
 	ETH_HandleTypeDef *heth = &dev_data->heth;
@@ -758,9 +764,6 @@ int eth_stm32_hal_set_config(const struct device *dev,
 			(dev_data->mac_addr[2] << 16) |
 			(dev_data->mac_addr[1] << 8) |
 			dev_data->mac_addr[0];
-		net_if_set_link_addr(dev_data->iface, dev_data->mac_addr,
-				     sizeof(dev_data->mac_addr),
-				     NET_LINK_ETHERNET);
 		return 0;
 #if defined(CONFIG_NET_PROMISCUOUS_MODE)
 	case ETHERNET_CONFIG_TYPE_PROMISC_MODE:

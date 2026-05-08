@@ -16,12 +16,14 @@
 #include <string.h>
 
 #include <zephyr/autoconf.h>
+#include <zephyr/bluetooth/assigned_numbers.h>
 #include <zephyr/bluetooth/audio/audio.h>
 #include <zephyr/bluetooth/hci_types.h>
 #include <zephyr/bluetooth/iso.h>
 #include <zephyr/device.h>
 #include <zephyr/devicetree.h>
 #include <zephyr/kernel.h>
+#include <zephyr/kernel/thread_stack.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/logging/log_core.h>
 #include <zephyr/net_buf.h>
@@ -42,9 +44,6 @@
 #include "hw_codec.h"
 
 LOG_MODULE_REGISTER(lc3, CONFIG_LOG_DEFAULT_LEVEL);
-
-#define LC3_ENCODER_STACK_SIZE 4096
-#define LC3_ENCODER_PRIORITY   5
 
 struct lc3_data {
 	void *fifo_reserved; /* 1st word reserved for use by FIFO */
@@ -259,11 +258,11 @@ static void do_lc3_decode(struct lc3_data *data)
 		const uint8_t frame_blocks_per_sdu = stream->lc3_frame_blocks_per_sdu;
 		size_t frame_cnt;
 
-		frame_cnt = 0;
+		frame_cnt = 0U;
 		for (uint8_t i = 0U; i < frame_blocks_per_sdu; i++) {
 			const size_t decoded_frames = decode_frame_block(data, frame_cnt);
 
-			if (decoded_frames == 0) {
+			if (decoded_frames == 0U) {
 				break;
 			}
 

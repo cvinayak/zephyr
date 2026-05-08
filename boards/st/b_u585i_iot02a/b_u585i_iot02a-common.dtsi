@@ -152,6 +152,7 @@ stm32_lp_tick_source: &lptim1 {
 		fixed-latency;
 		burst-length = <3>;
 		st,csbound = <10>;
+		st,refresh = <320>;
 		status = "okay";
 	};
 };
@@ -248,10 +249,6 @@ stm32_lp_tick_source: &lptim1 {
 	status = "okay";
 };
 
-&rng {
-	status = "okay";
-};
-
 zephyr_udc0: &usbotg_fs {
 	pinctrl-0 = <&usb_otg_fs_dm_pa11 &usb_otg_fs_dp_pa12>;
 	pinctrl-names = "default";
@@ -299,5 +296,9 @@ zephyr_udc0: &usbotg_fs {
 };
 
 &vbat4 {
+	status = "okay";
+};
+
+&crc {
 	status = "okay";
 };

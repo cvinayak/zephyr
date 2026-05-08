@@ -16,6 +16,12 @@ elseif(CONFIG_ARMV9_A)
   endif()
 endif()
 
+if(CONFIG_ARM64_RNG)
+  if(DEFINED GCC_M_ARCH)
+    set(GCC_M_ARCH "${GCC_M_ARCH}+rng")
+  endif()
+endif()
+
 if(DEFINED GCC_M_CPU)
   list(APPEND TOOLCHAIN_C_FLAGS   -mcpu=${GCC_M_CPU})
   list(APPEND TOOLCHAIN_LD_FLAGS  -mcpu=${GCC_M_CPU})
@@ -33,6 +39,21 @@ endif()
 
 list(APPEND TOOLCHAIN_C_FLAGS   -mabi=lp64)
 list(APPEND TOOLCHAIN_LD_FLAGS  -mabi=lp64)
+
+# Branch protection (PAC/BTI) compiler flags
+if(CONFIG_ARM_PACBTI_STANDARD)
+  list(APPEND TOOLCHAIN_C_FLAGS -mbranch-protection=standard)
+elseif(CONFIG_ARM_PACBTI_PACRET)
+  list(APPEND TOOLCHAIN_C_FLAGS -mbranch-protection=pac-ret)
+elseif(CONFIG_ARM_PACBTI_PACRET_LEAF)
+  list(APPEND TOOLCHAIN_C_FLAGS -mbranch-protection=pac-ret+leaf)
+elseif(CONFIG_ARM_PACBTI_BTI)
+  list(APPEND TOOLCHAIN_C_FLAGS -mbranch-protection=bti)
+elseif(CONFIG_ARM_PACBTI_PACRET_BTI)
+  list(APPEND TOOLCHAIN_C_FLAGS -mbranch-protection=pac-ret+bti)
+elseif(CONFIG_ARM_PACBTI_PACRET_LEAF_BTI)
+  list(APPEND TOOLCHAIN_C_FLAGS -mbranch-protection=pac-ret+leaf+bti)
+endif()
 
 set(LLEXT_REMOVE_FLAGS
   -fno-pic
