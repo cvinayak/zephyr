@@ -749,6 +749,7 @@ uint32_t radio_is_address(void)
 #if defined(CONFIG_BT_CTLR_RADIO_TIMER_ISR)
 static radio_tmr_isr_cb_t isr_radio_tmr_cb;
 static void *isr_radio_tmr_cb_param;
+static uint32_t isr_radio_tmr_cc_us;
 #endif /* CONFIG_BT_CTLR_RADIO_TIMER_ISR */
 
 #if defined(CONFIG_BT_CTLR_SW_SWITCH_SINGLE_TIMER)
@@ -781,6 +782,7 @@ uint32_t radio_is_done(void)
 			uint32_t actual_us;
 
 			actual_us = EVENT_TIMER->CC[HAL_EVENT_TIMER_DEFERRED_TRX_CC_OFFSET];
+
 			if (actual_us > elapsed_us) {
 				actual_us -= elapsed_us;
 			} else {
@@ -1451,6 +1453,9 @@ uint32_t radio_tmr_isr_set(uint32_t start_us, radio_tmr_isr_cb_t cb, void *param
 
 #if !defined(CONFIG_BT_CTLR_TIFS_HW)
 #if defined(CONFIG_BT_CTLR_SW_SWITCH_SINGLE_TIMER)
+	LL_ASSERT_MSG(start_us >= last_pdu_end_us, "start_us %u >= last_pdu_end_us %u",
+		      start_us, last_pdu_end_us);
+
 	/* As timer is reset on every radio end, remove the accumulated
 	 * last_pdu_end_us in the given start_us.
 	 */
@@ -1485,6 +1490,8 @@ uint32_t radio_tmr_isr_set(uint32_t start_us, radio_tmr_isr_cb_t cb, void *param
 		 (EVENT_TIMER->EVENTS_COMPARE[HAL_EVENT_TIMER_DEFERRED_TRX_CC_OFFSET] == 0U));
 
 	nrf_timer_cc_set(EVENT_TIMER, HAL_EVENT_TIMER_SAMPLE_CC_OFFSET, cc);
+
+	isr_radio_tmr_cc_us = actual_us;
 
 	nrf_timer_int_enable(EVENT_TIMER, HAL_EVENT_TIMER_INTENSET_DEFERRED_TX_Msk);
 
@@ -1770,6 +1777,8 @@ uint32_t radio_tmr_start(uint8_t trx, uint32_t ticks_start, uint32_t remainder)
 			actual_us += last_pdu_end_us;
 #endif /* CONFIG_BT_CTLR_SW_SWITCH_SINGLE_TIMER */
 
+			LL_ASSERT_MSG(actual_us == isr_radio_tmr_cc_us, "%u %u\n", actual_us, isr_radio_tmr_cc_us);
+
 			if (actual_us > elapsed_us) {
 				actual_us -= elapsed_us;
 			} else {
@@ -1777,6 +1786,7 @@ uint32_t radio_tmr_start(uint8_t trx, uint32_t ticks_start, uint32_t remainder)
 			}
 
 			if (actual_us > 1U) {
+				isr_radio_tmr_cc_us = actual_us;
 				nrf_timer_cc_set(EVENT_TIMER,
 						 HAL_EVENT_TIMER_DEFERRED_TRX_CC_OFFSET, actual_us);
 			} else {
@@ -1947,6 +1957,8 @@ uint32_t radio_tmr_start_tick(uint8_t trx, uint32_t ticks_start)
 			actual_us += last_pdu_end_us;
 #endif /* CONFIG_BT_CTLR_SW_SWITCH_SINGLE_TIMER */
 
+			LL_ASSERT_MSG(actual_us == isr_radio_tmr_cc_us, "%u %u\n", actual_us, isr_radio_tmr_cc_us);
+
 			if (actual_us > elapsed_us) {
 				actual_us -= elapsed_us;
 			} else {
@@ -1954,6 +1966,7 @@ uint32_t radio_tmr_start_tick(uint8_t trx, uint32_t ticks_start)
 			}
 
 			if (actual_us > 1U) {
+				isr_radio_tmr_cc_us = actual_us;
 				nrf_timer_cc_set(EVENT_TIMER,
 						 HAL_EVENT_TIMER_DEFERRED_TRX_CC_OFFSET, actual_us);
 			} else {
@@ -2070,6 +2083,7 @@ uint32_t radio_tmr_start_us(uint8_t trx, uint32_t start_us)
 
 #if !defined(CONFIG_BT_CTLR_TIFS_HW)
 #if defined(CONFIG_BT_CTLR_SW_SWITCH_SINGLE_TIMER)
+	LL_ASSERT_DBG(start_us >= last_pdu_end_us);
 	/* As timer is reset on every radio end, remove the accumulated
 	 * last_pdu_end_us in the given start_us.
 	 */
@@ -2269,6 +2283,7 @@ void radio_tmr_hcto_configure(uint32_t hcto_us)
 void radio_tmr_hcto_configure_abs(uint32_t hcto_from_start_us)
 {
 #if defined(CONFIG_BT_CTLR_SW_SWITCH_SINGLE_TIMER)
+	LL_ASSERT_DBG(hcto_from_start_us >= last_pdu_end_us);
 	/* As timer is reset on every radio end, remove the accumulated
 	 * last_pdu_end_us in the given hcto_us.
 	 */
