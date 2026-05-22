@@ -88,7 +88,7 @@ static void mfy_cis_offset_get(void *param);
 static void ticker_op_cb(uint32_t status, void *param);
 #endif /* CONFIG_BT_CTLR_CENTRAL_SPACING  == 0 */
 
-static uint32_t cis_offset_calc(struct ll_conn_iso_stream *cis, uint32_t ticks_offset);
+static uint32_t cis_offset_calc(const struct ll_conn_iso_stream *cis, uint32_t ticks_offset);
 static uint32_t iso_interval_adjusted_bn_max_pdu_get(bool framed, uint32_t iso_interval,
 						     uint32_t iso_interval_cig,
 						     uint32_t sdu_interval,
@@ -1029,11 +1029,7 @@ int ull_central_iso_cis_offset_get(uint16_t cis_handle,
 #else /* CONFIG_BT_CTLR_CENTRAL_SPACING != 0 */
 
 	/* Calculate the offset for the select CIS in the CIG */
-	*cis_offset_min = HAL_TICKER_TICKS_TO_US(conn->ull.ticks_slot);
-	*cis_offset_min += cig->sync_delay - cis->sync_delay;
-
-	/* Add the event resolution margin jitter of both ACL and CIG */
-	*cis_offset_min += (EVENT_TICKER_RES_MARGIN_US << 2U);
+	*cis_offset_min = cis_offset_calc(cis, conn->ull.ticks_slot);
 
 	return 0;
 #endif /* CONFIG_BT_CTLR_CENTRAL_SPACING != 0 */
@@ -1268,9 +1264,9 @@ static void ticker_op_cb(uint32_t status, void *param)
 }
 #endif /* CONFIG_BT_CTLR_CENTRAL_SPACING  == 0 */
 
-static uint32_t cis_offset_calc(struct ll_conn_iso_stream *cis, uint32_t ticks_offset)
+static uint32_t cis_offset_calc(const struct ll_conn_iso_stream *cis, uint32_t ticks_offset)
 {
-	struct ll_conn_iso_group *cig;
+	const struct ll_conn_iso_group *cig;
 	uint32_t offset_us;
 
 	/* Get reference to associated CIG context for the CIS */
