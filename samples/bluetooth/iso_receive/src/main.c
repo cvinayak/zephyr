@@ -423,17 +423,17 @@ int main(void)
 			printk("Creating Periodic Advertising Sync"
 			       " (source %u)...", src + 1);
 			bt_addr_le_copy(&sync_create_param.addr,
-					&per_addr[sources_found]);
+					&per_addr[src]);
 			sync_create_param.options = 0;
-			sync_create_param.sid = per_sid[sources_found];
+			sync_create_param.sid = per_sid[src];
 			sync_create_param.skip = 0;
 			/* Multiple PA interval with retry count and
 			 * convert to unit of 10 ms
 			 */
 			sync_create_param.timeout =
-				(per_interval_us[sources_found] *
+				(per_interval_us[src] *
 				 PA_RETRY_COUNT) / (10 * USEC_PER_MSEC);
-			sem_timeout_us = per_interval_us[sources_found] *
+			sem_timeout_us = per_interval_us[src] *
 					 PA_RETRY_COUNT;
 			err = bt_le_per_adv_sync_create(&sync_create_param,
 							&pa_syncs[src]);
