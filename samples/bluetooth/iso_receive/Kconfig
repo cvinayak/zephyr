@@ -5,6 +5,17 @@ source "Kconfig.zephyr"
 
 mainmenu "Bluetooth: ISO Receive"
 
+config ISO_BROADCAST_SOURCE_COUNT
+	int "Number of broadcast sources to synchronize to"
+	range 1 4
+	default 1
+	help
+	  Number of different iso_broadcast devices to synchronize to
+	  simultaneously. Each source requires its own periodic advertising
+	  sync and BIG sync. Ensure CONFIG_BT_ISO_MAX_CHAN is at least
+	  2 * ISO_BROADCAST_SOURCE_COUNT, and CONFIG_BT_PER_ADV_SYNC_MAX
+	  is at least ISO_BROADCAST_SOURCE_COUNT.
+
 config ISO_PRINT_INTERVAL
 	int "Interval between each packet report"
 	range 1 360000
