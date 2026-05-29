@@ -140,9 +140,9 @@ static void scan_recv(const struct bt_le_scan_recv_info *info,
 	       phy2str(info->primary_phy), phy2str(info->secondary_phy),
 	       info->interval, BT_CONN_INTERVAL_TO_US(info->interval), info->sid);
 
-	if (!per_adv_found && info->interval &&
-	    !is_source_already_found(info->addr, info->sid) &&
-	    setting_up_source >= 0) {
+	if (setting_up_source >= 0 && !per_adv_found &&
+	    info->interval &&
+	    !is_source_already_found(info->addr, info->sid)) {
 		per_adv_found = true;
 
 		per_sid[setting_up_source] = info->sid;
@@ -596,6 +596,10 @@ int main(void)
 			       needs_full ? "PA + BIG" : "BIG only");
 
 			while (true) {
+				/* Re-check PA state on each retry, as PA
+				 * sync may have been lost during a failed
+				 * BIG-only re-sync attempt.
+				 */
 				needs_full = (pa_syncs[src] == NULL);
 				err = setup_source(src, needs_full);
 				if (err == 0) {
