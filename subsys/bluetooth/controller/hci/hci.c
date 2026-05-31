@@ -4438,23 +4438,28 @@ static void le_cis_established(struct pdu_data *pdu_data,
 {
 	struct lll_conn_iso_stream_rxtx *lll_cis_c;
 	struct lll_conn_iso_stream_rxtx *lll_cis_p;
-	struct bt_hci_evt_le_cis_established *sep;
 	struct lll_conn_iso_stream *lll_cis;
 	struct node_rx_conn_iso_estab *est;
 	struct ll_conn_iso_stream *cis;
 	struct ll_conn_iso_group *cig;
 	bool is_central;
+	bool use_v2;
 	void *node;
 
-	if (!(event_mask & BT_EVT_MASK_LE_META_EVENT) ||
-	    !(le_event_mask & BT_EVT_MASK_LE_CIS_ESTABLISHED)) {
+	if (!(event_mask & BT_EVT_MASK_LE_META_EVENT)) {
+		return;
+	}
+
+	/* Check if host supports v2 event */
+	use_v2 = (le_event_mask & BT_EVT_MASK_LE_CIS_ESTABLISHED_V2) != 0;
+
+	/* If neither v1 nor v2 is masked, return */
+	if (!use_v2 && !(le_event_mask & BT_EVT_MASK_LE_CIS_ESTABLISHED)) {
 		return;
 	}
 
 	cis = node_rx->rx_ftr.param;
 	cig = cis->group;
-
-	sep = meta_evt(buf, BT_HCI_EVT_LE_CIS_ESTABLISHED, sizeof(*sep));
 
 	/* Check for pdu field being aligned before accessing CIS established
 	 * event.
@@ -4463,8 +4468,6 @@ static void le_cis_established(struct pdu_data *pdu_data,
 	LL_ASSERT_DBG(IS_PTR_ALIGNED(node, struct node_rx_conn_iso_estab));
 
 	est = node;
-	sep->status = est->status;
-	sep->conn_handle = sys_cpu_to_le16(est->cis_handle);
 
 	if (!cig) {
 		/* CIS was not established and instance was released */
@@ -4476,20 +4479,57 @@ static void le_cis_established(struct pdu_data *pdu_data,
 	lll_cis_c = is_central ? &lll_cis->tx : &lll_cis->rx;
 	lll_cis_p = is_central ? &lll_cis->rx : &lll_cis->tx;
 
-	sys_put_le24(cig->sync_delay, sep->cig_sync_delay);
-	sys_put_le24(cis->sync_delay, sep->cis_sync_delay);
-	sys_put_le24(cig->c_latency, sep->c_latency);
-	sys_put_le24(cig->p_latency, sep->p_latency);
-	sep->c_phy = find_lsb_set(lll_cis_c->phy);
-	sep->p_phy = find_lsb_set(lll_cis_p->phy);
-	sep->nse = lll_cis->nse;
-	sep->c_bn = lll_cis_c->bn;
-	sep->p_bn = lll_cis_p->bn;
-	sep->c_ft = lll_cis_c->ft;
-	sep->p_ft = lll_cis_p->ft;
-	sep->c_max_pdu = sys_cpu_to_le16(lll_cis_c->max_pdu);
-	sep->p_max_pdu = sys_cpu_to_le16(lll_cis_p->max_pdu);
-	sep->interval = sys_cpu_to_le16(cig->iso_interval);
+	if (use_v2) {
+		struct bt_hci_evt_le_cis_established_v2 *sep_v2;
+
+		sep_v2 = meta_evt(buf, BT_HCI_EVT_LE_CIS_ESTABLISHED_V2, sizeof(*sep_v2));
+		sep_v2->status = est->status;
+		sep_v2->conn_handle = sys_cpu_to_le16(est->cis_handle);
+
+		sys_put_le24(cig->sync_delay, sep_v2->cig_sync_delay);
+		sys_put_le24(cis->sync_delay, sep_v2->cis_sync_delay);
+		sys_put_le24(cig->c_latency, sep_v2->c_latency);
+		sys_put_le24(cig->p_latency, sep_v2->p_latency);
+		sep_v2->c_phy = find_lsb_set(lll_cis_c->phy);
+		sep_v2->p_phy = find_lsb_set(lll_cis_p->phy);
+		sep_v2->nse = lll_cis->nse;
+		sep_v2->c_bn = lll_cis_c->bn;
+		sep_v2->p_bn = lll_cis_p->bn;
+		sep_v2->c_ft = lll_cis_c->ft;
+		sep_v2->p_ft = lll_cis_p->ft;
+		sep_v2->c_max_pdu = sys_cpu_to_le16(lll_cis_c->max_pdu);
+		sep_v2->p_max_pdu = sys_cpu_to_le16(lll_cis_p->max_pdu);
+		sep_v2->interval = sys_cpu_to_le16(cig->iso_interval);
+
+		/* V2-specific fields */
+		sys_put_le24(lll_cis->sub_interval, sep_v2->sub_interval);
+		sep_v2->c_max_sdu = sys_cpu_to_le16(cis->c_max_sdu);
+		sep_v2->p_max_sdu = sys_cpu_to_le16(cis->p_max_sdu);
+		sys_put_le24(cig->c_sdu_interval, sep_v2->c_sdu_interval);
+		sys_put_le24(cig->p_sdu_interval, sep_v2->p_sdu_interval);
+		sep_v2->framing = cis->framed;
+	} else {
+		struct bt_hci_evt_le_cis_established *sep;
+
+		sep = meta_evt(buf, BT_HCI_EVT_LE_CIS_ESTABLISHED, sizeof(*sep));
+		sep->status = est->status;
+		sep->conn_handle = sys_cpu_to_le16(est->cis_handle);
+
+		sys_put_le24(cig->sync_delay, sep->cig_sync_delay);
+		sys_put_le24(cis->sync_delay, sep->cis_sync_delay);
+		sys_put_le24(cig->c_latency, sep->c_latency);
+		sys_put_le24(cig->p_latency, sep->p_latency);
+		sep->c_phy = find_lsb_set(lll_cis_c->phy);
+		sep->p_phy = find_lsb_set(lll_cis_p->phy);
+		sep->nse = lll_cis->nse;
+		sep->c_bn = lll_cis_c->bn;
+		sep->p_bn = lll_cis_p->bn;
+		sep->c_ft = lll_cis_c->ft;
+		sep->p_ft = lll_cis_p->ft;
+		sep->c_max_pdu = sys_cpu_to_le16(lll_cis_c->max_pdu);
+		sep->p_max_pdu = sys_cpu_to_le16(lll_cis_p->max_pdu);
+		sep->interval = sys_cpu_to_le16(cig->iso_interval);
+	}
 
 #if defined(CONFIG_BT_CTLR_CENTRAL_ISO)
 	if (is_central) {
