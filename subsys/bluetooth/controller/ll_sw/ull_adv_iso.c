@@ -1731,5 +1731,5 @@ static void tx_lll_flush(void *param)
 	rx->hdr.link = NULL;
 
 	/* Enqueue the terminate towards ULL context */
-	ull_rx_put_sched(link, rx);
+	ull_lll_rx_put_sched(link, rx);
 }

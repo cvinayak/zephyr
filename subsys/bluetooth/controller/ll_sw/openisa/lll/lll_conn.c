@@ -162,7 +162,7 @@ void lll_conn_isr_rx(void *param)
 
 	trx_cnt++;
 
-	node_rx = ull_pdu_rx_alloc_peek(1);
+	node_rx = ull_pdu_lll_rx_alloc_peek(1);
 	LL_ASSERT(node_rx);
 
 	pdu_data_rx = (void *)node_rx->pdu;
@@ -290,17 +290,17 @@ lll_conn_isr_rx_exit:
 	}
 
 	if (is_rx_enqueue) {
-		ull_pdu_rx_alloc();
+		ull_pdu_lll_rx_alloc();
 
 		node_rx->hdr.type = NODE_RX_TYPE_DC_PDU;
 		node_rx->hdr.handle = lll->handle;
 
-		ull_rx_put(node_rx->hdr.link, node_rx);
+		ull_lll_rx_put(node_rx->hdr.link, node_rx);
 		is_ull_rx = 1U;
 	}
 
 	if (is_ull_rx) {
-		ull_rx_sched();
+		ull_lll_rx_sched();
 	}
 
 #if defined(CONFIG_BT_CTLR_CONN_RSSI)
@@ -421,7 +421,7 @@ void lll_conn_rx_pkt_set(struct lll_conn *lll)
 	uint16_t max_rx_octets;
 	uint8_t phy;
 
-	node_rx = ull_pdu_rx_alloc_peek(1);
+	node_rx = ull_pdu_lll_rx_alloc_peek(1);
 	LL_ASSERT(node_rx);
 
 #if defined(CONFIG_BT_CTLR_DATA_LENGTH)
@@ -570,7 +570,7 @@ static void isr_done(void *param)
 #endif /* HAL_RADIO_GPIO_HAVE_PA_PIN || HAL_RADIO_GPIO_HAVE_LNA_PIN */
 	/* TODO: MOVE ^^ */
 
-	e = ull_event_done_extra_get();
+	e = ull_event_lll_done_extra_get();
 	LL_ASSERT(e);
 
 	e->type = EVENT_DONE_EXTRA_TYPE_CONN;
@@ -710,7 +710,7 @@ static int isr_rx_pdu(struct lll_conn *lll, struct pdu_data *pdu_data_rx,
 	    /* check so that we will NEVER use the rx buffer reserved for empty
 	     * packet and internal control enqueue
 	     */
-	    (ull_pdu_rx_alloc_peek(3) != 0)) {
+	    (ull_pdu_lll_rx_alloc_peek(3) != 0)) {
 		/* Increment next expected serial number */
 		lll->nesn++;
 

@@ -1021,7 +1021,7 @@ static void isr_done_create(void *param)
 {
 	lll_isr_status_reset();
 
-	ull_done_extra_type_set(EVENT_DONE_EXTRA_TYPE_ADV_ISO_COMPLETE);
+	ull_lll_done_extra_type_set(EVENT_DONE_EXTRA_TYPE_ADV_ISO_COMPLETE);
 
 	lll_isr_cleanup(param);
 }
@@ -1070,13 +1070,13 @@ static void isr_done_term(void *param)
 				 * in the BIGInfo struct present in the Periodic
 				 * Advertising PDU.
 				 */
-				rx = ull_pdu_rx_alloc();
+				rx = ull_pdu_lll_rx_alloc();
 				LL_ASSERT_ERR(rx);
 
 				rx->hdr.type = NODE_RX_TYPE_BIG_CHM_COMPLETE;
 				rx->rx_ftr.param = lll;
 
-				ull_rx_put_sched(rx->hdr.link, rx);
+				ull_lll_rx_put_sched(rx->hdr.link, rx);
 			}
 
 			/* Use new channel map */
@@ -1084,7 +1084,7 @@ static void isr_done_term(void *param)
 			(void)memcpy(lll->data_chan_map, lll->chm_chan_map,
 				     sizeof(lll->data_chan_map));
 		} else {
-			ull_done_extra_type_set(EVENT_DONE_EXTRA_TYPE_ADV_ISO_TERMINATE);
+			ull_lll_done_extra_type_set(EVENT_DONE_EXTRA_TYPE_ADV_ISO_TERMINATE);
 		}
 	}
 

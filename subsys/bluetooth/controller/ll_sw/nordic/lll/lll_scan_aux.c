@@ -230,7 +230,7 @@ uint8_t lll_scan_aux_setup(struct pdu_adv *pdu, uint8_t pdu_phy,
 		return 0;
 	}
 
-	node_rx = ull_pdu_rx_alloc_peek(1);
+	node_rx = ull_pdu_lll_rx_alloc_peek(1);
 	LL_ASSERT_DBG(node_rx);
 
 	/* Store the lll context, aux_ptr and start of PDU in footer */
@@ -507,7 +507,7 @@ static int prepare_cb(struct lll_prepare_param *p)
 	radio_pkt_configure(RADIO_PKT_CONF_LENGTH_8BIT, LL_EXT_OCTETS_RX_MAX,
 			    RADIO_PKT_CONF_PHY(lll_aux->phy));
 
-	node_rx = ull_pdu_rx_alloc_peek(1);
+	node_rx = ull_pdu_lll_rx_alloc_peek(1);
 	LL_ASSERT_DBG(node_rx);
 
 	radio_pkt_rx_set(node_rx->pdu);
@@ -692,7 +692,7 @@ static void abort_cb(struct lll_prepare_param *prepare_param, void *param)
 	err = lll_hfclock_off();
 	LL_ASSERT_ERR(err >= 0);
 
-	e = ull_done_extra_type_set(EVENT_DONE_EXTRA_TYPE_SCAN_AUX);
+	e = ull_lll_done_extra_type_set(EVENT_DONE_EXTRA_TYPE_SCAN_AUX);
 	LL_ASSERT_ERR(e);
 
 #if defined(CONFIG_BT_CTLR_SCAN_AUX_USE_CHAINS)
@@ -726,7 +726,7 @@ static void isr_done(void *param)
 		/* Generate message to release aux context and flag the report
 		 * generated thereafter by HCI as incomplete.
 		 */
-		node_rx = ull_pdu_rx_alloc();
+		node_rx = ull_pdu_lll_rx_alloc();
 		LL_ASSERT_ERR(node_rx);
 
 		node_rx->hdr.type = NODE_RX_TYPE_EXT_AUX_RELEASE;
@@ -735,12 +735,12 @@ static void isr_done(void *param)
 		node_rx->rx_ftr.lll_aux = lll->lll_aux;
 		node_rx->rx_ftr.aux_failed = 1U;
 
-		ull_rx_put_sched(node_rx->hdr.link, node_rx);
+		ull_lll_rx_put_sched(node_rx->hdr.link, node_rx);
 
 	} else if (!trx_cnt) {
 		struct event_done_extra *e;
 
-		e = ull_done_extra_type_set(EVENT_DONE_EXTRA_TYPE_SCAN_AUX);
+		e = ull_lll_done_extra_type_set(EVENT_DONE_EXTRA_TYPE_SCAN_AUX);
 		LL_ASSERT_ERR(e);
 
 #if defined(CONFIG_BT_CTLR_SCAN_AUX_USE_CHAINS)
@@ -854,7 +854,7 @@ static void isr_rx(struct lll_scan *lll, struct lll_scan_aux *lll_aux,
 		goto isr_rx_do_close;
 	}
 
-	node_rx = ull_pdu_rx_alloc_peek(3);
+	node_rx = ull_pdu_lll_rx_alloc_peek(3);
 	if (!node_rx) {
 		err = -ENOBUFS;
 
@@ -916,7 +916,7 @@ isr_rx_do_close:
 		if (lll->is_aux_sched && err != -ECANCELED) {
 			struct node_rx_pdu *node_rx2;
 
-			node_rx2 = ull_pdu_rx_alloc();
+			node_rx2 = ull_pdu_lll_rx_alloc();
 			LL_ASSERT_ERR(node_rx2);
 
 			node_rx2->hdr.type = NODE_RX_TYPE_EXT_AUX_RELEASE;
@@ -933,7 +933,7 @@ isr_rx_do_close:
 			node_rx2->rx_ftr.param = lll;
 			node_rx2->rx_ftr.lll_aux = lll->lll_aux;
 
-			ull_rx_put_sched(node_rx2->hdr.link, node_rx2);
+			ull_lll_rx_put_sched(node_rx2->hdr.link, node_rx2);
 		}
 
 		/* Check if LLL scheduled auxiliary PDU reception by scan
@@ -1003,7 +1003,7 @@ static int isr_rx_pdu(struct lll_scan *lll, struct lll_scan_aux *lll_aux,
 		/* Always use CSA#2 on secondary channel, we need 2 nodes for conn
 		 * and CSA#2 events and 2 nodes are always reserved for connection.
 		 */
-		rx = ull_pdu_rx_alloc_peek(4);
+		rx = ull_pdu_lll_rx_alloc_peek(4);
 		if (!rx) {
 			return -ENOBUFS;
 		}
@@ -1117,7 +1117,7 @@ static int isr_rx_pdu(struct lll_scan *lll, struct lll_scan_aux *lll_aux,
 		lll->is_stop = 1U;
 
 		/* Populate the connection complete message */
-		rx = ull_pdu_rx_alloc();
+		rx = ull_pdu_lll_rx_alloc();
 		rx->hdr.type = NODE_RX_TYPE_CONNECTION;
 		rx->hdr.handle = 0xffff;
 
@@ -1142,7 +1142,7 @@ static int isr_rx_pdu(struct lll_scan *lll, struct lll_scan_aux *lll_aux,
 		ftr->lrpa_used = lll->rpa_gen && lrpa;
 #endif /* CONFIG_BT_CTLR_PRIVACY */
 
-		ftr->extra = ull_pdu_rx_alloc();
+		ftr->extra = ull_pdu_lll_rx_alloc();
 
 		/* Hold onto connection event message until after successful
 		 * reception of CONNECT_RSP
@@ -1187,7 +1187,7 @@ static int isr_rx_pdu(struct lll_scan *lll, struct lll_scan_aux *lll_aux,
 		/* Check if 4 nodes free, 2 will be utilized for aux PDU and
 		 * scan response PDU; 2 more to ensure connections have them.
 		 */
-		rx = ull_pdu_rx_alloc_peek(4);
+		rx = ull_pdu_lll_rx_alloc_peek(4);
 		if (!rx) {
 			return -ENOBUFS;
 		}
@@ -1253,7 +1253,7 @@ static int isr_rx_pdu(struct lll_scan *lll, struct lll_scan_aux *lll_aux,
 					 HAL_RADIO_GPIO_PA_OFFSET);
 #endif /* HAL_RADIO_GPIO_HAVE_PA_PIN */
 
-		(void)ull_pdu_rx_alloc();
+		(void)ull_pdu_lll_rx_alloc();
 
 		node_rx->hdr.type = NODE_RX_TYPE_EXT_AUX_REPORT;
 
@@ -1294,7 +1294,7 @@ static int isr_rx_pdu(struct lll_scan *lll, struct lll_scan_aux *lll_aux,
 
 		ftr->aux_lll_sched = 0U;
 
-		ull_rx_put_sched(node_rx->hdr.link, node_rx);
+		ull_lll_rx_put_sched(node_rx->hdr.link, node_rx);
 
 		if (IS_ENABLED(CONFIG_BT_CTLR_PROFILE_ISR)) {
 			lll_prof_send();
@@ -1360,7 +1360,7 @@ static int isr_rx_pdu(struct lll_scan *lll, struct lll_scan_aux *lll_aux,
 		 * free PDU buffer is used to receive auxiliary PDU when using
 		 * LLL scheduling.
 		 */
-		(void)ull_pdu_rx_alloc();
+		(void)ull_pdu_lll_rx_alloc();
 
 		ftr->ticks_anchor = radio_tmr_start_get();
 		ftr->radio_end_us = radio_tmr_end_get() -
@@ -1391,7 +1391,7 @@ static int isr_rx_pdu(struct lll_scan *lll, struct lll_scan_aux *lll_aux,
 
 		node_rx->hdr.type = NODE_RX_TYPE_EXT_AUX_REPORT;
 
-		ull_rx_put_sched(node_rx->hdr.link, node_rx);
+		ull_lll_rx_put_sched(node_rx->hdr.link, node_rx);
 
 		/* Next aux scan is scheduled from LLL, we already handled radio
 		 * disable so prevent caller from doing it again.
@@ -1429,7 +1429,7 @@ static void isr_tx(struct lll_scan_aux *lll_aux, void (*isr)(void *), void *para
 	/* Clear radio tx status and events */
 	lll_isr_tx_status_reset();
 
-	node_rx = ull_pdu_rx_alloc_peek(1);
+	node_rx = ull_pdu_lll_rx_alloc_peek(1);
 	LL_ASSERT_DBG(node_rx);
 
 	radio_pkt_rx_set(node_rx->pdu);
@@ -1576,7 +1576,7 @@ static void isr_rx_connect_rsp(void *param)
 
 		pdu_tx = radio_pkt_scratch_get();
 
-		node_rx = ull_pdu_rx_alloc_peek(1);
+		node_rx = ull_pdu_lll_rx_alloc_peek(1);
 		LL_ASSERT_DBG(node_rx);
 		pdu_rx = (void *)node_rx->pdu;
 
@@ -1599,7 +1599,7 @@ static void isr_rx_connect_rsp(void *param)
 		ftr = &(rx->rx_ftr);
 
 		rx->hdr.type = NODE_RX_TYPE_RELEASE;
-		ull_rx_put(rx->hdr.link, rx);
+		ull_lll_rx_put(rx->hdr.link, rx);
 
 		rx = ftr->extra;
 		rx->hdr.type = NODE_RX_TYPE_RELEASE;
@@ -1644,7 +1644,7 @@ static void isr_rx_connect_rsp(void *param)
 #endif /* CONFIG_BT_CTLR_PRIVACY */
 
 isr_rx_connect_rsp_do_close:
-	ull_rx_put_sched(rx->hdr.link, rx);
+	ull_lll_rx_put_sched(rx->hdr.link, rx);
 
 	/* Check if LLL scheduled auxiliary PDU reception by scan
 	 * context or auxiliary PDU reception by aux context
@@ -1655,7 +1655,7 @@ isr_rx_connect_rsp_do_close:
 		lll->is_aux_sched = 0U;
 
 		/* Send message to flush Auxiliary PDU list */
-		node_rx = ull_pdu_rx_alloc();
+		node_rx = ull_pdu_lll_rx_alloc();
 		LL_ASSERT_ERR(node_rx);
 
 		node_rx->hdr.type = NODE_RX_TYPE_EXT_AUX_RELEASE;
@@ -1663,7 +1663,7 @@ isr_rx_connect_rsp_do_close:
 		node_rx->rx_ftr.param = lll;
 		node_rx->rx_ftr.lll_aux = lll->lll_aux;
 
-		ull_rx_put_sched(node_rx->hdr.link, node_rx);
+		ull_lll_rx_put_sched(node_rx->hdr.link, node_rx);
 
 		radio_isr_set(lll_scan_isr_resume, lll);
 	} else {
@@ -1704,7 +1704,7 @@ static void isr_early_abort(void *param)
 {
 	struct event_done_extra *e;
 
-	e = ull_done_extra_type_set(EVENT_DONE_EXTRA_TYPE_SCAN_AUX);
+	e = ull_lll_done_extra_type_set(EVENT_DONE_EXTRA_TYPE_SCAN_AUX);
 	LL_ASSERT_ERR(e);
 
 #if defined(CONFIG_BT_CTLR_SCAN_AUX_USE_CHAINS)

@@ -712,11 +712,11 @@ int lll_adv_scan_req_report(struct lll_adv *lll, struct pdu_adv *pdu_adv_rx,
 {
 	struct node_rx_pdu *node_rx;
 
-	node_rx = ull_pdu_rx_alloc_peek(3);
+	node_rx = ull_pdu_lll_rx_alloc_peek(3);
 	if (!node_rx) {
 		return -ENOBUFS;
 	}
-	ull_pdu_rx_alloc();
+	ull_pdu_lll_rx_alloc();
 
 	/* Prepare the report (scan req) */
 	node_rx->hdr.type = NODE_RX_TYPE_SCAN_REQ;
@@ -728,7 +728,7 @@ int lll_adv_scan_req_report(struct lll_adv *lll, struct pdu_adv *pdu_adv_rx,
 	node_rx->rx_ftr.rl_idx = rl_idx;
 #endif
 
-	ull_rx_put_sched(node_rx->hdr.link, node_rx);
+	ull_lll_rx_put_sched(node_rx->hdr.link, node_rx);
 
 	return 0;
 }
@@ -1177,7 +1177,7 @@ static void isr_tx(void *param)
 	radio_switch_complete_and_tx(phy_p, 0, phy_p, phy_flags);
 
 	/* setup Rx buffer */
-	node_rx = ull_pdu_rx_alloc_peek(1);
+	node_rx = ull_pdu_lll_rx_alloc_peek(1);
 	LL_ASSERT_DBG(node_rx);
 	radio_pkt_rx_set(node_rx->pdu);
 
@@ -1406,15 +1406,15 @@ static void isr_done(void *param)
 	}
 
 #if defined(CONFIG_BT_CTLR_ADV_INDICATION)
-	struct node_rx_pdu *node_rx = ull_pdu_rx_alloc_peek(3);
+	struct node_rx_pdu *node_rx = ull_pdu_lll_rx_alloc_peek(3);
 
 	if (node_rx) {
-		ull_pdu_rx_alloc();
+		ull_pdu_lll_rx_alloc();
 
 		/* TODO: add other info by defining a payload struct */
 		node_rx->hdr.type = NODE_RX_TYPE_ADV_INDICATION;
 
-		ull_rx_put_sched(node_rx->hdr.link, node_rx);
+		ull_lll_rx_put_sched(node_rx->hdr.link, node_rx);
 	}
 #endif /* CONFIG_BT_CTLR_ADV_INDICATION */
 
@@ -1427,7 +1427,7 @@ static void isr_done(void *param)
 	{
 		struct event_done_extra *extra;
 
-		extra = ull_done_extra_type_set(EVENT_DONE_EXTRA_TYPE_ADV);
+		extra = ull_lll_done_extra_type_set(EVENT_DONE_EXTRA_TYPE_ADV);
 		LL_ASSERT_ERR(extra);
 	}
 #endif /* CONFIG_BT_CTLR_ADV_EXT || CONFIG_BT_CTLR_JIT_SCHEDULING */
@@ -1562,7 +1562,7 @@ static inline int isr_rx_pdu(struct lll_adv *lll,
 	uint8_t rl_idx = FILTER_IDX_NONE;
 #endif /* CONFIG_BT_CTLR_PRIVACY */
 
-	node_rx = ull_pdu_rx_alloc_peek(1);
+	node_rx = ull_pdu_lll_rx_alloc_peek(1);
 	LL_ASSERT_DBG(node_rx);
 
 	pdu_rx = (void *)node_rx->pdu;
@@ -1651,9 +1651,9 @@ static inline int isr_rx_pdu(struct lll_adv *lll,
 		struct node_rx_pdu *rx;
 
 		if (IS_ENABLED(CONFIG_BT_CTLR_CHAN_SEL_2)) {
-			rx = ull_pdu_rx_alloc_peek(4);
+			rx = ull_pdu_lll_rx_alloc_peek(4);
 		} else {
-			rx = ull_pdu_rx_alloc_peek(3);
+			rx = ull_pdu_lll_rx_alloc_peek(3);
 		}
 
 		if (!rx) {
@@ -1684,7 +1684,7 @@ static inline int isr_rx_pdu(struct lll_adv *lll,
 		/* Stop further LLL radio events */
 		lll->conn->periph.initiated = 1;
 
-		rx = ull_pdu_rx_alloc();
+		rx = ull_pdu_lll_rx_alloc();
 
 		rx->hdr.type = NODE_RX_TYPE_CONNECTION;
 		rx->hdr.handle = 0xffff;
@@ -1700,10 +1700,10 @@ static inline int isr_rx_pdu(struct lll_adv *lll,
 #endif /* CONFIG_BT_CTLR_PRIVACY */
 
 		if (IS_ENABLED(CONFIG_BT_CTLR_CHAN_SEL_2)) {
-			ftr->extra = ull_pdu_rx_alloc();
+			ftr->extra = ull_pdu_lll_rx_alloc();
 		}
 
-		ull_rx_put_sched(rx->hdr.link, rx);
+		ull_lll_rx_put_sched(rx->hdr.link, rx);
 
 		return 0;
 #endif /* CONFIG_BT_PERIPHERAL */

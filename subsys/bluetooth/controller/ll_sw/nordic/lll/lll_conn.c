@@ -289,7 +289,7 @@ void lll_conn_abort_cb(struct lll_prepare_param *prepare_param, void *param)
 #endif /* CONFIG_BT_PERIPHERAL */
 
 	/* Extra done event, to check supervision timeout */
-	e = ull_event_done_extra_get();
+	e = ull_event_lll_done_extra_get();
 	LL_ASSERT_ERR(e);
 
 	e->type = EVENT_DONE_EXTRA_TYPE_CONN;
@@ -363,7 +363,7 @@ void lll_conn_isr_rx(void *param)
 
 	lll = param;
 
-	node_rx = ull_pdu_rx_alloc_peek(1);
+	node_rx = ull_pdu_lll_rx_alloc_peek(1);
 	LL_ASSERT_DBG(node_rx);
 
 	pdu_data_rx = (void *)node_rx->pdu;
@@ -594,12 +594,12 @@ lll_conn_isr_rx_exit:
 #elif !defined(HAL_RADIO_PDU_LEN_MAX)
 #error "Undefined HAL_RADIO_PDU_LEN_MAX."
 #endif
-		ull_pdu_rx_alloc();
+		ull_pdu_lll_rx_alloc();
 
 		node_rx->hdr.type = NODE_RX_TYPE_DC_PDU;
 		node_rx->hdr.handle = lll->handle;
 
-		ull_rx_put(node_rx->hdr.link, node_rx);
+		ull_lll_rx_put(node_rx->hdr.link, node_rx);
 		is_ull_rx = 1U;
 	}
 
@@ -617,7 +617,7 @@ lll_conn_isr_rx_exit:
 	}
 
 	if (is_ull_rx || is_iq_report) {
-		ull_rx_sched();
+		ull_lll_rx_sched();
 	}
 
 #if defined(CONFIG_BT_CTLR_CONN_RSSI)
@@ -835,7 +835,7 @@ void lll_conn_rx_pkt_set(struct lll_conn *lll)
 	uint16_t max_rx_octets;
 	uint8_t phy;
 
-	node_rx = ull_pdu_rx_alloc_peek(1);
+	node_rx = ull_pdu_lll_rx_alloc_peek(1);
 	LL_ASSERT_DBG(node_rx);
 
 	/* In case of ISR latencies, if packet pointer has not been set on time
@@ -1040,7 +1040,7 @@ static void isr_done(void *param)
 
 	lll_isr_status_reset();
 
-	e = ull_event_done_extra_get();
+	e = ull_event_lll_done_extra_get();
 	LL_ASSERT_ERR(e);
 
 	e->type = EVENT_DONE_EXTRA_TYPE_CONN;
@@ -1197,7 +1197,7 @@ static inline int isr_rx_pdu(struct lll_conn *lll, struct pdu_data *pdu_data_rx,
 	    /* check so that we will NEVER use the rx buffer reserved for empty
 	     * packet and internal control enqueue
 	     */
-	    (ull_pdu_rx_alloc_peek(3) != 0)) {
+	    (ull_pdu_lll_rx_alloc_peek(3) != 0)) {
 		/* Increment next expected serial number */
 		lll->nesn++;
 
@@ -1333,7 +1333,7 @@ static inline bool create_iq_report(struct lll_conn *lll, uint8_t rssi_ready, ui
 		ftr->param = lll;
 		ftr->rssi = ((rssi_ready) ? radio_rssi_get() : BT_HCI_LE_RSSI_NOT_AVAILABLE);
 
-		ull_rx_put(iq_report->rx.hdr.link, iq_report);
+		ull_lll_rx_put(iq_report->rx.hdr.link, iq_report);
 
 		return true;
 	}

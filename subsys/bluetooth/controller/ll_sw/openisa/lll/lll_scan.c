@@ -163,7 +163,7 @@ static int prepare_cb(struct lll_prepare_param *prepare_param)
 	radio_pkt_configure(8, PDU_AC_LEG_PAYLOAD_SIZE_MAX, 0);
 #endif /* !CONFIG_BT_CTLR_ADV_EXT */
 
-	node_rx = ull_pdu_rx_alloc_peek(1);
+	node_rx = ull_pdu_lll_rx_alloc_peek(1);
 	LL_ASSERT(node_rx);
 	radio_pkt_rx_set(node_rx->pdu);
 
@@ -445,7 +445,7 @@ static void isr_tx(void *param)
 	radio_tmr_tifs_set(EVENT_IFS_US);
 	radio_switch_complete_and_tx(0, 0, 0, 0);
 
-	node_rx = ull_pdu_rx_alloc_peek(1);
+	node_rx = ull_pdu_lll_rx_alloc_peek(1);
 	LL_ASSERT(node_rx);
 	radio_pkt_rx_set(node_rx->pdu);
 
@@ -498,7 +498,7 @@ static void isr_common_done(void *param)
 	radio_tmr_tifs_set(EVENT_IFS_US);
 	radio_switch_complete_and_tx(0, 0, 0, 0);
 
-	node_rx = ull_pdu_rx_alloc_peek(1);
+	node_rx = ull_pdu_lll_rx_alloc_peek(1);
 	LL_ASSERT(node_rx);
 	radio_pkt_rx_set(node_rx->pdu);
 
@@ -612,14 +612,14 @@ static void isr_cleanup(void *param)
 #endif /* CONFIG_BT_HCI_MESH_EXT */
 
 #if defined(CONFIG_BT_CTLR_SCAN_INDICATION)
-	node_rx = ull_pdu_rx_alloc_peek(3);
+	node_rx = ull_pdu_lll_rx_alloc_peek(3);
 	if (node_rx) {
-		ull_pdu_rx_alloc();
+		ull_pdu_lll_rx_alloc();
 
 		/* TODO: add other info by defining a payload struct */
 		node_rx->hdr.type = NODE_RX_TYPE_SCAN_INDICATION;
 
-		ull_rx_put_sched(node_rx->hdr.link, node_rx);
+		ull_lll_rx_put_sched(node_rx->hdr.link, node_rx);
 	}
 #else /* !CONFIG_BT_CTLR_SCAN_INDICATION */
 	ARG_UNUSED(node_rx);
@@ -663,7 +663,7 @@ static inline uint32_t isr_rx_pdu(struct lll_scan *lll, uint8_t devmatch_ok,
 	struct pdu_adv *pdu_adv_rx;
 	bool dir_report = false;
 
-	node_rx = ull_pdu_rx_alloc_peek(1);
+	node_rx = ull_pdu_lll_rx_alloc_peek(1);
 	LL_ASSERT(node_rx);
 
 	pdu_adv_rx = (void *)node_rx->pdu;
@@ -687,9 +687,9 @@ static inline uint32_t isr_rx_pdu(struct lll_scan *lll, uint8_t devmatch_ok,
 #endif /* CONFIG_BT_CTLR_PRIVACY */
 
 		if (IS_ENABLED(CONFIG_BT_CTLR_CHAN_SEL_2)) {
-			rx = ull_pdu_rx_alloc_peek(4);
+			rx = ull_pdu_lll_rx_alloc_peek(4);
 		} else {
-			rx = ull_pdu_rx_alloc_peek(3);
+			rx = ull_pdu_lll_rx_alloc_peek(3);
 		}
 
 		if (!rx) {
@@ -826,7 +826,7 @@ static inline uint32_t isr_rx_pdu(struct lll_scan *lll, uint8_t devmatch_ok,
 		/* Stop further LLL radio events */
 		lll->conn->central.initiated = 1;
 
-		rx = ull_pdu_rx_alloc();
+		rx = ull_pdu_lll_rx_alloc();
 
 		rx->hdr.type = NODE_RX_TYPE_CONNECTION;
 		rx->hdr.handle = 0xffff;
@@ -855,10 +855,10 @@ static inline uint32_t isr_rx_pdu(struct lll_scan *lll, uint8_t devmatch_ok,
 #endif /* CONFIG_BT_CTLR_PRIVACY */
 
 		if (IS_ENABLED(CONFIG_BT_CTLR_CHAN_SEL_2)) {
-			ftr->extra = ull_pdu_rx_alloc();
+			ftr->extra = ull_pdu_lll_rx_alloc();
 		}
 
-		ull_rx_put_sched(rx->hdr.link, rx);
+		ull_lll_rx_put_sched(rx->hdr.link, rx);
 
 		return 0;
 #endif /* CONFIG_BT_CENTRAL */
@@ -1083,11 +1083,11 @@ static uint32_t isr_rx_scan_report(struct lll_scan *lll, uint8_t rssi_ready,
 	struct node_rx_pdu *node_rx;
 	struct pdu_adv *pdu_adv_rx;
 
-	node_rx = ull_pdu_rx_alloc_peek(3);
+	node_rx = ull_pdu_lll_rx_alloc_peek(3);
 	if (!node_rx) {
 		return 1;
 	}
-	ull_pdu_rx_alloc();
+	ull_pdu_lll_rx_alloc();
 
 	/* Prepare the report (adv or scan resp) */
 	node_rx->hdr.handle = 0xffff;
@@ -1140,7 +1140,7 @@ static uint32_t isr_rx_scan_report(struct lll_scan *lll, uint8_t rssi_ready,
 	}
 #endif /* CONFIG_BT_CTLR_EXT_SCAN_FP */
 
-	ull_rx_put_sched(node_rx->hdr.link, node_rx);
+	ull_lll_rx_put_sched(node_rx->hdr.link, node_rx);
 
 	return 0;
 }
