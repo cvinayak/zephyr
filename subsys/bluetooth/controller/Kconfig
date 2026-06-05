@@ -33,6 +33,9 @@ config BT_CTLR_PRIVACY_SUPPORT
 config BT_CTLR_EXT_SCAN_FP_SUPPORT
 	bool
 
+config BT_CTLR_DECISION_BASED_FILTERING_SUPPORT
+	bool
+
 config BT_CTLR_PHY_UPDATE_SUPPORT
 	bool
 
@@ -710,6 +713,15 @@ config BT_CTLR_EXT_SCAN_FP
 	help
 	  Enable support for Bluetooth v4.2 LE Extended Scanner Filter Policies
 	  in the Controller.
+
+config BT_CTLR_DECISION_BASED_FILTERING
+	bool "LE Decision-Based Advertising Filtering"
+	depends on BT_OBSERVER && BT_CTLR_DECISION_BASED_FILTERING_SUPPORT
+	help
+	  Enable support for Bluetooth v6.2 LE Decision-Based Advertising
+	  Filtering in the Controller. This feature allows the scanner to
+	  make filtering decisions based on advertising data content as
+	  specified in BLUETOOTH CORE SPECIFICATION Version 6.2.
 
 config BT_CTLR_PHY_2M
 	bool "2Mbps PHY Support"
