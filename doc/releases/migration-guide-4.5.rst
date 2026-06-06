@@ -262,6 +262,9 @@ Input
   * ``CONFIG_INPUT_CST8XX_PERIOD`` → :kconfig:option:`CONFIG_INPUT_CST8XX_PERIOD_MS`
   * ``CONFIG_INPUT_FT6146_PERIOD`` → :kconfig:option:`CONFIG_INPUT_FT6146_PERIOD_MS`
 
+  * Nunchuk driver wronlgy reported ``INPUT_KEY_Z``, respective ``INPUT_KEY_C`` in button events. This
+    has been fixed and ``INPUT_BTN_Z``, respective ``INPUT_BTN_C`` is used now.
+
 Interrupt Controllers
 =====================
 
@@ -527,6 +530,17 @@ Bluetooth HCI
   on-chip BLE controllers (BL60x/BL70x/BL70XL). Out-of-tree boards and shields
   must update their devicetree nodes accordingly.
 
+* Bluetooth HCI drivers now have to provide a mandatory common struct as the first field of
+  their data (:c:struct:`bt_hci_driver_data`) and config (:c:struct:`bt_hci_driver_config`)
+  structs.
+
+* The HCI driver :c:member:`bt_hci_driver_api.open` callback no longer has a ``recv`` parameter;
+  rather the common HCI driver layer code takes care of managing this as part of the common
+  data struct. There is a new :c:func:`bt_hci_recv` API for drivers to pass data the higher
+  layer (e.g. the Bluetooth Host stack). For drivers that need access to any error from recv()
+  (most don't) there's also a new :c:func:`bt_hci_recv_err` API that leaves the responsibility
+  of unrefing the buffer to the caller in case of error situations.
+
 Networking
 **********
 
@@ -710,3 +724,9 @@ Architectures
   It returns the current interrupt-enable state of the calling CPU without
   modifying it, complementing ``arch_irq_unlocked()`` which inspects a saved
   key.  Out-of-tree architecture ports must provide an implementation.
+
+* ``CONFIG_XTENSA_MPU_ONLY_SOC_RANGES`` is removed. For SoC or board to override the default
+  MPU region table, override :c:var:`xtensa_mpu_ranges` in the SoC or board layer instead.
+
+* ``xtensa_soc_mpu_ranges[]`` and ``xtensa_soc_mpu_ranges_num`` are removed. If SoC or board
+  needs its own memory regions at boot, override :c:var:`xtensa_mpu_ranges` instead.
