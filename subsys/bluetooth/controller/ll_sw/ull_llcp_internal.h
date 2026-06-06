@@ -30,6 +30,7 @@ enum llcp_proc {
 	PROC_CIS_TERMINATE,
 	PROC_SCA_UPDATE,
 	PROC_PERIODIC_SYNC,
+	PROC_SUBRATE_UPDATE,
 	/* A helper enum entry, to use in pause procedure context */
 	PROC_NONE = 0x0,
 };
@@ -344,6 +345,21 @@ struct proc_ctx {
 #endif /* CONFIG_BT_CTLR_SYNC_TRANSFER_SENDER */
 		} periodic_sync;
 #endif /* CONFIG_BT_CTLR_SYNC_TRANSFER_RECEIVER || CONFIG_BT_CTLR_SYNC_TRANSFER_SENDER */
+
+#if defined(CONFIG_BT_CTLR_SUBRATING)
+		/* Subrate Update Procedure */
+		struct {
+			uint8_t  error;
+			uint16_t subrate_factor_min;
+			uint16_t subrate_factor_max;
+			uint16_t max_latency;
+			uint16_t continuation_number;
+			uint16_t supervision_timeout;
+			uint16_t subrate_factor;
+			uint16_t subrate_base_event;
+			uint16_t latency;
+		} subrate;
+#endif /* CONFIG_BT_CTLR_SUBRATING */
 	} data;
 
 	struct {
@@ -817,6 +833,24 @@ void llcp_pdu_decode_periodic_sync_ind(struct proc_ctx *ctx, struct pdu_data *pd
 void llcp_rp_past_run(struct ll_conn *conn, struct proc_ctx *ctx, void *param);
 void llcp_rp_past_rx(struct ll_conn *conn, struct proc_ctx *ctx, struct node_rx_pdu *rx);
 #endif /* CONFIG_BT_CTLR_SYNC_TRANSFER_RECEIVER */
+
+#if defined(CONFIG_BT_CTLR_SUBRATING)
+/*
+ * Subrate Update Procedure Helper
+ */
+void llcp_pdu_encode_subrate_req(struct proc_ctx *ctx, struct pdu_data *pdu);
+void llcp_pdu_decode_subrate_req(struct proc_ctx *ctx, struct pdu_data *pdu);
+void llcp_pdu_encode_subrate_ind(struct proc_ctx *ctx, struct pdu_data *pdu);
+void llcp_pdu_decode_subrate_ind(struct proc_ctx *ctx, struct pdu_data *pdu);
+
+void llcp_lp_subrate_init_proc(struct proc_ctx *ctx);
+void llcp_lp_subrate_run(struct ll_conn *conn, struct proc_ctx *ctx, void *param);
+void llcp_lp_subrate_rx(struct ll_conn *conn, struct proc_ctx *ctx, struct node_rx_pdu *rx);
+
+void llcp_rp_subrate_init_proc(struct proc_ctx *ctx);
+void llcp_rp_subrate_run(struct ll_conn *conn, struct proc_ctx *ctx, void *param);
+void llcp_rp_subrate_rx(struct ll_conn *conn, struct proc_ctx *ctx, struct node_rx_pdu *rx);
+#endif /* CONFIG_BT_CTLR_SUBRATING */
 
 #ifdef ZTEST_UNITTEST
 bool llcp_lr_is_disconnected(struct ll_conn *conn);
