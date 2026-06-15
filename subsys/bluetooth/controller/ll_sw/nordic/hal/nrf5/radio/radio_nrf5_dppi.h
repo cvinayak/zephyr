@@ -481,6 +481,24 @@ static inline void hal_sw_switch_timer_clear_ppi_config(void)
 	nrf_dppi_channels_enable(NRF_DPPIC, BIT(HAL_SW_SWITCH_TIMER_CLEAR_PPI));
 }
 
+#if defined(CONFIG_BT_CTLR_SYNC_ISO_SE_B2B_RX)
+/* Reconfigure SW-switch timer clear from EVENTS_END to EVENTS_READY.
+ * Used for BIS subevent back-to-back reception where the timer offset
+ * is relative to the current subevent's READY timestamp.
+ */
+static inline void hal_sw_switch_timer_clear_ppi_se_rx_config(void)
+{
+	/* Remove END/PHYEND publish for timer clear */
+	nrf_radio_publish_clear(NRF_RADIO, HAL_NRF_RADIO_TIMER_CLEAR_EVENT_END);
+
+	/* Publish READY event to the same DPPI channel used for timer clear
+	 * and PPI group enable.
+	 */
+	nrf_radio_publish_set(NRF_RADIO, NRF_RADIO_EVENT_READY,
+			      HAL_SW_SWITCH_TIMER_CLEAR_PPI);
+}
+#endif /* CONFIG_BT_CTLR_SYNC_ISO_SE_B2B_RX */
+
 /* The 2 adjacent PPI groups used for implementing SW_SWITCH_TIMER-based
  * auto-switch for TIFS. 'index' must be 0 or 1.
  */
