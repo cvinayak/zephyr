@@ -438,12 +438,12 @@ static int prepare_cb(struct lll_prepare_param *p)
 
 				/* Calculate initial channel for this CIS's first subevent */
 				cis_interleaved[cis_chan_idx].id = iter_data_chan_id;
-				cis_interleaved[cis_chan_idx].chan_use =
-					lll_chan_iso_event(iter_event_counter, iter_data_chan_id,
-							   iter_conn_lll->data_chan_map,
-							   iter_conn_lll->data_chan_count,
-							   &cis_interleaved[cis_chan_idx].prn_s,
-							   &cis_interleaved[cis_chan_idx].remap_idx);
+				cis_interleaved[cis_chan_idx].chan_use = lll_chan_iso_event(
+						iter_event_counter, iter_data_chan_id,
+						iter_conn_lll->data_chan_map,
+						iter_conn_lll->data_chan_count,
+						&cis_interleaved[cis_chan_idx].prn_s,
+						&cis_interleaved[cis_chan_idx].remap_idx);
 				cis_se[cis_chan_idx] = 0U;
 				cis_chan_idx++;
 			}
