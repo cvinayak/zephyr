@@ -30,8 +30,21 @@ enum llcp_proc {
 	PROC_CIS_TERMINATE,
 	PROC_SCA_UPDATE,
 	PROC_PERIODIC_SYNC,
+	PROC_CS,
 	/* A helper enum entry, to use in pause procedure context */
 	PROC_NONE = 0x0,
+};
+
+/* Channel Sounding sub-operation handled by a PROC_CS procedure context */
+enum llcp_cs_op {
+	LLCP_CS_OP_NONE,
+	/* Local-only completions (no over-the-air exchange) */
+	LLCP_CS_OP_READ_REMOTE_CAP,
+	LLCP_CS_OP_CREATE_CONFIG,
+	LLCP_CS_OP_SECURITY_ENABLE,
+	/* Over-the-air exchanges */
+	LLCP_CS_OP_READ_REMOTE_FAE,
+	LLCP_CS_OP_PROCEDURE_ENABLE,
 };
 
 /* Generic IDLE state to be used across all procedures
@@ -344,6 +357,17 @@ struct proc_ctx {
 #endif /* CONFIG_BT_CTLR_SYNC_TRANSFER_SENDER */
 		} periodic_sync;
 #endif /* CONFIG_BT_CTLR_SYNC_TRANSFER_RECEIVER || CONFIG_BT_CTLR_SYNC_TRANSFER_SENDER */
+
+#if defined(CONFIG_BT_CTLR_CHANNEL_SOUNDING)
+		/* Used by Channel Sounding Procedure */
+		struct {
+			uint8_t op;
+			uint8_t config_id;
+			uint8_t action;
+			uint8_t state;
+			uint8_t error;
+		} cs;
+#endif /* CONFIG_BT_CTLR_CHANNEL_SOUNDING */
 	} data;
 
 	struct {
