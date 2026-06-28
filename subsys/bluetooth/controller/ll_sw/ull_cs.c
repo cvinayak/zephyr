@@ -194,6 +194,11 @@ int ull_cs_reset(void)
 	return 0;
 }
 
+const struct ll_cs_local_capabilities *ull_cs_local_capabilities_get(void)
+{
+	return &local_capabilities;
+}
+
 uint8_t ll_cs_read_local_supported_capabilities(
 	struct bt_hci_rp_le_read_local_supported_capabilities *rp)
 {
@@ -656,9 +661,12 @@ uint8_t ull_cs_filtered_channels_get(const uint8_t channel_map[10],
 
 void ull_cs_channels_shuffle(uint8_t *channels, uint8_t count, uint32_t seed)
 {
-	/* Fisher-Yates shuffle driven by a linear congruential generator seeded
-	 * with the procedure/event counter, providing the per-procedure channel
-	 * reordering of the channel selection algorithm #1.
+	/* TODO: Replace with the spec-defined CS channel selection algorithm
+	 * (Bluetooth Core Vol 6, Part H, Section 3.1) once the full
+	 * CS_CHANNEL_MAP_IND procedure is implemented. The LCG-based
+	 * Fisher-Yates shuffle below is a temporary placeholder used for
+	 * BabbleSim emulation and initial bring-up only; it does not produce
+	 * the same channel order as a peer running the specification algorithm.
 	 */
 	uint32_t state = seed ? seed : 1U;
 

@@ -35,6 +35,7 @@
 #include "ull_tx_queue.h"
 #include "isoal.h"
 #include "ull_iso_types.h"
+#include "ull_cs_types.h"
 #include "ull_conn_types.h"
 #include "ull_conn_iso_types.h"
 
@@ -1322,4 +1323,294 @@ void helper_pdu_verify_periodic_sync_ind(const char *file, uint32_t line, struct
 	zassert_mem_equal(pdu->llctrl.periodic_sync_ind.adv_addr, p->adv_addr,
 			  sizeof(p->adv_addr),
 			  "adv_addr mismatch.\nCalled at %s:%d\n", file, line);
+}
+
+void helper_pdu_encode_cs_fae_req(struct pdu_data *pdu, void *param)
+{
+	pdu->ll_id = PDU_DATA_LLID_CTRL;
+	pdu->len = PDU_DATA_LLCTRL_LEN(cs_fae_req);
+	pdu->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_CS_FAE_REQ;
+}
+
+void helper_pdu_encode_cs_fae_rsp(struct pdu_data *pdu, void *param)
+{
+	struct pdu_data_llctrl_cs_fae_rsp *p = param;
+
+	pdu->ll_id = PDU_DATA_LLID_CTRL;
+	pdu->len = PDU_DATA_LLCTRL_LEN(cs_fae_rsp);
+	pdu->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_CS_FAE_RSP;
+	memcpy(pdu->llctrl.cs_fae_rsp.ch_fae, p->ch_fae, sizeof(p->ch_fae));
+}
+
+void helper_pdu_encode_cs_capabilities_req(struct pdu_data *pdu, void *param)
+{
+	struct pdu_data_llctrl_cs_capabilities_req *p = param;
+
+	pdu->ll_id = PDU_DATA_LLID_CTRL;
+	pdu->len = PDU_DATA_LLCTRL_LEN(cs_capabilities_req);
+	pdu->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_CS_CAPABILITIES_REQ;
+	pdu->llctrl.cs_capabilities_req = *p;
+}
+
+void helper_pdu_encode_cs_capabilities_rsp(struct pdu_data *pdu, void *param)
+{
+	struct pdu_data_llctrl_cs_capabilities_rsp *p = param;
+
+	pdu->ll_id = PDU_DATA_LLID_CTRL;
+	pdu->len = PDU_DATA_LLCTRL_LEN(cs_capabilities_rsp);
+	pdu->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_CS_CAPABILITIES_RSP;
+	pdu->llctrl.cs_capabilities_rsp = *p;
+}
+
+void helper_pdu_encode_cs_sec_req(struct pdu_data *pdu, void *param)
+{
+	struct pdu_data_llctrl_cs_sec_req *p = param;
+
+	pdu->ll_id = PDU_DATA_LLID_CTRL;
+	pdu->len = PDU_DATA_LLCTRL_LEN(cs_sec_req);
+	pdu->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_CS_SEC_REQ;
+	pdu->llctrl.cs_sec_req = *p;
+}
+
+void helper_pdu_encode_cs_sec_rsp(struct pdu_data *pdu, void *param)
+{
+	struct pdu_data_llctrl_cs_sec_rsp *p = param;
+
+	pdu->ll_id = PDU_DATA_LLID_CTRL;
+	pdu->len = PDU_DATA_LLCTRL_LEN(cs_sec_rsp);
+	pdu->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_CS_SEC_RSP;
+	pdu->llctrl.cs_sec_rsp = *p;
+}
+
+void helper_pdu_encode_cs_config_req(struct pdu_data *pdu, void *param)
+{
+	struct pdu_data_llctrl_cs_config_req *p = param;
+
+	pdu->ll_id = PDU_DATA_LLID_CTRL;
+	pdu->len = PDU_DATA_LLCTRL_LEN(cs_config_req);
+	pdu->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_CS_CONFIG_REQ;
+	pdu->llctrl.cs_config_req = *p;
+}
+
+void helper_pdu_encode_cs_config_rsp(struct pdu_data *pdu, void *param)
+{
+	struct pdu_data_llctrl_cs_config_rsp *p = param;
+
+	pdu->ll_id = PDU_DATA_LLID_CTRL;
+	pdu->len = PDU_DATA_LLCTRL_LEN(cs_config_rsp);
+	pdu->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_CS_CONFIG_RSP;
+	pdu->llctrl.cs_config_rsp.config_id = p->config_id;
+}
+
+void helper_pdu_encode_cs_req(struct pdu_data *pdu, void *param)
+{
+	struct pdu_data_llctrl_cs_req *p = param;
+
+	pdu->ll_id = PDU_DATA_LLID_CTRL;
+	pdu->len = PDU_DATA_LLCTRL_LEN(cs_req);
+	pdu->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_CS_REQ;
+	pdu->llctrl.cs_req = *p;
+}
+
+void helper_pdu_encode_cs_rsp(struct pdu_data *pdu, void *param)
+{
+	struct pdu_data_llctrl_cs_rsp *p = param;
+
+	pdu->ll_id = PDU_DATA_LLID_CTRL;
+	pdu->len = PDU_DATA_LLCTRL_LEN(cs_rsp);
+	pdu->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_CS_RSP;
+	pdu->llctrl.cs_rsp = *p;
+}
+
+void helper_pdu_encode_cs_ind(struct pdu_data *pdu, void *param)
+{
+	struct pdu_data_llctrl_cs_ind *p = param;
+
+	pdu->ll_id = PDU_DATA_LLID_CTRL;
+	pdu->len = PDU_DATA_LLCTRL_LEN(cs_ind);
+	pdu->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_CS_IND;
+	pdu->llctrl.cs_ind = *p;
+}
+
+void helper_pdu_encode_cs_terminate_req(struct pdu_data *pdu, void *param)
+{
+	struct pdu_data_llctrl_cs_terminate_req *p = param;
+
+	pdu->ll_id = PDU_DATA_LLID_CTRL;
+	pdu->len = PDU_DATA_LLCTRL_LEN(cs_terminate_req);
+	pdu->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_CS_TERMINATE_REQ;
+	pdu->llctrl.cs_terminate_req.config_id = p->config_id;
+	pdu->llctrl.cs_terminate_req.error_code = p->error_code;
+}
+
+void helper_pdu_encode_cs_terminate_rsp(struct pdu_data *pdu, void *param)
+{
+	struct pdu_data_llctrl_cs_terminate_rsp *p = param;
+
+	pdu->ll_id = PDU_DATA_LLID_CTRL;
+	pdu->len = PDU_DATA_LLCTRL_LEN(cs_terminate_rsp);
+	pdu->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_CS_TERMINATE_RSP;
+	pdu->llctrl.cs_terminate_rsp.config_id = p->config_id;
+	pdu->llctrl.cs_terminate_rsp.error_code = p->error_code;
+}
+
+void helper_pdu_verify_cs_fae_req(const char *file, uint32_t line, struct pdu_data *pdu,
+				  void *param)
+{
+	zassert_equal(pdu->ll_id, PDU_DATA_LLID_CTRL, "Not a Control PDU.\nCalled at %s:%d\n",
+		      file, line);
+	zassert_equal(pdu->llctrl.opcode, PDU_DATA_LLCTRL_TYPE_CS_FAE_REQ,
+		      "Not a LL_CS_FAE_REQ.\nCalled at %s:%d\n", file, line);
+}
+
+void helper_pdu_verify_cs_fae_rsp(const char *file, uint32_t line, struct pdu_data *pdu,
+				  void *param)
+{
+	struct pdu_data_llctrl_cs_fae_rsp *p = param;
+
+	zassert_equal(pdu->ll_id, PDU_DATA_LLID_CTRL, "Not a Control PDU.\nCalled at %s:%d\n",
+		      file, line);
+	zassert_equal(pdu->llctrl.opcode, PDU_DATA_LLCTRL_TYPE_CS_FAE_RSP,
+		      "Not a LL_CS_FAE_RSP.\nCalled at %s:%d\n", file, line);
+	zassert_mem_equal(pdu->llctrl.cs_fae_rsp.ch_fae, p->ch_fae,
+			  sizeof(p->ch_fae),
+			  "ch_fae mismatch.\nCalled at %s:%d\n", file, line);
+}
+
+void helper_pdu_verify_cs_capabilities_req(const char *file, uint32_t line, struct pdu_data *pdu,
+					   void *param)
+{
+	struct pdu_data_llctrl_cs_capabilities_req *p = param;
+
+	zassert_equal(pdu->ll_id, PDU_DATA_LLID_CTRL, "Not a Control PDU.\nCalled at %s:%d\n",
+		      file, line);
+	zassert_equal(pdu->llctrl.opcode, PDU_DATA_LLCTRL_TYPE_CS_CAPABILITIES_REQ,
+		      "Not a LL_CS_CAPABILITIES_REQ.\nCalled at %s:%d\n", file, line);
+	zassert_mem_equal(&pdu->llctrl.cs_capabilities_req, p, sizeof(*p),
+			  "cs_capabilities_req mismatch.\nCalled at %s:%d\n", file, line);
+}
+
+void helper_pdu_verify_cs_capabilities_rsp(const char *file, uint32_t line, struct pdu_data *pdu,
+					   void *param)
+{
+	struct pdu_data_llctrl_cs_capabilities_rsp *p = param;
+
+	zassert_equal(pdu->ll_id, PDU_DATA_LLID_CTRL, "Not a Control PDU.\nCalled at %s:%d\n",
+		      file, line);
+	zassert_equal(pdu->llctrl.opcode, PDU_DATA_LLCTRL_TYPE_CS_CAPABILITIES_RSP,
+		      "Not a LL_CS_CAPABILITIES_RSP.\nCalled at %s:%d\n", file, line);
+	zassert_mem_equal(&pdu->llctrl.cs_capabilities_rsp, p, sizeof(*p),
+			  "cs_capabilities_rsp mismatch.\nCalled at %s:%d\n", file, line);
+}
+
+void helper_pdu_verify_cs_sec_req(const char *file, uint32_t line, struct pdu_data *pdu,
+				  void *param)
+{
+	struct pdu_data_llctrl_cs_sec_req *p = param;
+
+	zassert_equal(pdu->ll_id, PDU_DATA_LLID_CTRL, "Not a Control PDU.\nCalled at %s:%d\n",
+		      file, line);
+	zassert_equal(pdu->llctrl.opcode, PDU_DATA_LLCTRL_TYPE_CS_SEC_REQ,
+		      "Not a LL_CS_SEC_REQ.\nCalled at %s:%d\n", file, line);
+	zassert_mem_equal(&pdu->llctrl.cs_sec_req, p, sizeof(*p),
+			  "cs_sec_req mismatch.\nCalled at %s:%d\n", file, line);
+}
+
+void helper_pdu_verify_cs_sec_rsp(const char *file, uint32_t line, struct pdu_data *pdu,
+				  void *param)
+{
+	struct pdu_data_llctrl_cs_sec_rsp *p = param;
+
+	zassert_equal(pdu->ll_id, PDU_DATA_LLID_CTRL, "Not a Control PDU.\nCalled at %s:%d\n",
+		      file, line);
+	zassert_equal(pdu->llctrl.opcode, PDU_DATA_LLCTRL_TYPE_CS_SEC_RSP,
+		      "Not a LL_CS_SEC_RSP.\nCalled at %s:%d\n", file, line);
+	zassert_mem_equal(&pdu->llctrl.cs_sec_rsp, p, sizeof(*p),
+			  "cs_sec_rsp mismatch.\nCalled at %s:%d\n", file, line);
+}
+
+void helper_pdu_verify_cs_config_req(const char *file, uint32_t line, struct pdu_data *pdu,
+				     void *param)
+{
+	struct pdu_data_llctrl_cs_config_req *p = param;
+
+	zassert_equal(pdu->ll_id, PDU_DATA_LLID_CTRL, "Not a Control PDU.\nCalled at %s:%d\n",
+		      file, line);
+	zassert_equal(pdu->llctrl.opcode, PDU_DATA_LLCTRL_TYPE_CS_CONFIG_REQ,
+		      "Not a LL_CS_CONFIG_REQ.\nCalled at %s:%d\n", file, line);
+	zassert_equal(pdu->llctrl.cs_config_req.config_id, p->config_id,
+		      "config_id mismatch.\nCalled at %s:%d\n", file, line);
+	zassert_equal(pdu->llctrl.cs_config_req.action, p->action,
+		      "action mismatch.\nCalled at %s:%d\n", file, line);
+}
+
+void helper_pdu_verify_cs_config_rsp(const char *file, uint32_t line, struct pdu_data *pdu,
+				     void *param)
+{
+	struct pdu_data_llctrl_cs_config_rsp *p = param;
+
+	zassert_equal(pdu->ll_id, PDU_DATA_LLID_CTRL, "Not a Control PDU.\nCalled at %s:%d\n",
+		      file, line);
+	zassert_equal(pdu->llctrl.opcode, PDU_DATA_LLCTRL_TYPE_CS_CONFIG_RSP,
+		      "Not a LL_CS_CONFIG_RSP.\nCalled at %s:%d\n", file, line);
+	zassert_equal(pdu->llctrl.cs_config_rsp.config_id, p->config_id,
+		      "config_id mismatch.\nCalled at %s:%d\n", file, line);
+}
+
+void helper_pdu_verify_cs_req(const char *file, uint32_t line, struct pdu_data *pdu, void *param)
+{
+	struct pdu_data_llctrl_cs_req *p = param;
+
+	zassert_equal(pdu->ll_id, PDU_DATA_LLID_CTRL, "Not a Control PDU.\nCalled at %s:%d\n",
+		      file, line);
+	zassert_equal(pdu->llctrl.opcode, PDU_DATA_LLCTRL_TYPE_CS_REQ,
+		      "Not a LL_CS_REQ.\nCalled at %s:%d\n", file, line);
+	zassert_equal(pdu->llctrl.cs_req.config_id, p->config_id,
+		      "config_id mismatch.\nCalled at %s:%d\n", file, line);
+}
+
+void helper_pdu_verify_cs_rsp(const char *file, uint32_t line, struct pdu_data *pdu, void *param)
+{
+	zassert_equal(pdu->ll_id, PDU_DATA_LLID_CTRL, "Not a Control PDU.\nCalled at %s:%d\n",
+		      file, line);
+	zassert_equal(pdu->llctrl.opcode, PDU_DATA_LLCTRL_TYPE_CS_RSP,
+		      "Not a LL_CS_RSP.\nCalled at %s:%d\n", file, line);
+}
+
+void helper_pdu_verify_cs_ind(const char *file, uint32_t line, struct pdu_data *pdu, void *param)
+{
+	zassert_equal(pdu->ll_id, PDU_DATA_LLID_CTRL, "Not a Control PDU.\nCalled at %s:%d\n",
+		      file, line);
+	zassert_equal(pdu->llctrl.opcode, PDU_DATA_LLCTRL_TYPE_CS_IND,
+		      "Not a LL_CS_IND.\nCalled at %s:%d\n", file, line);
+}
+
+void helper_pdu_verify_cs_terminate_req(const char *file, uint32_t line, struct pdu_data *pdu,
+					void *param)
+{
+	struct pdu_data_llctrl_cs_terminate_req *p = param;
+
+	zassert_equal(pdu->ll_id, PDU_DATA_LLID_CTRL, "Not a Control PDU.\nCalled at %s:%d\n",
+		      file, line);
+	zassert_equal(pdu->llctrl.opcode, PDU_DATA_LLCTRL_TYPE_CS_TERMINATE_REQ,
+		      "Not a LL_CS_TERMINATE_REQ.\nCalled at %s:%d\n", file, line);
+	zassert_equal(pdu->llctrl.cs_terminate_req.config_id, p->config_id,
+		      "config_id mismatch.\nCalled at %s:%d\n", file, line);
+	zassert_equal(pdu->llctrl.cs_terminate_req.error_code, p->error_code,
+		      "error_code mismatch.\nCalled at %s:%d\n", file, line);
+}
+
+void helper_pdu_verify_cs_terminate_rsp(const char *file, uint32_t line, struct pdu_data *pdu,
+					void *param)
+{
+	struct pdu_data_llctrl_cs_terminate_rsp *p = param;
+
+	zassert_equal(pdu->ll_id, PDU_DATA_LLID_CTRL, "Not a Control PDU.\nCalled at %s:%d\n",
+		      file, line);
+	zassert_equal(pdu->llctrl.opcode, PDU_DATA_LLCTRL_TYPE_CS_TERMINATE_RSP,
+		      "Not a LL_CS_TERMINATE_RSP.\nCalled at %s:%d\n", file, line);
+	zassert_equal(pdu->llctrl.cs_terminate_rsp.config_id, p->config_id,
+		      "config_id mismatch.\nCalled at %s:%d\n", file, line);
+	zassert_equal(pdu->llctrl.cs_terminate_rsp.error_code, p->error_code,
+		      "error_code mismatch.\nCalled at %s:%d\n", file, line);
 }
