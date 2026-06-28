@@ -28,6 +28,15 @@ struct ll_conn_cs_data {
 	uint8_t  remote_fae_available:1;
 	uint8_t  security_enabled:1;
 	int8_t   remote_fae_table[72];
+	/* CS security vectors CS_IV, CS_IN and CS_PV established by the CS
+	 * security start procedure (LSO first, peripheral part in the most
+	 * significant octets), and the CS step counter used to instantiate
+	 * and run the CS DRBG.
+	 */
+	uint8_t  cs_iv[16];
+	uint8_t  cs_in[8];
+	uint8_t  cs_pv[16];
+	uint16_t step_counter;
 	/* Scheduling parameters negotiated between the local and remote
 	 * device (Initiator and Reflector) using the LL_CS_REQ, LL_CS_RSP
 	 * and LL_CS_IND PDUs. The Initiator proposes a parameter set in

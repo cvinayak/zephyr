@@ -80,6 +80,10 @@
 #include "ll_sw/ull_llcp.h"
 #include "ll_sw/ull_llcp_features.h"
 
+#if defined(CONFIG_BT_CTLR_CHANNEL_SOUNDING)
+#include "ull_cs_internal.h"
+#endif /* CONFIG_BT_CTLR_CHANNEL_SOUNDING */
+
 #include "hal/debug.h"
 
 #define LOG_LEVEL CONFIG_BT_HCI_DRIVER_LOG_LEVEL
@@ -994,6 +998,11 @@ int ull_conn_llcp(struct ll_conn *conn, uint32_t ticks_at_expire,
 		/* Cancel prepare */
 		return -ECANCELED;
 	}
+
+#if defined(CONFIG_BT_CTLR_CHANNEL_SOUNDING)
+	/* Schedule the CS procedure instance anchored to this event */
+	ull_cs_conn_prepare(conn, ticks_at_expire, remainder, lazy);
+#endif /* CONFIG_BT_CTLR_CHANNEL_SOUNDING */
 
 	/* Continue prepare */
 	return 0;

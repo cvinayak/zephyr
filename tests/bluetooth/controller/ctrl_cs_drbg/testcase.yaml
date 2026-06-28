@@ -1,0 +1,7 @@
+common:
+  tags:
+    - bluetooth
+    - bt_channel_sounding
+tests:
+  bluetooth.controller.ctrl_cs_drbg.test:
+    type: unit

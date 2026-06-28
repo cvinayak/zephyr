@@ -240,7 +240,7 @@ config BT_CTLR_DUP_FILTER_ADV_SET_MAX
 config BT_CTLR_RX_BUFFERS
 	int "Number of Rx buffers"
 	depends on BT_LL_SW_SPLIT
-	default 6 if BT_HCI_RAW
+	default 6 if BT_HCI_RAW || BT_CTLR_CHANNEL_SOUNDING
 	default 1
 	range 1 18
 	help
@@ -1197,6 +1197,7 @@ config BT_CTLR_CHANNEL_SOUNDING
 	bool "Channel Sounding support"
 	depends on BT_CTLR_CHANNEL_SOUNDING_SUPPORT
 	select BT_CTLR_SET_HOST_FEATURE
+	select BT_CTLR_RADIO_TIMER_ISR if BT_LL_SW_SPLIT && SOC_COMPATIBLE_NRF54LX
 	default y if BT_CHANNEL_SOUNDING
 	help
 	  Enable support for Bluetooth 6.0 Channel Sounding in the
