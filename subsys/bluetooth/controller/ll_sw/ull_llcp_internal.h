@@ -842,6 +842,24 @@ void llcp_rp_past_run(struct ll_conn *conn, struct proc_ctx *ctx, void *param);
 void llcp_rp_past_rx(struct ll_conn *conn, struct proc_ctx *ctx, struct node_rx_pdu *rx);
 #endif /* CONFIG_BT_CTLR_SYNC_TRANSFER_RECEIVER */
 
+#if defined(CONFIG_BT_CTLR_CHANNEL_SOUNDING)
+/*
+ * LLCP Local Channel Sounding Procedure
+ */
+void llcp_lp_cs_init_proc(struct proc_ctx *ctx);
+void llcp_lp_cs_run(struct ll_conn *conn, struct proc_ctx *ctx, void *param);
+void llcp_lp_cs_rx(struct ll_conn *conn, struct proc_ctx *ctx, struct node_rx_pdu *rx);
+void llcp_lp_cs_tx_ack(struct ll_conn *conn, struct proc_ctx *ctx, struct node_tx *tx);
+
+/*
+ * LLCP Remote Channel Sounding Procedure
+ */
+void llcp_rp_cs_init_proc(struct proc_ctx *ctx);
+void llcp_rp_cs_run(struct ll_conn *conn, struct proc_ctx *ctx, void *param);
+void llcp_rp_cs_rx(struct ll_conn *conn, struct proc_ctx *ctx, struct node_rx_pdu *rx);
+void llcp_rp_cs_tx_ack(struct ll_conn *conn, struct proc_ctx *ctx, struct node_tx *tx);
+#endif /* CONFIG_BT_CTLR_CHANNEL_SOUNDING */
+
 #ifdef ZTEST_UNITTEST
 bool llcp_lr_is_disconnected(struct ll_conn *conn);
 bool llcp_lr_is_idle(struct ll_conn *conn);

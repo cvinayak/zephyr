@@ -99,6 +99,9 @@ static bool proc_with_instant(struct proc_ctx *ctx)
 	case PROC_CIS_CREATE:
 	case PROC_SCA_UPDATE:
 	case PROC_PERIODIC_SYNC:
+#if defined(CONFIG_BT_CTLR_CHANNEL_SOUNDING)
+	case PROC_CS:
+#endif /* CONFIG_BT_CTLR_CHANNEL_SOUNDING */
 		return 0U;
 	case PROC_PHY_UPDATE:
 	case PROC_CONN_UPDATE:
@@ -320,6 +323,11 @@ void llcp_rr_rx(struct ll_conn *conn, struct proc_ctx *ctx, memq_link_t *link,
 		llcp_rp_past_rx(conn, ctx, rx);
 		break;
 #endif /* CONFIG_BT_CTLR_SYNC_TRANSFER_RECEIVER */
+#if defined(CONFIG_BT_CTLR_CHANNEL_SOUNDING)
+	case PROC_CS:
+		llcp_rp_cs_rx(conn, ctx, rx);
+		break;
+#endif /* CONFIG_BT_CTLR_CHANNEL_SOUNDING */
 	default:
 		/* Unknown procedure */
 		LL_ASSERT_DBG(0);
@@ -357,6 +365,11 @@ void llcp_rr_tx_ack(struct ll_conn *conn, struct proc_ctx *ctx, struct node_tx *
 		llcp_rp_comm_tx_ack(conn, ctx, tx);
 		break;
 #endif /* CONFIG_BT_CTLR_DF_CONN_CTE_RSP */
+#if defined(CONFIG_BT_CTLR_CHANNEL_SOUNDING)
+	case PROC_CS:
+		llcp_rp_cs_tx_ack(conn, ctx, tx);
+		break;
+#endif /* CONFIG_BT_CTLR_CHANNEL_SOUNDING */
 	default:
 		/* Ignore tx_ack */
 		break;
@@ -460,6 +473,11 @@ static void rr_act_run(struct ll_conn *conn)
 		llcp_rp_past_run(conn, ctx, NULL);
 		break;
 #endif /* CONFIG_BT_CTLR_SYNC_TRANSFER_RECEIVER */
+#if defined(CONFIG_BT_CTLR_CHANNEL_SOUNDING)
+	case PROC_CS:
+		llcp_rp_cs_run(conn, ctx, NULL);
+		break;
+#endif /* CONFIG_BT_CTLR_CHANNEL_SOUNDING */
 	default:
 		/* Unknown procedure */
 		LL_ASSERT_DBG(0);
@@ -913,6 +931,21 @@ static const struct proc_role new_proc_lut[] = {
 #if defined(CONFIG_BT_CTLR_SYNC_TRANSFER_RECEIVER)
 	[PDU_DATA_LLCTRL_TYPE_PERIODIC_SYNC_IND] = { PROC_PERIODIC_SYNC, ACCEPT_ROLE_BOTH },
 #endif /* CONFIG_BT_CTLR_SYNC_TRANSFER_RECEIVER */
+#if defined(CONFIG_BT_CTLR_CHANNEL_SOUNDING)
+	[PDU_DATA_LLCTRL_TYPE_CS_CAPABILITIES_REQ] = { PROC_CS, ACCEPT_ROLE_BOTH },
+	[PDU_DATA_LLCTRL_TYPE_CS_CAPABILITIES_RSP] = { PROC_UNKNOWN, ACCEPT_ROLE_NONE },
+	[PDU_DATA_LLCTRL_TYPE_CS_CONFIG_REQ] = { PROC_CS, ACCEPT_ROLE_BOTH },
+	[PDU_DATA_LLCTRL_TYPE_CS_CONFIG_RSP] = { PROC_UNKNOWN, ACCEPT_ROLE_NONE },
+	[PDU_DATA_LLCTRL_TYPE_CS_SEC_REQ] = { PROC_CS, ACCEPT_ROLE_BOTH },
+	[PDU_DATA_LLCTRL_TYPE_CS_SEC_RSP] = { PROC_UNKNOWN, ACCEPT_ROLE_NONE },
+	[PDU_DATA_LLCTRL_TYPE_CS_REQ] = { PROC_CS, ACCEPT_ROLE_BOTH },
+	[PDU_DATA_LLCTRL_TYPE_CS_RSP] = { PROC_UNKNOWN, ACCEPT_ROLE_NONE },
+	[PDU_DATA_LLCTRL_TYPE_CS_IND] = { PROC_UNKNOWN, ACCEPT_ROLE_NONE },
+	[PDU_DATA_LLCTRL_TYPE_CS_TERMINATE_REQ] = { PROC_CS, ACCEPT_ROLE_BOTH },
+	[PDU_DATA_LLCTRL_TYPE_CS_FAE_REQ] = { PROC_CS, ACCEPT_ROLE_BOTH },
+	[PDU_DATA_LLCTRL_TYPE_CS_FAE_RSP] = { PROC_UNKNOWN, ACCEPT_ROLE_NONE },
+	[PDU_DATA_LLCTRL_TYPE_CS_CHANNEL_MAP_IND] = { PROC_UNKNOWN, ACCEPT_ROLE_NONE },
+#endif /* CONFIG_BT_CTLR_CHANNEL_SOUNDING */
 };
 
 void llcp_rr_new(struct ll_conn *conn, memq_link_t *link, struct node_rx_pdu *rx, bool valid_pdu)
