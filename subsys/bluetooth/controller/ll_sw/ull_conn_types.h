@@ -146,6 +146,10 @@ struct llcp_struct {
 		uint8_t terminate_ack;
 	} cis;
 
+#if defined(CONFIG_BT_CTLR_CHANNEL_SOUNDING)
+	struct ll_conn_cs_data cs;
+#endif /* CONFIG_BT_CTLR_CHANNEL_SOUNDING */
+
 	uint8_t tx_buffer_alloc;
 	uint8_t tx_q_pause_data_mask;
 
@@ -296,7 +300,35 @@ struct node_rx_cu {
 };
 
 struct node_rx_cs {
-	uint8_t csa;
+	uint8_t  csa;
+};
+
+/* Maximum number of CS steps reported in a single subevent result. */
+#define NODE_RX_CS_MAX_STEPS 15U
+
+/* Maximum step data payload per subevent result node. Each step carries:
+ * 1 byte mode + 1 byte channel + 1 byte data_length + up to ~12 bytes of
+ * per-step data (mode-1 or mode-2 with one antenna path).
+ * Capped to fit within HCI meta event size limits (uint8_t melen).
+ */
+#define NODE_RX_CS_STEP_DATA_MAX (NODE_RX_CS_MAX_STEPS * 15U)
+
+struct node_rx_csound {
+	uint8_t  status;
+	uint8_t  config_id;
+	uint8_t  action;
+	uint8_t  state;
+	/* Fields below are only valid for NODE_RX_TYPE_CS_SUBEVENT_RESULT */
+	uint16_t start_acl_conn_event;
+	uint16_t procedure_counter;
+	uint16_t frequency_compensation;
+	int8_t   reference_power_level;
+	uint8_t  procedure_done_status;
+	uint8_t  subevent_done_status;
+	uint8_t  num_antenna_paths;
+	uint8_t  num_steps_reported;
+	uint8_t  step_data_len;
+	uint8_t  step_data[NODE_RX_CS_STEP_DATA_MAX];
 };
 
 struct node_rx_pu {

@@ -58,8 +58,9 @@
 #include "ll_sw/ull_adv_types.h"
 #include "ll_sw/ull_scan_types.h"
 #include "ll_sw/ull_sync_types.h"
-#include "ll_sw/ull_conn_types.h"
 #include "ll_sw/ull_iso_types.h"
+#include "ll_sw/ull_cs_types.h"
+#include "ll_sw/ull_conn_types.h"
 #include "ll_sw/ull_conn_iso_types.h"
 #include "ll_sw/ull_conn_iso_internal.h"
 #include "ll_sw/ull_df_types.h"
@@ -71,6 +72,7 @@
 #include "ll_sw/ull_sync_iso_internal.h"
 #include "ll_sw/ull_iso_internal.h"
 #include "ll_sw/ull_df_internal.h"
+#include "ll_sw/ull_cs_internal.h"
 
 #include "ll.h"
 #include "ll_feat.h"
@@ -1125,6 +1127,23 @@ static void read_supported_commands(struct net_buf *buf, struct net_buf **evt)
 	/* Read Supported Codecs [v2], Codec Capabilities, Controller Delay, Configure Data Path */
 	rp->commands[45] |= BIT(2) | BIT(3) | BIT(4) | BIT(5);
 #endif /* CONFIG_BT_CTLR_HCI_CODEC_AND_DELAY_INFO */
+
+#if defined(CONFIG_BT_CTLR_CHANNEL_SOUNDING)
+	/* LE CS Read Local Supported Capabilities,
+	 * LE CS Read Remote Supported Capabilities,
+	 * LE CS Write Cached Remote Supported Capabilities,
+	 * LE CS Security Enable, LE CS Set Default Settings,
+	 * LE CS Read Remote FAE Table, LE CS Write Cached Remote FAE Table,
+	 * LE CS Create Config
+	 */
+	rp->commands[46] |= BIT(0) | BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5) |
+			    BIT(6) | BIT(7);
+	/* LE CS Remove Config, LE CS Set Channel Classification,
+	 * LE CS Set Procedure Parameters, LE CS Procedure Enable,
+	 * LE CS Test, LE CS Test End
+	 */
+	rp->commands[47] |= BIT(0) | BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5);
+#endif /* CONFIG_BT_CTLR_CHANNEL_SOUNDING */
 }
 
 static void read_local_features(struct net_buf *buf, struct net_buf **evt)
@@ -3365,6 +3384,167 @@ static void le_df_read_ant_inf(struct net_buf *buf, struct net_buf **evt)
 }
 #endif /* CONFIG_BT_CTLR_DF */
 
+#if defined(CONFIG_BT_CTLR_CHANNEL_SOUNDING)
+static void le_cs_read_local_supported_capabilities(struct net_buf *buf,
+						    struct net_buf **evt)
+{
+	struct bt_hci_rp_le_read_local_supported_capabilities *rp;
+
+	rp = hci_cmd_complete(evt, sizeof(*rp));
+	ll_cs_read_local_supported_capabilities(rp);
+}
+
+static void le_cs_read_remote_supported_capabilities(struct net_buf *buf,
+						     struct net_buf **evt)
+{
+	struct bt_hci_cp_le_read_remote_supported_capabilities *cmd =
+		(void *)buf->data;
+	uint16_t handle;
+	uint8_t status;
+
+	handle = sys_le16_to_cpu(cmd->handle);
+	status = ll_cs_read_remote_supported_capabilities(handle);
+
+	*evt = cmd_status(status);
+}
+
+static void le_cs_write_cached_remote_supported_capabilities(struct net_buf *buf,
+							     struct net_buf **evt)
+{
+	struct bt_hci_cp_le_write_cached_remote_supported_capabilities *cmd =
+		(void *)buf->data;
+	uint8_t status;
+
+	status = ll_cs_write_cached_remote_supported_capabilities(cmd);
+
+	*evt = cmd_complete_status(status);
+}
+
+static void le_cs_security_enable(struct net_buf *buf, struct net_buf **evt)
+{
+	struct bt_hci_cp_le_security_enable *cmd = (void *)buf->data;
+	uint16_t handle;
+	uint8_t status;
+
+	handle = sys_le16_to_cpu(cmd->handle);
+	status = ll_cs_security_enable(handle);
+
+	*evt = cmd_status(status);
+}
+
+static void le_cs_set_default_settings(struct net_buf *buf,
+				       struct net_buf **evt)
+{
+	struct bt_hci_cp_le_cs_set_default_settings *cmd = (void *)buf->data;
+	uint8_t status;
+
+	status = ll_cs_set_default_settings(cmd);
+
+	*evt = cmd_complete_status(status);
+}
+
+static void le_cs_read_remote_fae_table(struct net_buf *buf,
+					struct net_buf **evt)
+{
+	struct bt_hci_cp_le_read_remote_fae_table *cmd = (void *)buf->data;
+	uint16_t handle;
+	uint8_t status;
+
+	handle = sys_le16_to_cpu(cmd->handle);
+	status = ll_cs_read_remote_fae_table(handle);
+
+	*evt = cmd_status(status);
+}
+
+static void le_cs_write_cached_remote_fae_table(struct net_buf *buf,
+						struct net_buf **evt)
+{
+	struct bt_hci_cp_le_write_cached_remote_fae_table *cmd =
+		(void *)buf->data;
+	uint8_t status;
+
+	status = ll_cs_write_cached_remote_fae_table(cmd);
+
+	*evt = cmd_complete_status(status);
+}
+
+static void le_cs_create_config(struct net_buf *buf, struct net_buf **evt)
+{
+	struct bt_hci_cp_le_cs_create_config *cmd = (void *)buf->data;
+	uint8_t config_id;
+	uint8_t status;
+
+	status = ll_cs_create_config(cmd, &config_id);
+
+	*evt = cmd_status(status);
+}
+
+static void le_cs_remove_config(struct net_buf *buf, struct net_buf **evt)
+{
+	struct bt_hci_cp_le_cs_remove_config *cmd = (void *)buf->data;
+	uint16_t handle;
+	uint8_t status;
+
+	handle = sys_le16_to_cpu(cmd->handle);
+	status = ll_cs_remove_config(handle, cmd->config_id);
+
+	*evt = cmd_status(status);
+}
+
+static void le_cs_set_channel_classification(struct net_buf *buf,
+					     struct net_buf **evt)
+{
+	uint8_t *channel_map = (void *)buf->data;
+	uint8_t status;
+
+	status = ll_cs_set_channel_classification(channel_map);
+
+	*evt = cmd_complete_status(status);
+}
+
+static void le_cs_set_procedure_parameters(struct net_buf *buf,
+					   struct net_buf **evt)
+{
+	struct bt_hci_cp_le_set_procedure_parameters *cmd = (void *)buf->data;
+	uint8_t status;
+
+	status = ll_cs_set_procedure_parameters(cmd);
+
+	*evt = cmd_status(status);
+}
+
+static void le_cs_procedure_enable(struct net_buf *buf, struct net_buf **evt)
+{
+	struct bt_hci_cp_le_procedure_enable *cmd = (void *)buf->data;
+	uint16_t handle;
+	uint8_t status;
+
+	handle = sys_le16_to_cpu(cmd->handle);
+	status = ll_cs_procedure_enable(handle, cmd->config_id, cmd->enable);
+
+	*evt = cmd_status(status);
+}
+
+static void le_cs_test(struct net_buf *buf, struct net_buf **evt)
+{
+	struct bt_hci_op_le_cs_test *cmd = (void *)buf->data;
+	uint8_t status;
+
+	status = ll_cs_test(cmd);
+
+	*evt = cmd_complete_status(status);
+}
+
+static void le_cs_test_end(struct net_buf *buf, struct net_buf **evt)
+{
+	uint8_t status;
+
+	status = ll_cs_test_end();
+
+	*evt = cmd_complete_status(status);
+}
+#endif /* CONFIG_BT_CTLR_CHANNEL_SOUNDING */
+
 #if defined(CONFIG_BT_CTLR_DTM_HCI)
 static void le_rx_test(struct net_buf *buf, struct net_buf **evt)
 {
@@ -5030,6 +5210,51 @@ static int controller_cmd_handle(uint16_t  ocf, struct net_buf *cmd,
 		break;
 #endif /* CONFIG_BT_CTLR_DF_CONN_CTE_RSP */
 #endif /* CONFIG_BT_CTLR_DF */
+
+#if defined(CONFIG_BT_CTLR_CHANNEL_SOUNDING)
+	case BT_OCF(BT_HCI_OP_LE_CS_READ_LOCAL_SUPPORTED_CAPABILITIES):
+		le_cs_read_local_supported_capabilities(cmd, evt);
+		break;
+	case BT_OCF(BT_HCI_OP_LE_CS_READ_REMOTE_SUPPORTED_CAPABILITIES):
+		le_cs_read_remote_supported_capabilities(cmd, evt);
+		break;
+	case BT_OCF(BT_HCI_OP_LE_CS_WRITE_CACHED_REMOTE_SUPPORTED_CAPABILITIES):
+		le_cs_write_cached_remote_supported_capabilities(cmd, evt);
+		break;
+	case BT_OCF(BT_HCI_OP_LE_CS_SECURITY_ENABLE):
+		le_cs_security_enable(cmd, evt);
+		break;
+	case BT_OCF(BT_HCI_OP_LE_CS_SET_DEFAULT_SETTINGS):
+		le_cs_set_default_settings(cmd, evt);
+		break;
+	case BT_OCF(BT_HCI_OP_LE_CS_READ_REMOTE_FAE_TABLE):
+		le_cs_read_remote_fae_table(cmd, evt);
+		break;
+	case BT_OCF(BT_HCI_OP_LE_CS_WRITE_CACHED_REMOTE_FAE_TABLE):
+		le_cs_write_cached_remote_fae_table(cmd, evt);
+		break;
+	case BT_OCF(BT_HCI_OP_LE_CS_CREATE_CONFIG):
+		le_cs_create_config(cmd, evt);
+		break;
+	case BT_OCF(BT_HCI_OP_LE_CS_REMOVE_CONFIG):
+		le_cs_remove_config(cmd, evt);
+		break;
+	case BT_OCF(BT_HCI_OP_LE_CS_SET_CHANNEL_CLASSIFICATION):
+		le_cs_set_channel_classification(cmd, evt);
+		break;
+	case BT_OCF(BT_HCI_OP_LE_CS_SET_PROCEDURE_PARAMETERS):
+		le_cs_set_procedure_parameters(cmd, evt);
+		break;
+	case BT_OCF(BT_HCI_OP_LE_CS_PROCEDURE_ENABLE):
+		le_cs_procedure_enable(cmd, evt);
+		break;
+	case BT_OCF(BT_HCI_OP_LE_CS_TEST):
+		le_cs_test(cmd, evt);
+		break;
+	case BT_OCF(BT_HCI_OP_LE_CS_TEST_END):
+		le_cs_test_end(cmd, evt);
+		break;
+#endif /* CONFIG_BT_CTLR_CHANNEL_SOUNDING */
 
 #if defined(CONFIG_BT_CTLR_DTM_HCI)
 	case BT_OCF(BT_HCI_OP_LE_RX_TEST):
@@ -8712,6 +8937,226 @@ static void le_req_peer_sca_complete(struct pdu_data *pdu, uint16_t handle,
 	sep->sca = scau->sca;
 }
 #endif /* CONFIG_BT_CTLR_SCA_UPDATE */
+
+#if defined(CONFIG_BT_CTLR_CHANNEL_SOUNDING)
+static void le_cs_read_remote_supported_capabilities_complete(struct pdu_data *pdu,
+							      uint16_t handle,
+							      struct net_buf *buf)
+{
+	struct bt_hci_evt_le_cs_read_remote_supported_capabilities_complete *sep;
+	struct node_rx_csound *cs = (void *)pdu;
+	struct ll_conn *conn;
+
+	if (!(event_mask & BT_EVT_MASK_LE_META_EVENT) ||
+	    !(le_event_mask & BT_EVT_MASK_LE_CS_READ_REMOTE_SUPPORTED_CAPABILITIES_COMPLETE)) {
+		return;
+	}
+
+	sep = meta_evt(buf, BT_HCI_EVT_LE_CS_READ_REMOTE_SUPPORTED_CAPABILITIES_COMPLETE,
+		       sizeof(*sep));
+
+	memset(sep, 0, sizeof(*sep));
+	sep->status = cs->status;
+	sep->conn_handle = sys_cpu_to_le16(handle);
+
+	conn = ll_connected_get(handle);
+	if (conn) {
+		struct ll_conn_cs_data *cs_data = &conn->llcp.cs;
+
+		sep->num_config_supported = cs_data->remote_capabilities.num_config_supported;
+		sep->max_consecutive_procedures_supported = sys_cpu_to_le16(
+			cs_data->remote_capabilities.max_consecutive_procedures_supported);
+		sep->num_antennas_supported =
+			cs_data->remote_capabilities.num_antennas_supported;
+		sep->max_antenna_paths_supported =
+			cs_data->remote_capabilities.max_antenna_paths_supported;
+		sep->roles_supported = cs_data->remote_capabilities.roles_supported;
+		sep->modes_supported = cs_data->remote_capabilities.modes_supported;
+		sep->rtt_capability = cs_data->remote_capabilities.rtt_capability;
+		sep->rtt_aa_only_n = cs_data->remote_capabilities.rtt_aa_only_n;
+		sep->rtt_sounding_n = cs_data->remote_capabilities.rtt_sounding_n;
+		sep->rtt_random_payload_n =
+			cs_data->remote_capabilities.rtt_random_payload_n;
+		sep->nadm_sounding_capability = sys_cpu_to_le16(
+			cs_data->remote_capabilities.nadm_sounding_capability);
+		sep->nadm_random_capability = sys_cpu_to_le16(
+			cs_data->remote_capabilities.nadm_random_capability);
+		sep->cs_sync_phys_supported =
+			cs_data->remote_capabilities.cs_sync_phys_supported;
+		sep->subfeatures_supported = sys_cpu_to_le16(
+			cs_data->remote_capabilities.subfeatures_supported);
+		sep->t_ip1_times_supported = sys_cpu_to_le16(
+			cs_data->remote_capabilities.t_ip1_times_supported);
+		sep->t_ip2_times_supported = sys_cpu_to_le16(
+			cs_data->remote_capabilities.t_ip2_times_supported);
+		sep->t_fcs_times_supported = sys_cpu_to_le16(
+			cs_data->remote_capabilities.t_fcs_times_supported);
+		sep->t_pm_times_supported = sys_cpu_to_le16(
+			cs_data->remote_capabilities.t_pm_times_supported);
+		sep->t_sw_time_supported =
+			cs_data->remote_capabilities.t_sw_time_supported;
+		sep->tx_snr_capability = cs_data->remote_capabilities.tx_snr_capability;
+	}
+}
+
+static void le_cs_read_remote_fae_table_complete(struct pdu_data *pdu, uint16_t handle,
+						 struct net_buf *buf)
+{
+	struct bt_hci_evt_le_cs_read_remote_fae_table_complete *sep;
+	struct node_rx_csound *cs = (void *)pdu;
+	struct ll_conn *conn;
+
+	if (!(event_mask & BT_EVT_MASK_LE_META_EVENT) ||
+	    !(le_event_mask & BT_EVT_MASK_LE_CS_READ_REMOTE_FAE_TABLE_COMPLETE)) {
+		return;
+	}
+
+	sep = meta_evt(buf, BT_HCI_EVT_LE_CS_READ_REMOTE_FAE_TABLE_COMPLETE, sizeof(*sep));
+
+	memset(sep, 0, sizeof(*sep));
+	sep->status = cs->status;
+	sep->conn_handle = sys_cpu_to_le16(handle);
+
+	conn = ll_connected_get(handle);
+	if (conn) {
+		memcpy(sep->remote_fae_table, conn->llcp.cs.remote_fae_table,
+		       sizeof(sep->remote_fae_table));
+	}
+}
+
+static void le_cs_security_enable_complete(struct pdu_data *pdu, uint16_t handle,
+					   struct net_buf *buf)
+{
+	struct bt_hci_evt_le_cs_security_enable_complete *sep;
+	struct node_rx_csound *cs = (void *)pdu;
+
+	if (!(event_mask & BT_EVT_MASK_LE_META_EVENT) ||
+	    !(le_event_mask & BT_EVT_MASK_LE_CS_SECURITY_ENABLE_COMPLETE)) {
+		return;
+	}
+
+	sep = meta_evt(buf, BT_HCI_EVT_LE_CS_SECURITY_ENABLE_COMPLETE, sizeof(*sep));
+
+	sep->status = cs->status;
+	sep->handle = sys_cpu_to_le16(handle);
+}
+
+static void le_cs_config_complete(struct pdu_data *pdu, uint16_t handle, struct net_buf *buf)
+{
+	struct bt_hci_evt_le_cs_config_complete *sep;
+	struct node_rx_csound *cs = (void *)pdu;
+	struct ll_conn *conn;
+
+	if (!(event_mask & BT_EVT_MASK_LE_META_EVENT) ||
+	    !(le_event_mask & BT_EVT_MASK_LE_CS_CONFIG_COMPLETE)) {
+		return;
+	}
+
+	sep = meta_evt(buf, BT_HCI_EVT_LE_CS_CONFIG_COMPLETE, sizeof(*sep));
+
+	memset(sep, 0, sizeof(*sep));
+	sep->status = cs->status;
+	sep->handle = sys_cpu_to_le16(handle);
+	sep->config_id = cs->config_id;
+	sep->action = cs->action;
+
+	conn = ll_connected_get(handle);
+	if (conn && cs->action == BT_HCI_LE_CS_CONFIG_ACTION_CREATED &&
+	    cs->config_id < CONFIG_BT_CTLR_CHANNEL_SOUNDING_MAX_CONFIG) {
+		struct ll_conn_cs_data *cs_data = &conn->llcp.cs;
+
+		sep->main_mode_type = cs_data->config[cs->config_id].main_mode_type;
+		sep->sub_mode_type = cs_data->config[cs->config_id].sub_mode_type;
+		sep->min_main_mode_steps = cs_data->config[cs->config_id].min_main_mode_steps;
+		sep->max_main_mode_steps = cs_data->config[cs->config_id].max_main_mode_steps;
+		sep->main_mode_repetition =
+			cs_data->config[cs->config_id].main_mode_repetition;
+		sep->mode_0_steps = cs_data->config[cs->config_id].mode_0_steps;
+		sep->role = cs_data->config[cs->config_id].role;
+		sep->rtt_type = cs_data->config[cs->config_id].rtt_type;
+		sep->cs_sync_phy = cs_data->config[cs->config_id].cs_sync_phy;
+		memcpy(sep->channel_map, cs_data->config[cs->config_id].channel_map,
+		       sizeof(sep->channel_map));
+		sep->channel_map_repetition =
+			cs_data->config[cs->config_id].channel_map_repetition;
+		sep->channel_selection_type =
+			cs_data->config[cs->config_id].channel_selection_type;
+		sep->ch3c_shape = cs_data->config[cs->config_id].ch3c_shape;
+		sep->ch3c_jump = cs_data->config[cs->config_id].ch3c_jump;
+	}
+}
+
+static void le_cs_procedure_enable_complete(struct pdu_data *pdu, uint16_t handle,
+					    struct net_buf *buf)
+{
+	struct bt_hci_evt_le_cs_procedure_enable_complete *sep;
+	struct node_rx_csound *cs = (void *)pdu;
+	struct ll_conn *conn;
+
+	if (!(event_mask & BT_EVT_MASK_LE_META_EVENT) ||
+	    !(le_event_mask & BT_EVT_MASK_LE_CS_PROCEDURE_ENABLE_COMPLETE)) {
+		return;
+	}
+
+	sep = meta_evt(buf, BT_HCI_EVT_LE_CS_PROCEDURE_ENABLE_COMPLETE, sizeof(*sep));
+
+	memset(sep, 0, sizeof(*sep));
+	sep->status = cs->status;
+	sep->handle = sys_cpu_to_le16(handle);
+	sep->config_id = cs->config_id;
+	sep->state = cs->state;
+
+	conn = ll_connected_get(handle);
+	if (conn) {
+		struct ll_conn_cs_data *cs_data = &conn->llcp.cs;
+
+		sep->tone_antenna_config_selection =
+			cs_data->tone_antenna_config_selection;
+		memcpy(sep->subevent_len, cs_data->max_subevent_len,
+		       sizeof(sep->subevent_len));
+		sep->subevent_interval =
+			sys_cpu_to_le16(cs_data->min_procedure_interval);
+		sep->procedure_interval =
+			sys_cpu_to_le16(cs_data->max_procedure_interval);
+		sep->procedure_count = sys_cpu_to_le16(cs_data->max_procedure_count);
+		sep->max_procedure_len = sys_cpu_to_le16(cs_data->max_procedure_len);
+	}
+}
+
+static void le_cs_subevent_result(struct pdu_data *pdu, uint16_t handle, struct net_buf *buf)
+{
+	struct bt_hci_evt_le_cs_subevent_result *sep;
+	struct node_rx_csound *cs = (void *)pdu;
+
+	if (!(event_mask & BT_EVT_MASK_LE_META_EVENT) ||
+	    !(le_event_mask & BT_EVT_MASK_LE_CS_SUBEVENT_RESULT)) {
+		return;
+	}
+
+	sep = meta_evt(buf, BT_HCI_EVT_LE_CS_SUBEVENT_RESULT,
+		       sizeof(*sep) + cs->step_data_len);
+
+	sep->conn_handle = sys_cpu_to_le16(handle);
+	sep->config_id = cs->config_id;
+	sep->start_acl_conn_event_counter =
+		sys_cpu_to_le16(cs->start_acl_conn_event);
+	sep->procedure_counter = sys_cpu_to_le16(cs->procedure_counter);
+	sep->frequency_compensation =
+		sys_cpu_to_le16(cs->frequency_compensation);
+	sep->reference_power_level = cs->reference_power_level;
+	sep->procedure_done_status = cs->procedure_done_status;
+	sep->subevent_done_status = cs->subevent_done_status;
+	sep->procedure_abort_reason = 0U;
+	sep->subevent_abort_reason = 0U;
+	sep->num_antenna_paths = cs->num_antenna_paths;
+	sep->num_steps_reported = cs->num_steps_reported;
+
+	if (cs->step_data_len > 0U) {
+		memcpy(sep->steps, cs->step_data, cs->step_data_len);
+	}
+}
+#endif /* CONFIG_BT_CTLR_CHANNEL_SOUNDING */
+
 #if defined(CONFIG_BT_CTLR_LE_PATH_LOSS_MONITORING)
 static void le_path_loss_threshold(struct pdu_data *pdu,
 				   uint16_t handle,
@@ -8926,6 +9371,27 @@ static void encode_control(struct node_rx_pdu *node_rx,
 		le_req_peer_sca_complete(pdu_data, handle, buf);
 		return;
 #endif /* CONFIG_BT_CTLR_SCA_UPDATE */
+
+#if defined(CONFIG_BT_CTLR_CHANNEL_SOUNDING)
+	case NODE_RX_TYPE_CS_READ_REMOTE_SUPPORTED_CAPABILITIES_COMPLETE:
+		le_cs_read_remote_supported_capabilities_complete(pdu_data, handle, buf);
+		return;
+	case NODE_RX_TYPE_CS_READ_REMOTE_FAE_TABLE_COMPLETE:
+		le_cs_read_remote_fae_table_complete(pdu_data, handle, buf);
+		return;
+	case NODE_RX_TYPE_CS_SECURITY_ENABLE_COMPLETE:
+		le_cs_security_enable_complete(pdu_data, handle, buf);
+		return;
+	case NODE_RX_TYPE_CS_CONFIG_COMPLETE:
+		le_cs_config_complete(pdu_data, handle, buf);
+		return;
+	case NODE_RX_TYPE_CS_PROCEDURE_ENABLE_COMPLETE:
+		le_cs_procedure_enable_complete(pdu_data, handle, buf);
+		return;
+	case NODE_RX_TYPE_CS_SUBEVENT_RESULT:
+		le_cs_subevent_result(pdu_data, handle, buf);
+		return;
+#endif /* CONFIG_BT_CTLR_CHANNEL_SOUNDING */
 
 #if defined(CONFIG_BT_CTLR_DF_CONN_CTE_RX)
 	case NODE_RX_TYPE_CONN_IQ_SAMPLE_REPORT:
@@ -9443,6 +9909,16 @@ uint8_t hci_get_class(struct node_rx_pdu *node_rx)
 		case NODE_RX_TYPE_DTM_IQ_SAMPLE_REPORT:
 			return HCI_CLASS_EVT_REQUIRED;
 #endif /* CONFIG_BT_CTLR_DTM_HCI_DF_IQ_REPORT */
+
+#if defined(CONFIG_BT_CTLR_CHANNEL_SOUNDING)
+		case NODE_RX_TYPE_CS_READ_REMOTE_SUPPORTED_CAPABILITIES_COMPLETE:
+		case NODE_RX_TYPE_CS_READ_REMOTE_FAE_TABLE_COMPLETE:
+		case NODE_RX_TYPE_CS_SECURITY_ENABLE_COMPLETE:
+		case NODE_RX_TYPE_CS_CONFIG_COMPLETE:
+		case NODE_RX_TYPE_CS_PROCEDURE_ENABLE_COMPLETE:
+		case NODE_RX_TYPE_CS_SUBEVENT_RESULT:
+			return HCI_CLASS_EVT_REQUIRED;
+#endif /* CONFIG_BT_CTLR_CHANNEL_SOUNDING */
 
 #if CONFIG_BT_CTLR_USER_EVT_RANGE > 0
 		case NODE_RX_TYPE_USER_START ... NODE_RX_TYPE_USER_END - 1:

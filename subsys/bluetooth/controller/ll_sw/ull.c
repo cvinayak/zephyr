@@ -47,15 +47,18 @@
 #include "lll_conn.h"
 #include "lll_conn_iso.h"
 #include "lll_df.h"
+#include "lll_cs.h"
 
 #include "ull_adv_types.h"
 #include "ull_scan_types.h"
 #include "ull_sync_types.h"
 #include "ll_sw/ull_tx_queue.h"
+#include "ull_cs_types.h"
 #include "ull_conn_types.h"
-#include "ull_filter.h"
 #include "ull_df_types.h"
 #include "ull_df_internal.h"
+
+#include "ull_filter.h"
 
 #if defined(CONFIG_BT_CTLR_USER_EXT)
 #include "ull_vendor.h"
@@ -70,16 +73,16 @@
 #include "ull_scan_internal.h"
 #include "ull_sync_internal.h"
 #include "ull_sync_iso_internal.h"
-#include "ull_central_internal.h"
 #include "ull_iso_types.h"
 #include "ull_conn_internal.h"
+#include "ull_central_internal.h"
 #include "ull_conn_iso_types.h"
+#include "ull_conn_iso_internal.h"
 #include "ull_central_iso_internal.h"
+#include "ull_peripheral_iso_internal.h"
+#include "ull_cs_internal.h"
 #include "ull_llcp_internal.h"
 #include "ull_llcp.h"
-
-#include "ull_conn_iso_internal.h"
-#include "ull_peripheral_iso_internal.h"
 
 #include "ll.h"
 #include "ll_feat.h"
@@ -178,6 +181,12 @@
 #define BT_CIG_TICKER_NODES 0
 #endif
 
+#if defined(CONFIG_BT_CTLR_CHANNEL_SOUNDING)
+#define BT_CS_TICKER_NODES ((TICKER_ID_CS_TEST) - (TICKER_ID_CS_BASE) + 1)
+#else
+#define BT_CS_TICKER_NODES 0
+#endif
+
 #if defined(CONFIG_BT_CTLR_USER_EXT)
 #define USER_TICKER_NODES         CONFIG_BT_CTLR_USER_TICKER_ID_RANGE
 #else
@@ -225,6 +234,7 @@
 				   BT_SCAN_SYNC_ISO_TICKER_NODES + \
 				   BT_CONN_TICKER_NODES + \
 				   BT_CIG_TICKER_NODES + \
+				   BT_CS_TICKER_NODES + \
 				   USER_TICKER_NODES + \
 				   FLASH_TICKER_NODES + \
 				   COEX_TICKER_NODES)
