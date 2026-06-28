@@ -133,6 +133,11 @@ zephyr_library_sources_ifdef(
   )
 
 zephyr_library_sources_ifdef(
+  CONFIG_BT_CTLR_CHANNEL_SOUNDING
+  ll_sw/ull_cs.c
+  )
+
+zephyr_library_sources_ifdef(
   CONFIG_BT_CTLR_CONN_ISO
   ll_sw/ull_conn_iso.c
   )
