@@ -281,6 +281,11 @@ int ull_cs_reset(void)
 	return 0;
 }
 
+const struct ll_cs_local_capabilities *ull_cs_local_capabilities_get(void)
+{
+	return &local_capabilities;
+}
+
 uint8_t ll_cs_read_local_supported_capabilities(
 	struct bt_hci_rp_le_read_local_supported_capabilities *rp)
 {
@@ -380,15 +385,18 @@ uint8_t ll_cs_write_cached_remote_supported_capabilities(
 uint8_t ll_cs_security_enable(uint16_t handle)
 {
 	struct ll_conn *conn;
-	struct ll_conn_cs_data *cs_data;
 
 	conn = ll_connected_get(handle);
 	if (!conn) {
 		return BT_HCI_ERR_UNKNOWN_CONN_ID;
 	}
 
-	cs_data = &conn->llcp.cs;
-	cs_data->security_enabled = 1;
+	/* The CS security start procedure is initiated by the Central on an
+	 * encrypted ACL connection.
+	 */
+	if ((conn->lll.role != BT_HCI_ROLE_CENTRAL) || !conn->lll.enc_tx) {
+		return BT_HCI_ERR_CMD_DISALLOWED;
+	}
 
 	return ull_cp_cs_security_enable(conn);
 }

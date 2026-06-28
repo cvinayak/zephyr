@@ -10,6 +10,12 @@ int ull_cs_reset(void);
 uint8_t ll_cs_read_local_supported_capabilities(
 	struct bt_hci_rp_le_read_local_supported_capabilities *rp);
 
+/* Return the local Channel Sounding capabilities used to populate the
+ * LL_CS_CAPABILITIES_RSP PDU when responding to a remote-initiated
+ * capabilities exchange.
+ */
+const struct ll_cs_local_capabilities *ull_cs_local_capabilities_get(void);
+
 uint8_t ll_cs_read_remote_supported_capabilities(uint16_t handle);
 
 uint8_t ll_cs_write_cached_remote_supported_capabilities(
