@@ -833,3 +833,98 @@ static inline uint32_t hal_radio_rx_chain_delay_ns_get(uint8_t phy, uint8_t flag
 #endif /* CONFIG_BT_CTLR_PHY_CODED */
 	}
 }
+
+/* Channel Sounding (CS) HW abstraction specifics for the nRF54L RADIO.
+ *
+ * The nRF54L RADIO peripheral implements dedicated Channel Sounding support:
+ * generation and extraction of the CS tones (sounding sequence), Round Trip
+ * Time (RTT) timestamping of the CS_SYNC packets and IQ/phase (PCT) sampling
+ * of the CS tones used to derive the Phase Based Ranging measurements.
+ *
+ * The constants below capture the values required by the Bluetooth Core
+ * specification (Vol 6, Part A, Section 5 "Channel Sounding") that are mapped
+ * onto the nRF54L RADIO hardware. Register level access to the CS specific
+ * RADIO registers is gated by HAL_RADIO_NRF54LX_CS_REG_PRESENT so that the
+ * abstraction also builds on MDK revisions that do not yet expose the CS
+ * register block. Refer to the nRF54L15 Product Specification, RADIO chapter
+ * "Channel sounding" for the register details.
+ */
+
+/* Indicates that register level access to the RADIO Channel Sounding block is
+ * available in the MDK for the selected target. The symbol may be predefined
+ * by the build system; otherwise it is derived from the presence of the MDK
+ * provided CS register field definitions.
+ */
+#if !defined(HAL_RADIO_NRF54LX_CS_REG_PRESENT)
+#if defined(RADIO_CS_MODE_MODE_Msk) || defined(RADIO_MODE_MODE_Ble_Cs) || \
+	defined(RADIO_CSTONES_NUMTONES_Msk)
+#define HAL_RADIO_NRF54LX_CS_REG_PRESENT 1
+#else
+#define HAL_RADIO_NRF54LX_CS_REG_PRESENT 0
+#endif
+#endif /* !HAL_RADIO_NRF54LX_CS_REG_PRESENT */
+
+/* Total number of Channel Sounding RF channel indices (2402 MHz .. 2480 MHz,
+ * 1 MHz spacing). Channel index n maps to (2402 + n) MHz.
+ */
+#define HAL_RADIO_NRF54LX_CS_CHAN_COUNT 79U
+
+/* Number of CS channel indices usable for mode-1/mode-2/mode-3 steps. The
+ * indices 0, 1, 23, 24, 25, 77 and 78 are not allowed for Channel Sounding
+ * (they overlap the LE primary advertising channels and the band guards).
+ */
+#define HAL_RADIO_NRF54LX_CS_CHAN_USABLE 72U
+
+/* Convert a Channel Sounding channel index (0..78) to the value programmed in
+ * the RADIO FREQUENCY register. The nRF54L FREQUENCY register holds the offset
+ * in MHz from 2400 MHz, hence (2402 + index) MHz becomes (index + 2).
+ */
+#define HAL_RADIO_NRF54LX_CS_CHAN_TO_FREQ(index) ((uint32_t)(index) + 2U)
+
+/* CS tone (phase measurement) duration T_PM in microseconds. A single tone is
+ * transmitted/received for this period before the antenna path switches.
+ */
+#define HAL_RADIO_NRF54LX_CS_T_PM_US 40U
+
+/* Antenna switch period T_SW in microseconds applied between consecutive tone
+ * antenna paths during the tone extension slots.
+ */
+#define HAL_RADIO_NRF54LX_CS_T_SW_US 10U
+
+/* Interlude periods between the two devices for the mode RTT/tone exchanges,
+ * T_IP1 and T_IP2, in microseconds (the supported values reported to the host).
+ */
+#define HAL_RADIO_NRF54LX_CS_T_IP1_US 10U
+#define HAL_RADIO_NRF54LX_CS_T_IP2_US 10U
+
+/* Frequency change spacing T_FCS in microseconds. Time allowed for the radio
+ * to retune (PLL settle) between consecutive CS steps on different channels.
+ */
+#define HAL_RADIO_NRF54LX_CS_T_FCS_US 15U
+
+/* Maximum number of antenna paths supported for tone extension on this target. */
+#define HAL_RADIO_NRF54LX_CS_ANT_PATHS_MAX 1U
+
+/* Channel Sounding step modes, as defined by the Bluetooth Core specification.
+ * Mode 0 is used for frequency offset and timing recovery, mode 1 carries the
+ * RTT exchange, mode 2 carries the tone (PBR) exchange and mode 3 carries both.
+ */
+#define HAL_RADIO_NRF54LX_CS_MODE_0 0U
+#define HAL_RADIO_NRF54LX_CS_MODE_1 1U
+#define HAL_RADIO_NRF54LX_CS_MODE_2 2U
+#define HAL_RADIO_NRF54LX_CS_MODE_3 3U
+
+/* Returns true if the given Channel Sounding channel index (0..78) is allowed
+ * to be used for a CS step. Refer to the Bluetooth Core specification, Vol 6,
+ * Part A, Section 5 for the list of disallowed channels.
+ */
+static inline bool hal_radio_nrf54lx_cs_chan_is_usable(uint8_t index)
+{
+	if ((index == 0U) || (index == 1U) || (index == 23U) ||
+	    (index == 24U) || (index == 25U) || (index == 77U) ||
+	    (index == 78U)) {
+		return false;
+	}
+
+	return index < HAL_RADIO_NRF54LX_CS_CHAN_COUNT;
+}

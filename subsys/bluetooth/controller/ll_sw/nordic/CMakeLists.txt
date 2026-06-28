@@ -76,6 +76,10 @@ zephyr_library_sources_ifdef(
   lll/lll_test.c
 )
 zephyr_library_sources_ifdef(
+  CONFIG_BT_CTLR_CHANNEL_SOUNDING
+  lll/lll_cs.c
+)
+zephyr_library_sources_ifdef(
   CONFIG_BT_CTLR_PROFILE_ISR
   lll/lll_prof.c
 )
@@ -104,6 +108,12 @@ zephyr_library_sources_ifdef(
 if(CONFIG_BT_CTLR_DF AND NOT CONFIG_SOC_SERIES_BSIM_NRFXX)
   zephyr_library_sources(
     hal/nrf5/radio/radio_df.c
+    )
+endif()
+
+if(CONFIG_BT_CTLR_CHANNEL_SOUNDING)
+  zephyr_library_sources(
+    hal/nrf5/radio/radio_cs.c
     )
 endif()
 
