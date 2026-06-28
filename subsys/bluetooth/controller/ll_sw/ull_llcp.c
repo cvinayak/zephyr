@@ -1145,6 +1145,53 @@ uint8_t ull_cp_periodic_sync(struct ll_conn *conn, struct ll_sync_set *sync,
 }
 #endif /* CONFIG_BT_CTLR_SYNC_TRANSFER_SENDER */
 
+#if defined(CONFIG_BT_CTLR_CHANNEL_SOUNDING)
+static uint8_t ull_cp_cs_enqueue(struct ll_conn *conn, uint8_t op, uint8_t config_id,
+				 uint8_t action, uint8_t state)
+{
+	struct proc_ctx *ctx;
+
+	ctx = llcp_create_local_procedure(PROC_CS);
+	if (!ctx) {
+		return BT_HCI_ERR_CMD_DISALLOWED;
+	}
+
+	ctx->data.cs.op = op;
+	ctx->data.cs.config_id = config_id;
+	ctx->data.cs.action = action;
+	ctx->data.cs.state = state;
+
+	llcp_lr_enqueue(conn, ctx);
+
+	return BT_HCI_ERR_SUCCESS;
+}
+
+uint8_t ull_cp_cs_read_remote_supported_capabilities(struct ll_conn *conn)
+{
+	return ull_cp_cs_enqueue(conn, LLCP_CS_OP_READ_REMOTE_CAP, 0U, 0U, 0U);
+}
+
+uint8_t ull_cp_cs_read_remote_fae_table(struct ll_conn *conn)
+{
+	return ull_cp_cs_enqueue(conn, LLCP_CS_OP_READ_REMOTE_FAE, 0U, 0U, 0U);
+}
+
+uint8_t ull_cp_cs_create_config(struct ll_conn *conn, uint8_t config_id, uint8_t action)
+{
+	return ull_cp_cs_enqueue(conn, LLCP_CS_OP_CREATE_CONFIG, config_id, action, 0U);
+}
+
+uint8_t ull_cp_cs_security_enable(struct ll_conn *conn)
+{
+	return ull_cp_cs_enqueue(conn, LLCP_CS_OP_SECURITY_ENABLE, 0U, 0U, 0U);
+}
+
+uint8_t ull_cp_cs_procedure_enable(struct ll_conn *conn, uint8_t config_id, uint8_t enable)
+{
+	return ull_cp_cs_enqueue(conn, LLCP_CS_OP_PROCEDURE_ENABLE, config_id, 0U, enable);
+}
+#endif /* CONFIG_BT_CTLR_CHANNEL_SOUNDING */
+
 #if defined(CONFIG_BT_CTLR_DATA_LENGTH)
 uint8_t ull_cp_remote_dle_pending(struct ll_conn *conn)
 {

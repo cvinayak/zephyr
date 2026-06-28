@@ -286,6 +286,33 @@ void ull_cp_cte_rsp_enable(struct ll_conn *conn, bool enable, uint8_t max_cte_le
 uint8_t ull_cp_req_peer_sca(struct ll_conn *conn);
 #endif /* CONFIG_BT_CTLR_SCA_UPDATE */
 
+#if defined(CONFIG_BT_CTLR_CHANNEL_SOUNDING)
+/**
+ * @brief Initiate a Channel Sounding Read Remote Supported Capabilities Procedure.
+ */
+uint8_t ull_cp_cs_read_remote_supported_capabilities(struct ll_conn *conn);
+
+/**
+ * @brief Initiate a Channel Sounding Read Remote FAE Table Procedure.
+ */
+uint8_t ull_cp_cs_read_remote_fae_table(struct ll_conn *conn);
+
+/**
+ * @brief Initiate a Channel Sounding Create Config Procedure.
+ */
+uint8_t ull_cp_cs_create_config(struct ll_conn *conn, uint8_t config_id, uint8_t action);
+
+/**
+ * @brief Initiate a Channel Sounding Security Enable Procedure.
+ */
+uint8_t ull_cp_cs_security_enable(struct ll_conn *conn);
+
+/**
+ * @brief Initiate a Channel Sounding Procedure Enable/Disable Procedure.
+ */
+uint8_t ull_cp_cs_procedure_enable(struct ll_conn *conn, uint8_t config_id, uint8_t enable);
+#endif /* CONFIG_BT_CTLR_CHANNEL_SOUNDING */
+
 #if defined(CONFIG_BT_CTLR_SYNC_TRANSFER_SENDER)
 struct ll_adv_sync_set;
 struct ll_sync_set;
