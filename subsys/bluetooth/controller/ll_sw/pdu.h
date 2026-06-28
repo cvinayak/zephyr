@@ -624,6 +624,20 @@ enum pdu_data_llctrl_type {
 	PDU_DATA_LLCTRL_TYPE_CIS_RSP = 0x20,
 	PDU_DATA_LLCTRL_TYPE_CIS_IND = 0x21,
 	PDU_DATA_LLCTRL_TYPE_CIS_TERMINATE_IND = 0x22,
+	PDU_DATA_LLCTRL_TYPE_CS_SEC_RSP = 0x2D,
+	PDU_DATA_LLCTRL_TYPE_CS_CAPABILITIES_REQ = 0x2E,
+	PDU_DATA_LLCTRL_TYPE_CS_CAPABILITIES_RSP = 0x2F,
+	PDU_DATA_LLCTRL_TYPE_CS_CONFIG_REQ = 0x30,
+	PDU_DATA_LLCTRL_TYPE_CS_CONFIG_RSP = 0x31,
+	PDU_DATA_LLCTRL_TYPE_CS_REQ = 0x32,
+	PDU_DATA_LLCTRL_TYPE_CS_RSP = 0x33,
+	PDU_DATA_LLCTRL_TYPE_CS_IND = 0x34,
+	PDU_DATA_LLCTRL_TYPE_CS_TERMINATE_REQ = 0x35,
+	PDU_DATA_LLCTRL_TYPE_CS_FAE_REQ = 0x36,
+	PDU_DATA_LLCTRL_TYPE_CS_FAE_RSP = 0x37,
+	PDU_DATA_LLCTRL_TYPE_CS_CHANNEL_MAP_IND = 0x38,
+	PDU_DATA_LLCTRL_TYPE_CS_SEC_REQ = 0x39,
+	PDU_DATA_LLCTRL_TYPE_CS_TERMINATE_RSP = 0x3A,
 	PDU_DATA_LLCTRL_TYPE_UNUSED = 0xFF
 };
 
@@ -892,6 +906,263 @@ struct pdu_data_llctrl_cis_terminate_ind {
 	uint8_t  error_code;
 } __packed;
 
+struct pdu_data_llctrl_cs_capabilities_req {
+	uint8_t  mode_types;
+	uint8_t  rtt_capability;
+	uint8_t  rtt_aa_only_n;
+	uint8_t  rtt_sounding_n;
+	uint8_t  rtt_random_sequence_n;
+	uint16_t nadm_sounding_capability;
+	uint16_t nadm_random_capability;
+	uint8_t  cs_sync_phy_capability;
+#ifdef CONFIG_LITTLE_ENDIAN
+	uint8_t  num_ant:4;
+	uint8_t  max_ant_path:4;
+	uint8_t  role:2;
+	uint8_t  rfu0:1;
+	uint8_t  no_fae:1;
+	uint8_t  channel_selection_3c:1;
+	uint8_t  sounding_pct_estimate:1;
+	uint8_t  rfu1:2;
+#else
+	uint8_t  max_ant_path:4;
+	uint8_t  num_ant:4;
+	uint8_t  rfu1:2;
+	uint8_t  sounding_pct_estimate:1;
+	uint8_t  channel_selection_3c:1;
+	uint8_t  no_fae:1;
+	uint8_t  rfu0:1;
+	uint8_t  role:2;
+#endif /* CONFIG_LITTLE_ENDIAN */
+	uint8_t  num_configs;
+	uint16_t max_procedures_supported;
+	uint8_t  t_sw;
+	uint16_t t_ip1_capability;
+	uint16_t t_ip2_capability;
+	uint16_t t_fcs_capability;
+	uint16_t t_pm_capability;
+#ifdef CONFIG_LITTLE_ENDIAN
+	uint8_t  rfu2:1;
+	uint8_t  tx_snr_capability:7;
+#else
+	uint8_t  tx_snr_capability:7;
+	uint8_t  rfu2:1;
+#endif /* CONFIG_LITTLE_ENDIAN */
+} __packed;
+
+struct pdu_data_llctrl_cs_capabilities_rsp {
+	uint8_t  mode_types;
+	uint8_t  rtt_capability;
+	uint8_t  rtt_aa_only_n;
+	uint8_t  rtt_sounding_n;
+	uint8_t  rtt_random_sequence_n;
+	uint16_t nadm_sounding_capability;
+	uint16_t nadm_random_capability;
+	uint8_t  cs_sync_phy_capability;
+#ifdef CONFIG_LITTLE_ENDIAN
+	uint8_t  num_ant:4;
+	uint8_t  max_ant_path:4;
+	uint8_t  role:2;
+	uint8_t  rfu0:1;
+	uint8_t  no_fae:1;
+	uint8_t  channel_selection_3c:1;
+	uint8_t  sounding_pct_estimate:1;
+	uint8_t  rfu1:2;
+#else
+	uint8_t  max_ant_path:4;
+	uint8_t  num_ant:4;
+	uint8_t  rfu1:2;
+	uint8_t  sounding_pct_estimate:1;
+	uint8_t  channel_selection_3c:1;
+	uint8_t  no_fae:1;
+	uint8_t  rfu0:1;
+	uint8_t  role:2;
+#endif /* CONFIG_LITTLE_ENDIAN */
+	uint8_t  num_configs;
+	uint16_t max_procedures_supported;
+	uint8_t  t_sw;
+	uint16_t t_ip1_capability;
+	uint16_t t_ip2_capability;
+	uint16_t t_fcs_capability;
+	uint16_t t_pm_capability;
+#ifdef CONFIG_LITTLE_ENDIAN
+	uint8_t  rfu2:1;
+	uint8_t  tx_snr_capability:7;
+#else
+	uint8_t  tx_snr_capability:7;
+	uint8_t  rfu2:1;
+#endif /* CONFIG_LITTLE_ENDIAN */
+} __packed;
+
+struct pdu_data_llctrl_cs_config_req {
+#ifdef CONFIG_LITTLE_ENDIAN
+	uint8_t  config_id:6;
+	uint8_t  action:2;
+#else
+	uint8_t  action:2;
+	uint8_t  config_id:6;
+#endif /* CONFIG_LITTLE_ENDIAN */
+	uint8_t  channel_map[10];
+	uint8_t  channel_map_repetition;
+	uint8_t  main_mode;
+	uint8_t  sub_mode;
+	uint8_t  main_mode_min_steps;
+	uint8_t  main_mode_max_steps;
+	uint8_t  main_mode_repetition;
+	uint8_t  mode_0_steps;
+	uint8_t  cs_sync_phy;
+#ifdef CONFIG_LITTLE_ENDIAN
+	uint8_t  rtt_type:4;
+	uint8_t  role:2;
+	uint8_t  rfu0:2;
+	uint8_t  chsel:4;
+	uint8_t  ch3c_shape:4;
+#else
+	uint8_t  rfu0:2;
+	uint8_t  role:2;
+	uint8_t  rtt_type:4;
+	uint8_t  ch3c_shape:4;
+	uint8_t  chsel:4;
+#endif /* CONFIG_LITTLE_ENDIAN */
+	uint8_t  ch3c_jump;
+	uint8_t  t_ip1;
+	uint8_t  t_ip2;
+	uint8_t  t_fcs;
+	uint8_t  t_pm;
+	uint8_t  rfu1;
+} __packed;
+
+struct pdu_data_llctrl_cs_config_rsp {
+#ifdef CONFIG_LITTLE_ENDIAN
+	uint8_t  config_id:6;
+	uint8_t  rfu:2;
+#else
+	uint8_t  rfu:2;
+	uint8_t  config_id:6;
+#endif /* CONFIG_LITTLE_ENDIAN */
+} __packed;
+
+struct pdu_data_llctrl_cs_sec_req {
+	uint8_t  cs_iv_c[8];
+	uint8_t  cs_in_c[4];
+	uint8_t  cs_pv_c[8];
+} __packed;
+
+struct pdu_data_llctrl_cs_sec_rsp {
+	uint8_t  cs_iv_p[8];
+	uint8_t  cs_in_p[4];
+	uint8_t  cs_pv_p[8];
+} __packed;
+
+struct pdu_data_llctrl_cs_req {
+#ifdef CONFIG_LITTLE_ENDIAN
+	uint8_t  config_id:6;
+	uint8_t  rfu0:2;
+#else
+	uint8_t  rfu0:2;
+	uint8_t  config_id:6;
+#endif /* CONFIG_LITTLE_ENDIAN */
+	uint16_t conn_event_count;
+	uint8_t  offset_min[3];
+	uint8_t  offset_max[3];
+	uint16_t max_procedure_len;
+	uint16_t event_interval;
+	uint8_t  subevents_per_event;
+	uint16_t subevent_interval;
+	uint8_t  subevent_len[3];
+	uint16_t procedure_interval;
+	uint16_t procedure_count;
+	uint8_t  aci;
+	uint8_t  preferred_peer_ant;
+	uint8_t  phy;
+	int8_t   pwr_delta;
+#ifdef CONFIG_LITTLE_ENDIAN
+	uint8_t  tx_snr_i:4;
+	uint8_t  tx_snr_r:4;
+#else
+	uint8_t  tx_snr_r:4;
+	uint8_t  tx_snr_i:4;
+#endif /* CONFIG_LITTLE_ENDIAN */
+} __packed;
+
+struct pdu_data_llctrl_cs_rsp {
+#ifdef CONFIG_LITTLE_ENDIAN
+	uint8_t  config_id:6;
+	uint8_t  rfu0:2;
+#else
+	uint8_t  rfu0:2;
+	uint8_t  config_id:6;
+#endif /* CONFIG_LITTLE_ENDIAN */
+	uint16_t conn_event_count;
+	uint8_t  offset_min[3];
+	uint8_t  offset_max[3];
+	uint16_t event_interval;
+	uint8_t  subevents_per_event;
+	uint16_t subevent_interval;
+	uint8_t  subevent_len[3];
+	uint8_t  aci;
+	uint8_t  phy;
+	int8_t   pwr_delta;
+	uint8_t  rfu1;
+} __packed;
+
+struct pdu_data_llctrl_cs_ind {
+#ifdef CONFIG_LITTLE_ENDIAN
+	uint8_t  config_id:6;
+	uint8_t  rfu0:2;
+#else
+	uint8_t  rfu0:2;
+	uint8_t  config_id:6;
+#endif /* CONFIG_LITTLE_ENDIAN */
+	uint16_t conn_event_count;
+	uint8_t  offset[3];
+	uint16_t event_interval;
+	uint8_t  subevents_per_event;
+	uint16_t subevent_interval;
+	uint8_t  subevent_len[3];
+	uint8_t  aci;
+	uint8_t  phy;
+	int8_t   pwr_delta;
+	uint8_t  rfu1;
+} __packed;
+
+struct pdu_data_llctrl_cs_terminate_req {
+#ifdef CONFIG_LITTLE_ENDIAN
+	uint8_t  config_id:6;
+	uint8_t  rfu:2;
+#else
+	uint8_t  rfu:2;
+	uint8_t  config_id:6;
+#endif /* CONFIG_LITTLE_ENDIAN */
+	uint16_t proc_count;
+	uint8_t  error_code;
+} __packed;
+
+struct pdu_data_llctrl_cs_terminate_rsp {
+#ifdef CONFIG_LITTLE_ENDIAN
+	uint8_t  config_id:6;
+	uint8_t  rfu:2;
+#else
+	uint8_t  rfu:2;
+	uint8_t  config_id:6;
+#endif /* CONFIG_LITTLE_ENDIAN */
+	uint16_t proc_count;
+	uint8_t  error_code;
+} __packed;
+
+struct pdu_data_llctrl_cs_fae_req {
+	/* no members */
+} __packed;
+
+struct pdu_data_llctrl_cs_fae_rsp {
+	int8_t   ch_fae[72];
+} __packed;
+
+struct pdu_data_llctrl_cs_channel_map_ind {
+	uint8_t  channel_map[10];
+	uint16_t instant;
+} __packed;
+
 struct pdu_data_llctrl_periodic_sync_ind {
 	uint16_t id;
 	struct pdu_adv_sync_info sync_info;
@@ -949,6 +1220,20 @@ struct pdu_data_llctrl {
 		struct pdu_data_llctrl_cis_ind cis_ind;
 		struct pdu_data_llctrl_cis_terminate_ind cis_terminate_ind;
 		struct pdu_data_llctrl_periodic_sync_ind periodic_sync_ind;
+		struct pdu_data_llctrl_cs_capabilities_req cs_capabilities_req;
+		struct pdu_data_llctrl_cs_capabilities_rsp cs_capabilities_rsp;
+		struct pdu_data_llctrl_cs_config_req cs_config_req;
+		struct pdu_data_llctrl_cs_config_rsp cs_config_rsp;
+		struct pdu_data_llctrl_cs_sec_req cs_sec_req;
+		struct pdu_data_llctrl_cs_sec_rsp cs_sec_rsp;
+		struct pdu_data_llctrl_cs_req cs_req;
+		struct pdu_data_llctrl_cs_rsp cs_rsp;
+		struct pdu_data_llctrl_cs_ind cs_ind;
+		struct pdu_data_llctrl_cs_terminate_req cs_terminate_req;
+		struct pdu_data_llctrl_cs_terminate_rsp cs_terminate_rsp;
+		struct pdu_data_llctrl_cs_fae_req cs_fae_req;
+		struct pdu_data_llctrl_cs_fae_rsp cs_fae_rsp;
+		struct pdu_data_llctrl_cs_channel_map_ind cs_channel_map_ind;
 	} __packed;
 } __packed;
 
