@@ -33,6 +33,7 @@
 #include "lll_conn_iso.h"
 
 #include "ull_tx_queue.h"
+#include "ull_cs_types.h"
 #include "ull_conn_types.h"
 #include "isoal.h"
 #include "ull_iso_types.h"

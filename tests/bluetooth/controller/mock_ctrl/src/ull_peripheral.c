@@ -20,6 +20,7 @@
 #include "lll.h"
 #include "lll/lll_df_types.h"
 #include "lll_conn.h"
+#include "ull_cs_types.h"
 #include "ull_conn_types.h"
 
 void ull_periph_setup(memq_link_t *link, struct node_rx_pdu *rx, struct node_rx_ftr *ftr,

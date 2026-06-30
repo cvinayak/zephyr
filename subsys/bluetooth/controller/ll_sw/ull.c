@@ -47,15 +47,18 @@
 #include "lll_conn.h"
 #include "lll_conn_iso.h"
 #include "lll_df.h"
+#include "lll_cs.h"
 
 #include "ull_adv_types.h"
 #include "ull_scan_types.h"
 #include "ull_sync_types.h"
 #include "ll_sw/ull_tx_queue.h"
+#include "ull_cs_types.h"
 #include "ull_conn_types.h"
-#include "ull_filter.h"
 #include "ull_df_types.h"
 #include "ull_df_internal.h"
+
+#include "ull_filter.h"
 
 #if defined(CONFIG_BT_CTLR_USER_EXT)
 #include "ull_vendor.h"
@@ -70,16 +73,16 @@
 #include "ull_scan_internal.h"
 #include "ull_sync_internal.h"
 #include "ull_sync_iso_internal.h"
-#include "ull_central_internal.h"
 #include "ull_iso_types.h"
 #include "ull_conn_internal.h"
+#include "ull_central_internal.h"
 #include "ull_conn_iso_types.h"
+#include "ull_conn_iso_internal.h"
 #include "ull_central_iso_internal.h"
+#include "ull_peripheral_iso_internal.h"
+#include "ull_cs_internal.h"
 #include "ull_llcp_internal.h"
 #include "ull_llcp.h"
-
-#include "ull_conn_iso_internal.h"
-#include "ull_peripheral_iso_internal.h"
 
 #include "ll.h"
 #include "ll_feat.h"
@@ -178,6 +181,12 @@
 #define BT_CIG_TICKER_NODES 0
 #endif
 
+#if defined(CONFIG_BT_CTLR_CHANNEL_SOUNDING)
+#define BT_CS_TICKER_NODES ((TICKER_ID_CS_TEST) - (TICKER_ID_CS_BASE) + 1)
+#else
+#define BT_CS_TICKER_NODES 0
+#endif
+
 #if defined(CONFIG_BT_CTLR_USER_EXT)
 #define USER_TICKER_NODES         CONFIG_BT_CTLR_USER_TICKER_ID_RANGE
 #else
@@ -225,6 +234,7 @@
 				   BT_SCAN_SYNC_ISO_TICKER_NODES + \
 				   BT_CONN_TICKER_NODES + \
 				   BT_CIG_TICKER_NODES + \
+				   BT_CS_TICKER_NODES + \
 				   USER_TICKER_NODES + \
 				   FLASH_TICKER_NODES + \
 				   COEX_TICKER_NODES)
@@ -733,6 +743,18 @@ int ll_init(struct k_sem *sem_rx)
 	}
 #endif
 
+#if defined(CONFIG_BT_CTLR_CHANNEL_SOUNDING)
+	err = lll_cs_init();
+	if (err) {
+		return err;
+	}
+
+	err = ull_cs_init();
+	if (err) {
+		return err;
+	}
+#endif /* CONFIG_BT_CTLR_CHANNEL_SOUNDING */
+
 #if defined(CONFIG_BT_CTLR_ISO)
 	err = ull_iso_init();
 	if (err) {
@@ -1031,6 +1053,14 @@ void ll_reset(void)
 	err = ull_df_reset();
 	LL_ASSERT_DBG(!err);
 #endif
+
+#if defined(CONFIG_BT_CTLR_CHANNEL_SOUNDING)
+	err = lll_cs_reset();
+	LL_ASSERT_DBG(!err);
+
+	err = ull_cs_reset();
+	LL_ASSERT_DBG(!err);
+#endif /* CONFIG_BT_CTLR_CHANNEL_SOUNDING */
 
 #if defined(CONFIG_BT_CTLR_SET_HOST_FEATURE)
 	ll_feat_reset();
@@ -1478,6 +1508,15 @@ void ll_rx_dequeue(void)
 	case NODE_RX_TYPE_REQ_PEER_SCA_COMPLETE:
 #endif /* CONFIG_BT_CTLR_SCA_UPDATE */
 
+#if defined(CONFIG_BT_CTLR_CHANNEL_SOUNDING)
+	case NODE_RX_TYPE_CS_READ_REMOTE_SUPPORTED_CAPABILITIES_COMPLETE:
+	case NODE_RX_TYPE_CS_READ_REMOTE_FAE_TABLE_COMPLETE:
+	case NODE_RX_TYPE_CS_SECURITY_ENABLE_COMPLETE:
+	case NODE_RX_TYPE_CS_CONFIG_COMPLETE:
+	case NODE_RX_TYPE_CS_PROCEDURE_ENABLE_COMPLETE:
+	case NODE_RX_TYPE_CS_SUBEVENT_RESULT:
+#endif /* CONFIG_BT_CTLR_CHANNEL_SOUNDING */
+
 #if defined(CONFIG_BT_CTLR_CONN_ISO)
 	case NODE_RX_TYPE_CIS_ESTABLISHED:
 #endif /* CONFIG_BT_CTLR_CONN_ISO */
@@ -1680,6 +1719,15 @@ void ll_rx_mem_release(void **node_rx)
 #if defined(CONFIG_BT_CTLR_SCA_UPDATE)
 		case NODE_RX_TYPE_REQ_PEER_SCA_COMPLETE:
 #endif /* CONFIG_BT_CTLR_SCA_UPDATE */
+
+#if defined(CONFIG_BT_CTLR_CHANNEL_SOUNDING)
+		case NODE_RX_TYPE_CS_READ_REMOTE_SUPPORTED_CAPABILITIES_COMPLETE:
+		case NODE_RX_TYPE_CS_READ_REMOTE_FAE_TABLE_COMPLETE:
+		case NODE_RX_TYPE_CS_SECURITY_ENABLE_COMPLETE:
+		case NODE_RX_TYPE_CS_CONFIG_COMPLETE:
+		case NODE_RX_TYPE_CS_PROCEDURE_ENABLE_COMPLETE:
+		case NODE_RX_TYPE_CS_SUBEVENT_RESULT:
+#endif /* CONFIG_BT_CTLR_CHANNEL_SOUNDING */
 
 #if defined(CONFIG_BT_CTLR_ISO)
 		case NODE_RX_TYPE_ISO_PDU:
@@ -3039,19 +3087,6 @@ static inline void rx_demux_rx(memq_link_t *link, struct node_rx_hdr *rx)
 	break;
 #endif /* CONFIG_BT_CTLR_CONN_ISO */
 
-#if defined(CONFIG_BT_CTLR_DF_SCAN_CTE_RX) || defined(CONFIG_BT_CTLR_DF_CONN_CTE_RX) || \
-	defined(CONFIG_BT_CTLR_DTM_HCI_DF_IQ_REPORT)
-	case NODE_RX_TYPE_SYNC_IQ_SAMPLE_REPORT:
-	case NODE_RX_TYPE_CONN_IQ_SAMPLE_REPORT:
-	case NODE_RX_TYPE_DTM_IQ_SAMPLE_REPORT:
-	case NODE_RX_TYPE_IQ_SAMPLE_REPORT_LLL_RELEASE:
-	{
-		(void)memq_dequeue(memq_ull_rx.tail, &memq_ull_rx.head, NULL);
-		ll_rx_put_sched(link, rx);
-	}
-	break;
-#endif /* CONFIG_BT_CTLR_DF_SCAN_CTE_RX || CONFIG_BT_CTLR_DF_CONN_CTE_RX */
-
 #if defined(CONFIG_BT_CONN)
 	case NODE_RX_TYPE_CONNECTION:
 	{
@@ -3075,6 +3110,23 @@ static inline void rx_demux_rx(memq_link_t *link, struct node_rx_hdr *rx)
 
 	case NODE_RX_TYPE_TERMINATE:
 #endif /* CONFIG_BT_CONN */
+
+#if defined(CONFIG_BT_CTLR_DF_SCAN_CTE_RX) || defined(CONFIG_BT_CTLR_DF_CONN_CTE_RX) || \
+	defined(CONFIG_BT_CTLR_DTM_HCI_DF_IQ_REPORT)
+	case NODE_RX_TYPE_SYNC_IQ_SAMPLE_REPORT:
+	case NODE_RX_TYPE_CONN_IQ_SAMPLE_REPORT:
+	case NODE_RX_TYPE_DTM_IQ_SAMPLE_REPORT:
+	case NODE_RX_TYPE_IQ_SAMPLE_REPORT_LLL_RELEASE:
+#endif /* CONFIG_BT_CTLR_DF_SCAN_CTE_RX || CONFIG_BT_CTLR_DF_CONN_CTE_RX */
+
+#if defined(CONFIG_BT_CTLR_CHANNEL_SOUNDING)
+	case NODE_RX_TYPE_CS_READ_REMOTE_SUPPORTED_CAPABILITIES_COMPLETE:
+	case NODE_RX_TYPE_CS_READ_REMOTE_FAE_TABLE_COMPLETE:
+	case NODE_RX_TYPE_CS_SECURITY_ENABLE_COMPLETE:
+	case NODE_RX_TYPE_CS_CONFIG_COMPLETE:
+	case NODE_RX_TYPE_CS_PROCEDURE_ENABLE_COMPLETE:
+	case NODE_RX_TYPE_CS_SUBEVENT_RESULT:
+#endif /* CONFIG_BT_CTLR_CHANNEL_SOUNDING */
 
 #if defined(CONFIG_BT_OBSERVER) || \
 	defined(CONFIG_BT_CTLR_ADV_PERIODIC) || \
