@@ -103,6 +103,10 @@ static struct lll_adv_iso_stream
 			stream_pool[CONFIG_BT_CTLR_ADV_ISO_STREAM_COUNT];
 static void *stream_free;
 
+#if defined(CONFIG_BT_CTLR_ADV_ISO_SLOT_WINDOW_JITTER)
+static struct ticker_ext ll_adv_iso_ticker_ext[CONFIG_BT_CTLR_ADV_ISO_SET];
+#endif /* CONFIG_BT_CTLR_ADV_ISO_SLOT_WINDOW_JITTER */
+
 uint8_t ll_big_create(uint8_t big_handle, uint8_t adv_handle, uint8_t num_bis,
 		      uint32_t sdu_interval, uint16_t max_sdu,
 		      uint16_t max_latency, uint8_t rtn, uint8_t phy,
@@ -524,6 +528,21 @@ struct lll_adv_iso_stream *ull_adv_iso_stream_get(uint16_t handle)
 struct lll_adv_iso_stream *ull_adv_iso_lll_stream_get(uint16_t handle)
 {
 	return ull_adv_iso_stream_get(handle);
+}
+
+uint8_t ull_adv_iso_lll_index_get(struct lll_adv_iso *lll)
+{
+	return ARRAY_INDEX(ll_adv_iso, HDR_LLL2ULL(lll));
+}
+
+uint32_t ull_adv_iso_lll_ticks_slot_get(struct lll_adv_iso *lll)
+{
+	struct ll_adv_iso_set *adv_iso;
+
+	/* Get reference to ULL context */
+	adv_iso = HDR_LLL2ULL(lll);
+
+	return adv_iso->ull.ticks_slot;
 }
 
 void ull_adv_iso_stream_release(struct ll_adv_iso_set *adv_iso)
@@ -1308,11 +1327,15 @@ static uint32_t adv_iso_time_get(const struct ll_adv_iso_set *adv_iso, bool max)
 
 	} else if (lll_iso->bis_spacing >=
 		   (lll_iso->sub_interval * lll_iso->nse)) {
-		/* Time reservation omitting PTC subevents in sequential
-		 * packing.
-		 */
-		time_us = pdu_spacing * ((lll_iso->nse * lll_iso->num_bis) -
-					 lll_iso->ptc);
+		if (IS_ENABLED(CONFIG_BT_CTLR_ADV_ISO_SLOT_WINDOW_JITTER)) {
+			time_us = pdu_spacing * lll_iso->bn;
+		} else {
+			/* Time reservation omitting PTC subevents in sequential
+			 * packing.
+			 */
+			time_us = pdu_spacing * ((lll_iso->nse * lll_iso->num_bis) -
+						 lll_iso->ptc);
+		}
 
 	} else {
 		/* Time reservation omitting PTC subevents in interleaved
@@ -1321,6 +1344,9 @@ static uint32_t adv_iso_time_get(const struct ll_adv_iso_set *adv_iso, bool max)
 		time_us = pdu_spacing * ((lll_iso->nse - lll_iso->ptc) *
 					 lll_iso->num_bis);
 	}
+
+	/* Add radio tx ready delay */
+	time_us += lll_radio_tx_ready_delay_get(lll_iso->phy, lll_iso->phy_flags);
 
 	/* Add implementation defined radio event overheads */
 	time_us += EVENT_OVERHEAD_START_US + EVENT_OVERHEAD_END_US;
@@ -1370,6 +1396,41 @@ static uint32_t adv_iso_start(struct ll_adv_iso_set *adv_iso,
 	mfy_lll_prepare.fp = lll_adv_iso_create_prepare;
 
 	ret_cb = TICKER_STATUS_BUSY;
+
+#if defined(CONFIG_BT_CTLR_ADV_ISO_SLOT_WINDOW_JITTER)
+	{
+		const struct lll_adv_iso *lll_iso = &adv_iso->lll;
+		uint32_t jitter_us;
+		uint8_t index;
+
+		if (lll_iso->bis_spacing >=
+		    (lll_iso->sub_interval * lll_iso->nse)) {
+			/* Sequential packing jitter */
+			jitter_us = lll_iso->sub_interval * lll_iso->bn *
+				    (lll_iso->irc - 1U);
+		} else {
+			/* Interleaved packing jitter */
+			jitter_us = lll_iso->bis_spacing * lll_iso->num_bis * lll_iso->bn *
+				    (lll_iso->irc - 1U);
+		}
+
+		index = ARRAY_INDEX(ll_adv_iso, adv_iso);
+		ll_adv_iso_ticker_ext[index].ticks_slot_window =
+			HAL_TICKER_US_TO_TICKS(jitter_us + slot_us);
+		ll_adv_iso_ticker_ext[index].is_jitter_in_window = 1U;
+
+		ret = ticker_start_ext(
+				TICKER_INSTANCE_ID_CTLR, TICKER_USER_ID_THREAD,
+				(TICKER_ID_ADV_ISO_BASE + adv_iso->lll.handle),
+				ticks_anchor, 0U,
+				HAL_TICKER_US_TO_TICKS(iso_interval_us),
+				HAL_TICKER_REMAINDER(iso_interval_us),
+				TICKER_NULL_LAZY, ticks_slot, ticker_cb, adv_iso,
+				ull_ticker_status_give, (void *)&ret_cb,
+				&ll_adv_iso_ticker_ext[index]);
+	}
+
+#else /* !CONFIG_BT_CTLR_ADV_ISO_SLOT_WINDOW_JITTER */
 	ret = ticker_start(TICKER_INSTANCE_ID_CTLR, TICKER_USER_ID_THREAD,
 			   (TICKER_ID_ADV_ISO_BASE + adv_iso->lll.handle),
 			   ticks_anchor, 0U,
@@ -1377,6 +1438,7 @@ static uint32_t adv_iso_start(struct ll_adv_iso_set *adv_iso,
 			   HAL_TICKER_REMAINDER(iso_interval_us),
 			   TICKER_NULL_LAZY, ticks_slot, ticker_cb, adv_iso,
 			   ull_ticker_status_give, (void *)&ret_cb);
+#endif /* !CONFIG_BT_CTLR_ADV_ISO_SLOT_WINDOW_JITTER */
 	ret = ull_ticker_status_take(ret, &ret_cb);
 
 	return ret;
@@ -1643,6 +1705,9 @@ static void ticker_cb(uint32_t ticks_at_expire, uint32_t ticks_drift,
 
 	/* Append timing parameters */
 	p.ticks_at_expire = ticks_at_expire;
+#if defined(CONFIG_BT_CTLR_ADV_ISO_SLOT_WINDOW_JITTER)
+	p.ticks_drift = ticks_drift;
+#endif /* CONFIG_BT_CTLR_ADV_ISO_SLOT_WINDOW_JITTER */
 	p.remainder = remainder;
 	p.lazy = lazy;
 	p.force = force;
