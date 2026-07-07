@@ -1251,6 +1251,56 @@ void radio_switch_complete_and_b2b_rx_disable(void)
 #endif /* !CONFIG_BT_CTLR_TIFS_HW */
 }
 
+#if defined(CONFIG_BT_CTLR_SYNC_ISO_SE_B2B_RX)
+void radio_switch_complete_and_b2b_se_rx(uint8_t phy_curr, uint8_t flags_curr,
+					 uint8_t phy_next, uint8_t flags_next)
+{
+#if defined(CONFIG_BT_CTLR_TIFS_PLLEN)
+	NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | NRF_RADIO_SHORTS_TRX_END_PLLEN_Msk;
+#else /* !CONFIG_BT_CTLR_TIFS_PLLEN */
+	NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | NRF_RADIO_SHORTS_TRX_END_DISABLE_Msk;
+#endif /* !CONFIG_BT_CTLR_TIFS_PLLEN */
+
+	/* Cache the CC value set by radio_tmr_tifs_set() before sw_switch()
+	 * modifies it. The caller has already calculated the offset as:
+	 *   offset = sub_interval - rx_ready_delay - jitter_us
+	 * and set it via radio_tmr_tifs_set(offset).
+	 */
+	uint8_t cc = SW_SWITCH_TIMER_EVTS_COMP(sw_tifs_toggle);
+	uint32_t cc_val_orig = SW_SWITCH_TIMER->CC[cc];
+
+	/* Use the standard sw_switch RX->RX path to set up PPI/DPPI channels,
+	 * groups, and compare events. This configures everything for END-based
+	 * timer clear.
+	 */
+	sw_switch(SW_SWITCH_RX, SW_SWITCH_RX, phy_curr, flags_curr, phy_next, flags_next,
+		  END_EVT_DELAY_DISABLED);
+
+	/* Restore the original CC value. sw_switch() subtracted the RX ready
+	 * delay and chain delay from the CC value, but for SE RX the caller
+	 * has already accounted for these in the offset.
+	 */
+	nrf_timer_cc_set(SW_SWITCH_TIMER, cc, HAL_EVENT_TIMER_US_TO_TICKS(cc_val_orig));
+
+	/* Reconfigure PPI/DPPI to clear the SW_SWITCH_TIMER at EVENTS_READY
+	 * instead of EVENTS_END/PHYEND. This is the key difference from
+	 * standard b2b_rx: the timer reference point is READY (known, fixed
+	 * timing) rather than END (depends on unknown PDU length).
+	 */
+	hal_sw_switch_timer_clear_ppi_se_rx_config();
+}
+
+void radio_switch_complete_and_b2b_se_rx_disable(void)
+{
+	NRF_RADIO->SHORTS = RADIO_SHORTS_READY_START_Msk | NRF_RADIO_SHORTS_TRX_END_DISABLE_Msk;
+
+	hal_radio_sw_switch_b2b_rx_disable(sw_tifs_toggle);
+
+	/* Restore timer clear PPI to standard END-based configuration */
+	hal_sw_switch_timer_clear_ppi_config();
+}
+#endif /* CONFIG_BT_CTLR_SYNC_ISO_SE_B2B_RX */
+
 void radio_switch_complete_and_disable(void)
 {
 #if defined(CONFIG_BT_CTLR_TIFS_HW)
