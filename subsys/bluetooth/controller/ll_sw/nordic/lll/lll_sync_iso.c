@@ -570,7 +570,27 @@ static int prepare_cb_common(struct lll_prepare_param *p)
 		radio_pkt_rx_set(node_rx->pdu);
 	}
 
+#if defined(CONFIG_BT_CTLR_SYNC_ISO_SE_B2B_RX)
+	/* Setup back-to-back subevent reception: pre-schedule the next
+	 * subevent's RXEN via SW_SWITCH_TIMER cleared at EVENTS_READY.
+	 * The offset from READY to the next subevent's RXEN is:
+	 *   sub_interval - rx_ready_delay - jitter_us
+	 */
+	{
+		const uint32_t rx_ready_delay_se =
+			radio_rx_ready_delay_get(lll->phy, PHY_FLAGS_S8);
+		const uint32_t se_jitter_us = (EVENT_CLOCK_JITTER_US << 1);
+		uint32_t se_offset;
+
+		se_offset = lll->sub_interval - rx_ready_delay_se - se_jitter_us;
+
+		radio_tmr_tifs_set(se_offset);
+		radio_switch_complete_and_b2b_se_rx(lll->phy, PHY_FLAGS_S8,
+						    lll->phy, PHY_FLAGS_S8);
+	}
+#else /* !CONFIG_BT_CTLR_SYNC_ISO_SE_B2B_RX */
 	radio_switch_complete_and_disable();
+#endif /* !CONFIG_BT_CTLR_SYNC_ISO_SE_B2B_RX */
 
 	ticks_at_event = p->ticks_at_expire;
 	ull = HDR_LLL2ULL(lll);
@@ -1749,7 +1769,26 @@ isr_rx_next_subevent:
 	radio_aa_set(access_addr);
 	radio_crc_configure(PDU_CRC_POLYNOMIAL, sys_get_le24(crc_init));
 
+#if defined(CONFIG_BT_CTLR_SYNC_ISO_SE_B2B_RX)
+	/* Setup back-to-back reception for the subevent after the one being
+	 * configured now. The offset from READY to the next subevent's RXEN:
+	 *   sub_interval - rx_ready_delay - jitter_us
+	 */
+	{
+		const uint32_t rx_ready_delay_se =
+			radio_rx_ready_delay_get(lll->phy, PHY_FLAGS_S8);
+		const uint32_t se_jitter_us = (EVENT_CLOCK_JITTER_US << 1);
+		uint32_t se_offset;
+
+		se_offset = lll->sub_interval - rx_ready_delay_se - se_jitter_us;
+
+		radio_tmr_tifs_set(se_offset);
+		radio_switch_complete_and_b2b_se_rx(lll->phy, PHY_FLAGS_S8,
+						    lll->phy, PHY_FLAGS_S8);
+	}
+#else /* !CONFIG_BT_CTLR_SYNC_ISO_SE_B2B_RX */
 	radio_switch_complete_and_disable();
+#endif /* !CONFIG_BT_CTLR_SYNC_ISO_SE_B2B_RX */
 
 	/* Set the channel to use */
 	if (!bis) {
@@ -1852,8 +1891,21 @@ isr_rx_next_subevent:
 		radio_pkt_rx_set(pdu);
 	}
 
+	/* assert if radio packet ptr is not set and radio started tx */
 	if (IS_ENABLED(CONFIG_BT_CTLR_PROFILE_ISR)) {
-		lll_prof_cputime_capture();
+		if (radio_is_ready()) {
+			uint32_t end_se_us;
+
+			end_se_us = radio_tmr_end_get();
+
+			LL_ASSERT_MSG(false, "%s: trx_cnt %u crc_ok %u lll->se %u skipped %u"
+				      " aa_se_us %u end_se_us %u Radio ISR latency: %u (%u)",
+				      __func__, lll->trx_cnt, crc_ok, lll->se, skipped,
+				      lll->aa_se, end_se_us, lll_prof_latency_get(),
+				      lll_prof_cputime_get());
+		}
+	} else {
+		LL_ASSERT_ERR(!radio_is_ready());
 	}
 
 	/* PDU Header Complete TimeOut, calculate the absolute timeout in
@@ -1927,15 +1979,24 @@ isr_rx_next_subevent:
 
 		hcto -= jitter_us;
 
+#if defined(CONFIG_BT_CTLR_SYNC_ISO_SE_B2B_RX)
+		/* For b2b SE RX, the radio start is handled by PPI triggered
+		 * from SW_SWITCH_TIMER. Calculate HCTO directly without
+		 * calling radio_tmr_start_us(). The +1 compensates for the
+		 * offset that radio_tmr_start_us() would have added.
+		 */
+		start_us = hcto;
+		hcto += 1U;
+#else /* !CONFIG_BT_CTLR_SYNC_ISO_SE_B2B_RX */
 		/* +1 us radio_tmr_start_us compensation */
 		start_us = hcto - 1U;
 
 		hcto = radio_tmr_start_us(0U, start_us);
 		if (IS_ENABLED(CONFIG_BT_CTLR_PROFILE_ISR)) {
+			lll_prof_cputime_capture();
+
 			if (hcto != (start_us + 1U)) {
 				uint32_t end_se_us;
-
-				lll_prof_cputime_capture();
 
 				end_se_us = radio_tmr_end_get();
 
@@ -1949,6 +2010,7 @@ isr_rx_next_subevent:
 		} else {
 			LL_ASSERT_ERR(hcto == (start_us + 1U));
 		}
+#endif /* !CONFIG_BT_CTLR_SYNC_ISO_SE_B2B_RX */
 
 		/* Add 8 us * subevents so far, as radio was setup to listen
 		 * 4 us early and subevents could have a 4 us drift each until
@@ -1963,11 +2025,19 @@ isr_rx_next_subevent:
 		 */
 		hcto += radio_tmr_ready_restore();
 
+#if defined(CONFIG_BT_CTLR_SYNC_ISO_SE_B2B_RX)
+		/* For b2b SE RX, the radio start is handled by PPI.
+		 * Calculate HCTO directly.
+		 */
+		start_us = hcto;
+		hcto += 1U;
+#else /* !CONFIG_BT_CTLR_SYNC_ISO_SE_B2B_RX */
 		/* +1 us radio_tmr_start_us compensation */
 		start_us = hcto - 1U;
 
 		hcto = radio_tmr_start_us(0U, start_us);
 		LL_ASSERT_ERR(hcto == (start_us + 1U));
+#endif /* !CONFIG_BT_CTLR_SYNC_ISO_SE_B2B_RX */
 
 		hcto += ((EVENT_JITTER_US + EVENT_TICKER_RES_MARGIN_US +
 			  lll->window_widening_event_us) << 1) +
