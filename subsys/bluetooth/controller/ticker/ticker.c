@@ -329,6 +329,18 @@ struct ticker_instance {
 	uint32_t ticks_slot_previous;	/* Number of ticks previously reserved
 					 * by a ticker node (active air-time)
 					 */
+
+#if defined(CONFIG_BT_TICKER_EXT)
+	uint8_t  ticker_id_slot_window_previous; /* Id of previous ticker node
+						  * with ticks_slot_window that
+						  * expired
+						  */
+	uint32_t ticks_slot_window_previous;	 /* Ticks remaining of the
+						  * slot_window reservation
+						  * held by the previous
+						  * window-based ticker
+						  */
+#endif /* CONFIG_BT_TICKER_EXT */
 #endif /* !CONFIG_BT_TICKER_SLOT_AGNOSTIC */
 
 #if defined(CONFIG_BT_TICKER_EXT_EXPIRE_INFO)
@@ -874,8 +886,16 @@ static uint8_t ticker_resolve_collision(struct ticker_node *nodes,
 				break;
 			}
 
-			/* We only care about nodes with slot reservation, continue accumulating */
-			if (ticker_next->ticks_slot == 0U) {
+			/* We only care about nodes with slot reservation,
+			 * continue accumulating. As a special case, when the
+			 * current ticker has ticks_slot_window and the next
+			 * ticker also has ticks_slot_window (with ticks_slot
+			 * == 0), treat it as a colliding node so that only one
+			 * window-based ticker expires within the overlap.
+			 */
+			if ((ticker_next->ticks_slot == 0U) &&
+			    !(TICKER_HAS_SLOT_WINDOW(ticker) &&
+			      TICKER_HAS_SLOT_WINDOW(ticker_next))) {
 				id_head = ticker_next->next;
 				continue;
 			}
@@ -949,6 +969,7 @@ static uint8_t ticker_resolve_collision(struct ticker_node *nodes,
 			 */
 			uint8_t next_not_ticks_slot_window =
 					(TICKER_HAS_SLOT_WINDOW(ticker) &&
+					 (ticker->ticks_slot != 0U) &&
 					 (ticker->ext_data->is_drift_in_window == 0U)) ||
 					!TICKER_HAS_SLOT_WINDOW(ticker_next) ||
 					((ticker_next->ext_data->is_drift_in_window != 0U) &&
@@ -1010,8 +1031,8 @@ static uint8_t ticker_resolve_collision(struct ticker_node *nodes,
 			/* Check if next node is within this reservation slot
 			 * and wins conflict resolution
 			 */
-			if ((curr_has_ticks_slot_window &&
-			     next_not_ticks_slot_window) ||
+			if (((curr_has_ticks_slot_window != 0U) &&
+			     (next_not_ticks_slot_window != 0U)) ||
 			    (!lazy_next_periodic_skip &&
 			     (next_is_critical ||
 			      next_force ||
@@ -1021,6 +1042,7 @@ static uint8_t ticker_resolve_collision(struct ticker_node *nodes,
 				/* This node must be skipped - check window */
 				return 1U;
 			}
+
 			id_head = ticker_next->next;
 		}
 	}
@@ -1304,6 +1326,19 @@ void ticker_worker(void *param)
 		/* This node intersects reserved slot */
 		slot_reserved = 1;
 	}
+
+#if defined(CONFIG_BT_TICKER_EXT)
+	/* Check if a previously expired ticker with ticks_slot_window still
+	 * has its window reservation active. This blocks other window-based
+	 * tickers (with ticks_slot_window != 0) from expiring in the overlap,
+	 * but does not block normal (non-window) tickers.
+	 */
+	uint8_t slot_window_reserved = 0U;
+
+	if (instance->ticks_slot_window_previous > ticks_elapsed) {
+		slot_window_reserved = 1U;
+	}
+#endif /* CONFIG_BT_TICKER_EXT */
 #endif /* !CONFIG_BT_TICKER_LOW_LAT &&
 	* !CONFIG_BT_TICKER_SLOT_AGNOSTIC
 	*/
@@ -1355,7 +1390,18 @@ void ticker_worker(void *param)
 		if ((ticker_ticks_slot != 0U) &&
 		    (slot_reserved ||
 		     (instance->ticks_slot_previous > ticks_expired) ||
-		     ticker_resolve_collision(node, ticker))) {
+#if defined(CONFIG_BT_TICKER_EXT)
+		     /* A window-based ticker (ticks_slot_window != 0) must
+		      * yield if another window-based ticker has already
+		      * expired and its window reservation still overlaps.
+		      * Normal (non-window) tickers are not affected by
+		      * slot_window_reserved.
+		      */
+		     (TICKER_HAS_SLOT_WINDOW(ticker) && (ticker->ticks_slot == 0U) &&
+		      ((slot_window_reserved != 0U) ||
+		       (instance->ticks_slot_window_previous > ticks_expired))) ||
+#endif /* CONFIG_BT_TICKER_EXT */
+		     (ticker_resolve_collision(node, ticker) != 0U))) {
 #if defined(CONFIG_BT_TICKER_EXT)
 			struct ticker_ext *ext_data = ticker->ext_data;
 
@@ -1494,8 +1540,32 @@ void ticker_worker(void *param)
 #if !defined(CONFIG_BT_TICKER_LOW_LAT) && \
 	!defined(CONFIG_BT_TICKER_SLOT_AGNOSTIC)
 				if (ticker_ticks_slot != 0U) {
-					/* Any further nodes will be skipped */
-					slot_reserved = 1U;
+					/* Only real slot reservations (non-zero
+					 * ticks_slot) block subsequent normal
+					 * tickers. Window-based tickers with
+					 * ticks_slot == 0 use MARGIN internally
+					 * but must not block normal tickers, so
+					 * they only update slot_window_reserved
+					 * below.
+					 */
+					if (ticker->ticks_slot != 0U) {
+						/* Any further nodes will be
+						 * skipped
+						 */
+						slot_reserved = 1U;
+					}
+#if defined(CONFIG_BT_TICKER_EXT)
+					if (TICKER_HAS_SLOT_WINDOW(ticker) &&
+					    (ticker->ticks_slot == 0U)) {
+						/* Mark that a window-based
+						 * ticker has expired; other
+						 * window-based tickers must
+						 * yield within its window
+						 * duration.
+						 */
+						slot_window_reserved = 1U;
+					}
+#endif /* CONFIG_BT_TICKER_EXT */
 				}
 #endif /* !CONFIG_BT_TICKER_LOW_LAT &&
 	* !CONFIG_BT_TICKER_SLOT_AGNOSTIC
@@ -1915,6 +1985,16 @@ static inline void ticker_job_node_manage(struct ticker_instance *instance,
 				instance->ticks_slot_previous = ticks_used;
 			}
 		}
+
+#if defined(CONFIG_BT_TICKER_EXT)
+		/* If yield_abs/stop/stop_abs then also clear any tracked
+		 * ticks_slot_window reservation held by this node.
+		 */
+		if (instance->ticker_id_slot_window_previous == user_op->id) {
+			instance->ticker_id_slot_window_previous = TICKER_NULL;
+			instance->ticks_slot_window_previous = 0U;
+		}
+#endif /* CONFIG_BT_TICKER_EXT */
 #endif /* !CONFIG_BT_TICKER_SLOT_AGNOSTIC */
 
 	}
@@ -2137,6 +2217,42 @@ static inline void ticker_job_worker_bh(struct ticker_instance *instance,
 			instance->ticker_id_slot_previous = id_expired;
 			instance->ticks_slot_previous = ticker->ticks_slot;
 		}
+
+#if defined(CONFIG_BT_TICKER_EXT)
+		/* decrement ticks_slot_window_previous */
+		if (instance->ticks_slot_window_previous > ticks_to_expire) {
+			instance->ticks_slot_window_previous -= ticks_to_expire;
+		} else {
+			instance->ticker_id_slot_window_previous = TICKER_NULL;
+			instance->ticks_slot_window_previous = 0U;
+		}
+
+		/* Track window reservation for cross-pass collision handling
+		 * between window-based tickers. Reservation duration is the
+		 * ticker's ticks_slot_window. Do not track if the node is
+		 * being rescheduled.
+		 */
+		if (TICKER_HAS_SLOT_WINDOW(ticker) && (ticker->ticks_slot == 0U) &&
+		    (state == 2U) &&
+		    (skip_collision == 0U) &&
+		    !TICKER_RESCHEDULE_PENDING(ticker)) {
+			uint32_t ticks_slot;
+
+			instance->ticker_id_slot_window_previous = id_expired;
+
+			ticks_slot = ticker->ext_data->ticks_slot_window;
+			if ((ticker->ticks_slot != 0U) &&
+			    (ticker->ticks_slot < ticks_slot)) {
+				ticks_slot = ticker->ticks_slot;
+			}
+			if ((ticker->ticks_periodic != 0U) &&
+			    (ticker->ticks_periodic < ticks_slot)) {
+				ticks_slot = ticker->ticks_periodic;
+			}
+
+			instance->ticks_slot_window_previous = ticks_slot;
+		}
+#endif /* CONFIG_BT_TICKER_EXT */
 #endif /* CONFIG_BT_TICKER_SLOT_AGNOSTIC */
 
 		/* ticker expired, set ticks_to_expire zero */
@@ -3097,6 +3213,11 @@ ticker_job_compare_update(struct ticker_instance *instance,
 		if (cntr_stop() == 0) {
 #if !defined(CONFIG_BT_TICKER_SLOT_AGNOSTIC)
 			instance->ticks_slot_previous = 0U;
+
+#if defined(CONFIG_BT_TICKER_EXT)
+			instance->ticker_id_slot_window_previous = TICKER_NULL;
+			instance->ticks_slot_window_previous = 0U;
+#endif /* CONFIG_BT_TICKER_EXT */
 #endif /* !CONFIG_BT_TICKER_SLOT_AGNOSTIC */
 
 #if !defined(CONFIG_BT_TICKER_CNTR_FREE_RUNNING)
@@ -3444,6 +3565,11 @@ uint8_t ticker_init(uint8_t instance_index, uint8_t count_node, void *node,
 #if !defined(CONFIG_BT_TICKER_SLOT_AGNOSTIC)
 	instance->ticker_id_slot_previous = TICKER_NULL;
 	instance->ticks_slot_previous = 0U;
+
+#if defined(CONFIG_BT_TICKER_EXT)
+	instance->ticker_id_slot_window_previous = TICKER_NULL;
+	instance->ticks_slot_window_previous = 0U;
+#endif /* CONFIG_BT_TICKER_EXT */
 #endif /* !CONFIG_BT_TICKER_SLOT_AGNOSTIC */
 
 #if defined(CONFIG_BT_TICKER_EXT_EXPIRE_INFO)
