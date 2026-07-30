@@ -1483,6 +1483,14 @@ void ull_conn_tx_lll_enqueue(struct ll_conn *conn, uint8_t count)
 		link = mem_acquire(&mem_link_tx.free);
 		LL_ASSERT_ERR(link);
 
+#if defined(CONFIG_BT_CTLR_ACL_DATA_FLUSH)
+		/* Set flush deadline: current event counter + reasonable window
+		 * For now, use 0xFFFF (never flush) as default behavior
+		 * This maintains backward compatibility
+		 */
+		tx->flush_event_counter = 0xFFFF;
+#endif /* CONFIG_BT_CTLR_ACL_DATA_FLUSH */
+
 		/* Enqueue towards LLL */
 		memq_enqueue(link, tx, &conn->lll.memq_tx.tail);
 	}
@@ -2021,6 +2029,11 @@ static void tx_ull_flush(struct ll_conn *conn)
 
 		link = mem_acquire(&mem_link_tx.free);
 		LL_ASSERT_ERR(link);
+
+#if defined(CONFIG_BT_CTLR_ACL_DATA_FLUSH)
+		/* Set flush deadline: use 0xFFFF (never flush) as default */
+		tx->flush_event_counter = 0xFFFF;
+#endif /* CONFIG_BT_CTLR_ACL_DATA_FLUSH */
 
 		/* Enqueue towards LLL */
 		memq_enqueue(link, tx, &conn->lll.memq_tx.tail);

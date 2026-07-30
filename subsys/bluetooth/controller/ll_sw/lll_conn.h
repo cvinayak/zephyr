@@ -41,6 +41,9 @@ struct node_tx {
 		memq_link_t *link;
 	};
 
+#if defined(CONFIG_BT_CTLR_ACL_DATA_FLUSH)
+	uint16_t flush_event_counter;  /* Connection event counter at which this buffer should be flushed */
+#endif /* CONFIG_BT_CTLR_ACL_DATA_FLUSH */
 	uint8_t pdu[];
 };
 

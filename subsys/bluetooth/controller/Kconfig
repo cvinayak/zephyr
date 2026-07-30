@@ -616,6 +616,17 @@ config BT_CTLR_DATA_LENGTH_MAX
 	help
 	  Set the maximum data length of PDU supported in the Controller.
 
+config BT_CTLR_ACL_DATA_FLUSH
+	bool "ACL Data Flushing Support"
+	default y
+	help
+	  Enable ACL data flushing feature as per Bluetooth Core Specification
+	  Version 6.2, Volume 6, Part B, Section 4.5.17.1. This allows the
+	  Controller to flush (discard) queued ACL data that hasn't been
+	  transmitted over the air based on flush timeout parameters. Full
+	  L2CAP packets are associated with an event_counter that defines when
+	  the packet shall be flushed if not transmitted by that connection event.
+
 config BT_CTLR_PHY
 	# Hidden option to enable support for Bluetooth 5.0 PHY Update
 	# Procedure in the Controller.
