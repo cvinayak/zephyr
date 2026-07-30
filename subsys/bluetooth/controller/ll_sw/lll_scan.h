@@ -29,7 +29,11 @@ struct lll_scan {
 
 	uint8_t  state:1;
 	uint8_t  chan:2;
+#if defined(CONFIG_BT_CTLR_DECISION_BASED_FILTERING)
+	uint8_t  filter_policy:3;
+#else
 	uint8_t  filter_policy:2;
+#endif /* CONFIG_BT_CTLR_DECISION_BASED_FILTERING */
 	uint8_t  type:1;
 	uint8_t  init_addr_type:1;
 	uint8_t  is_stop:1;
@@ -89,10 +93,13 @@ struct lll_scan_aux {
 
 
 /* Define to check if filter is enabled and in addition if it is Extended Scan
- * Filtering.
+ * Filtering or Decision-Based Filtering.
  */
 #define SCAN_FP_FILTER BIT(0)
 #define SCAN_FP_EXT    BIT(1)
+#if defined(CONFIG_BT_CTLR_DECISION_BASED_FILTERING)
+#define SCAN_FP_DECISION BIT(2)
+#endif /* CONFIG_BT_CTLR_DECISION_BASED_FILTERING */
 
 int lll_scan_init(void);
 int lll_scan_reset(void);

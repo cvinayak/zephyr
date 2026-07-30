@@ -1,0 +1,17 @@
+sample:
+  description: Bluetooth broadcaster with decision-based advertising filtering
+  name: Bluetooth broadcaster_decision
+common:
+  tags: bluetooth
+  filter: dt_compat_enabled("zephyr,bt-hci")
+  harness: bluetooth
+  platform_allow:
+    - native_sim
+    - qemu_cortex_m3
+    - nrf52dk/nrf52832
+    - nrf52840dk/nrf52840
+  integration_platforms:
+    - native_sim
+tests:
+  sample.bluetooth.broadcaster_decision:
+    build_only: true
