@@ -35,15 +35,18 @@
 #include "ull_tx_queue.h"
 
 #include "isoal.h"
-#include "ull_internal.h"
-#include "ull_iso_types.h"
-#include "ull_conn_iso_types.h"
-#include "ull_conn_iso_internal.h"
 
+#include "ull_iso_types.h"
+#include "ull_cs_types.h"
 #include "ull_conn_types.h"
-#include "ull_llcp.h"
+#include "ull_conn_iso_types.h"
+
+#include "ull_internal.h"
 #include "ull_llcp_internal.h"
 #include "ull_conn_internal.h"
+#include "ull_conn_iso_internal.h"
+
+#include "ull_llcp.h"
 
 #include <soc.h>
 #include "hal/debug.h"
@@ -352,6 +355,11 @@ void llcp_lr_rx(struct ll_conn *conn, struct proc_ctx *ctx, memq_link_t *link,
 		llcp_lp_comm_rx(conn, ctx, rx);
 		break;
 #endif /* CONFIG_BT_CTLR_SCA_UPDATE */
+#if defined(CONFIG_BT_CTLR_CHANNEL_SOUNDING)
+	case PROC_CS:
+		llcp_lp_cs_rx(conn, ctx, rx);
+		break;
+#endif /* CONFIG_BT_CTLR_CHANNEL_SOUNDING */
 	default:
 		/* Unknown procedure */
 		LL_ASSERT_DBG(0);
@@ -397,6 +405,11 @@ void llcp_lr_tx_ack(struct ll_conn *conn, struct proc_ctx *ctx, struct node_tx *
 		llcp_lp_past_tx_ack(conn, ctx, tx);
 		break;
 #endif /* defined(CONFIG_BT_CTLR_SYNC_TRANSFER_SENDER) */
+#if defined(CONFIG_BT_CTLR_CHANNEL_SOUNDING)
+	case PROC_CS:
+		llcp_lp_cs_tx_ack(conn, ctx, tx);
+		break;
+#endif /* CONFIG_BT_CTLR_CHANNEL_SOUNDING */
 	default:
 		break;
 		/* Ignore tx_ack */
@@ -501,6 +514,11 @@ static void lr_act_run(struct ll_conn *conn)
 		llcp_lp_past_run(conn, ctx, NULL);
 		break;
 #endif /* CONFIG_BT_CTLR_SYNC_TRANSFER_SENDER */
+#if defined(CONFIG_BT_CTLR_CHANNEL_SOUNDING)
+	case PROC_CS:
+		llcp_lp_cs_run(conn, ctx, NULL);
+		break;
+#endif /* CONFIG_BT_CTLR_CHANNEL_SOUNDING */
 	default:
 		/* Unknown procedure */
 		LL_ASSERT_DBG(0);

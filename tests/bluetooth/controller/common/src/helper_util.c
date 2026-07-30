@@ -36,6 +36,7 @@
 
 #include "isoal.h"
 #include "ull_iso_types.h"
+#include "ull_cs_types.h"
 #include "ull_conn_iso_types.h"
 #include "ull_conn_iso_internal.h"
 #include "ull_conn_types.h"
@@ -97,6 +98,19 @@ helper_pdu_encode_func_t *const helper_pdu_encode[] = {
 	[LL_CIS_IND] = helper_pdu_encode_cis_ind,
 	[LL_CIS_TERMINATE_IND] = helper_pdu_encode_cis_terminate_ind,
 	[LL_PERIODIC_SYNC_IND] = helper_pdu_encode_periodic_sync_ind,
+	[LL_CS_FAE_REQ] = helper_pdu_encode_cs_fae_req,
+	[LL_CS_FAE_RSP] = helper_pdu_encode_cs_fae_rsp,
+	[LL_CS_CAPABILITIES_REQ] = helper_pdu_encode_cs_capabilities_req,
+	[LL_CS_CAPABILITIES_RSP] = helper_pdu_encode_cs_capabilities_rsp,
+	[LL_CS_SEC_REQ] = helper_pdu_encode_cs_sec_req,
+	[LL_CS_SEC_RSP] = helper_pdu_encode_cs_sec_rsp,
+	[LL_CS_CONFIG_REQ] = helper_pdu_encode_cs_config_req,
+	[LL_CS_CONFIG_RSP] = helper_pdu_encode_cs_config_rsp,
+	[LL_CS_REQ] = helper_pdu_encode_cs_req,
+	[LL_CS_RSP] = helper_pdu_encode_cs_rsp,
+	[LL_CS_IND] = helper_pdu_encode_cs_ind,
+	[LL_CS_TERMINATE_REQ] = helper_pdu_encode_cs_terminate_req,
+	[LL_CS_TERMINATE_RSP] = helper_pdu_encode_cs_terminate_rsp,
 	[LL_ZERO] = helper_pdu_encode_zero,
 };
 
@@ -136,6 +150,19 @@ helper_pdu_verify_func_t *const helper_pdu_verify[] = {
 	[LL_CIS_IND] = helper_pdu_verify_cis_ind,
 	[LL_CIS_TERMINATE_IND] = helper_pdu_verify_cis_terminate_ind,
 	[LL_PERIODIC_SYNC_IND] = helper_pdu_verify_periodic_sync_ind,
+	[LL_CS_FAE_REQ] = helper_pdu_verify_cs_fae_req,
+	[LL_CS_FAE_RSP] = helper_pdu_verify_cs_fae_rsp,
+	[LL_CS_CAPABILITIES_REQ] = helper_pdu_verify_cs_capabilities_req,
+	[LL_CS_CAPABILITIES_RSP] = helper_pdu_verify_cs_capabilities_rsp,
+	[LL_CS_SEC_REQ] = helper_pdu_verify_cs_sec_req,
+	[LL_CS_SEC_RSP] = helper_pdu_verify_cs_sec_rsp,
+	[LL_CS_CONFIG_REQ] = helper_pdu_verify_cs_config_req,
+	[LL_CS_CONFIG_RSP] = helper_pdu_verify_cs_config_rsp,
+	[LL_CS_REQ] = helper_pdu_verify_cs_req,
+	[LL_CS_RSP] = helper_pdu_verify_cs_rsp,
+	[LL_CS_IND] = helper_pdu_verify_cs_ind,
+	[LL_CS_TERMINATE_REQ] = helper_pdu_verify_cs_terminate_req,
+	[LL_CS_TERMINATE_RSP] = helper_pdu_verify_cs_terminate_rsp,
 };
 
 helper_pdu_ntf_verify_func_t *const helper_pdu_ntf_verify[] = {
@@ -173,6 +200,13 @@ helper_pdu_ntf_verify_func_t *const helper_pdu_ntf_verify[] = {
 	[LL_CIS_IND] = NULL,
 	[LL_CIS_TERMINATE_IND] = NULL,
 	[LL_PERIODIC_SYNC_IND] = NULL,
+	[LL_CS_FAE_REQ] = NULL,
+	[LL_CS_FAE_RSP] = NULL,
+	[LL_CS_REQ] = NULL,
+	[LL_CS_RSP] = NULL,
+	[LL_CS_IND] = NULL,
+	[LL_CS_TERMINATE_REQ] = NULL,
+	[LL_CS_TERMINATE_RSP] = NULL,
 };
 
 helper_node_encode_func_t *const helper_node_encode[] = {
@@ -207,6 +241,13 @@ helper_node_encode_func_t *const helper_node_encode[] = {
 	[LL_CIS_IND] = NULL,
 	[LL_CIS_TERMINATE_IND] = NULL,
 	[LL_PERIODIC_SYNC_IND] = NULL,
+	[LL_CS_FAE_REQ] = NULL,
+	[LL_CS_FAE_RSP] = NULL,
+	[LL_CS_REQ] = NULL,
+	[LL_CS_RSP] = NULL,
+	[LL_CS_IND] = NULL,
+	[LL_CS_TERMINATE_REQ] = NULL,
+	[LL_CS_TERMINATE_RSP] = NULL,
 };
 
 helper_node_verify_func_t *const helper_node_verify[] = {
