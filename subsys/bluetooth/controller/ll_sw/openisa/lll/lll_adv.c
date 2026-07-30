@@ -723,14 +723,14 @@ static void isr_done(void *param)
 	}
 
 #if defined(CONFIG_BT_CTLR_ADV_INDICATION)
-	node_rx = ull_pdu_rx_alloc_peek(3);
+	node_rx = ull_pdu_lll_rx_alloc_peek(3);
 	if (node_rx) {
-		ull_pdu_rx_alloc();
+		ull_pdu_lll_rx_alloc();
 
 		/* TODO: add other info by defining a payload struct */
 		node_rx->hdr.type = NODE_RX_TYPE_ADV_INDICATION;
 
-		ull_rx_put_sched(node_rx->hdr.link, node_rx);
+		ull_lll_rx_put_sched(node_rx->hdr.link, node_rx);
 	}
 #else /* !CONFIG_BT_CTLR_ADV_INDICATION */
 	ARG_UNUSED(node_rx);
@@ -892,9 +892,9 @@ static inline int isr_rx_pdu(struct lll_adv *lll,
 		struct node_rx_pdu *rx;
 
 		if (IS_ENABLED(CONFIG_BT_CTLR_CHAN_SEL_2)) {
-			rx = ull_pdu_rx_alloc_peek(4);
+			rx = ull_pdu_lll_rx_alloc_peek(4);
 		} else {
-			rx = ull_pdu_rx_alloc_peek(3);
+			rx = ull_pdu_lll_rx_alloc_peek(3);
 		}
 
 		if (!rx) {
@@ -919,7 +919,7 @@ static inline int isr_rx_pdu(struct lll_adv *lll,
 		/* Stop further LLL radio events */
 		lll->conn->central.initiated = 1;
 
-		rx = ull_pdu_rx_alloc();
+		rx = ull_pdu_lll_rx_alloc();
 
 		rx->hdr.type = NODE_RX_TYPE_CONNECTION;
 		rx->hdr.handle = 0xffff;
@@ -938,10 +938,10 @@ static inline int isr_rx_pdu(struct lll_adv *lll,
 #endif /* CONFIG_BT_CTLR_PRIVACY */
 
 		if (IS_ENABLED(CONFIG_BT_CTLR_CHAN_SEL_2)) {
-			ftr->extra = ull_pdu_rx_alloc();
+			ftr->extra = ull_pdu_lll_rx_alloc();
 		}
 
-		ull_rx_put_sched(rx->hdr.link, rx);
+		ull_lll_rx_put_sched(rx->hdr.link, rx);
 
 		return 0;
 #endif /* CONFIG_BT_PERIPHERAL */
@@ -984,11 +984,11 @@ static inline int isr_rx_sr_report(struct pdu_adv *pdu_adv_rx,
 	struct pdu_adv *pdu_adv;
 	uint8_t pdu_len;
 
-	node_rx = ull_pdu_rx_alloc_peek(3);
+	node_rx = ull_pdu_lll_rx_alloc_peek(3);
 	if (!node_rx) {
 		return -ENOBUFS;
 	}
-	ull_pdu_rx_alloc();
+	ull_pdu_lll_rx_alloc();
 
 	/* Prepare the report (scan req) */
 	node_rx->hdr.type = NODE_RX_TYPE_SCAN_REQ;
@@ -1004,7 +1004,7 @@ static inline int isr_rx_sr_report(struct pdu_adv *pdu_adv_rx,
 	node_rx->rx_ftr.rssi = (rssi_ready) ? (radio_rssi_get() & 0x7f) :
 						  0x7f;
 
-	ull_rx_put_sched(node_rx->hdr.link, node_rx);
+	ull_lll_rx_put_sched(node_rx->hdr.link, node_rx);
 
 	return 0;
 }

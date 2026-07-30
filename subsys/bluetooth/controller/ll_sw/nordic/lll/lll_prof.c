@@ -240,12 +240,12 @@ struct node_rx_pdu *lll_prof_reserve(void)
 {
 	struct node_rx_pdu *rx;
 
-	rx = ull_pdu_rx_alloc_peek(3);
+	rx = ull_pdu_lll_rx_alloc_peek(3);
 	if (!rx) {
 		return NULL;
 	}
 
-	ull_pdu_rx_alloc();
+	ull_pdu_lll_rx_alloc();
 
 	return rx;
 }
@@ -258,7 +258,7 @@ void lll_prof_reserve_send(struct node_rx_pdu *rx)
 	if ((err != 0) && (rx != NULL)) {
 		rx->hdr.type = NODE_RX_TYPE_PROFILE;
 
-		ull_rx_put_sched(rx->hdr.link, rx);
+		ull_lll_rx_put_sched(rx->hdr.link, rx);
 	}
 }
 
@@ -319,12 +319,12 @@ static int send(struct node_rx_pdu *rx)
 
 	/* Allocate if not already allocated */
 	if (!rx) {
-		rx = ull_pdu_rx_alloc_peek(3U);
+		rx = ull_pdu_lll_rx_alloc_peek(3U);
 		if (!rx) {
 			return -ENOMEM;
 		}
 
-		(void)ull_pdu_rx_alloc();
+		(void)ull_pdu_lll_rx_alloc();
 	}
 
 	/* Generate event with the allocated node rx */
@@ -348,7 +348,7 @@ static int send(struct node_rx_pdu *rx)
 	p->ull_high_ticks = cputime_ticks_ull_high;
 	p->ull_low_ticks = cputime_ticks_ull_low;
 
-	ull_rx_put_sched(rx->hdr.link, rx);
+	ull_lll_rx_put_sched(rx->hdr.link, rx);
 
 	return 0;
 }

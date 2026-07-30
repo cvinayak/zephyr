@@ -428,7 +428,7 @@ void ull_conn_iso_lll_cis_established(struct lll_conn_iso_stream *cis_lll)
 		return;
 	}
 
-	node_rx = ull_pdu_rx_alloc();
+	node_rx = ull_pdu_lll_rx_alloc();
 	if (!node_rx) {
 		/* No node available - try again later */
 		return;
@@ -439,7 +439,7 @@ void ull_conn_iso_lll_cis_established(struct lll_conn_iso_stream *cis_lll)
 	/* Send node to ULL RX demuxer for triggering LLCP state machine */
 	node_rx->hdr.handle = cis->lll.acl_handle;
 
-	ull_rx_put_sched(node_rx->hdr.link, node_rx);
+	ull_lll_rx_put_sched(node_rx->hdr.link, node_rx);
 
 	cis->established = 1;
 }

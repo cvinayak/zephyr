@@ -312,7 +312,7 @@ static int prepare_cb_common(struct lll_prepare_param *p)
 	/* By design, there shall always be one free node rx available for
 	 * setting up radio for new PDU reception.
 	 */
-	node_rx = ull_iso_pdu_rx_alloc_peek(1U);
+	node_rx = ull_iso_pdu_lll_rx_alloc_peek(1U);
 	LL_ASSERT_DBG(node_rx);
 
 	/* Encryption */
@@ -485,7 +485,7 @@ static void abort_cb(struct lll_prepare_param *prepare_param, void *param)
 	}
 
 	/* Extra done event, to check sync lost */
-	e = ull_event_done_extra_get();
+	e = ull_event_lll_done_extra_get();
 	LL_ASSERT_ERR(e);
 
 	e->type = EVENT_DONE_EXTRA_TYPE_SYNC_ISO;
@@ -526,7 +526,7 @@ static void isr_rx_estab(void *param)
 		/* By design, there shall always be one free node rx available when setting up radio
 		 * for new PDU reception.
 		 */
-		node_rx = ull_iso_pdu_rx_alloc_peek(1U);
+		node_rx = ull_iso_pdu_lll_rx_alloc_peek(1U);
 		LL_ASSERT_DBG(node_rx);
 
 		/* Get reference to received PDU and validate MIC for non-empty PDU */
@@ -546,7 +546,7 @@ static void isr_rx_estab(void *param)
 	}
 
 	/* Calculate and place the drift information in done event */
-	e = ull_event_done_extra_get();
+	e = ull_event_lll_done_extra_get();
 	LL_ASSERT_ERR(e);
 
 	e->type = EVENT_DONE_EXTRA_TYPE_SYNC_ISO_ESTAB;
@@ -689,7 +689,7 @@ static void isr_rx(void *param)
 			goto isr_rx_done;
 		}
 
-		node_rx = ull_iso_pdu_rx_alloc_peek(1U);
+		node_rx = ull_iso_pdu_lll_rx_alloc_peek(1U);
 		LL_ASSERT_DBG(node_rx);
 
 		pdu = (void *)node_rx->pdu;
@@ -705,7 +705,7 @@ static void isr_rx(void *param)
 		 * is to ensure a PDU can be setup for the radio DMA to
 		 * receive in the next sub_interval/iso_interval.
 		 */
-		if (ull_iso_pdu_rx_alloc_peek(2U) == NULL) {
+		if (ull_iso_pdu_lll_rx_alloc_peek(2U) == NULL) {
 			goto isr_rx_done;
 		}
 
@@ -751,7 +751,7 @@ static void isr_rx(void *param)
 				}
 			}
 
-			ull_iso_pdu_rx_alloc();
+			ull_iso_pdu_lll_rx_alloc();
 
 			handle = LL_BIS_SYNC_HANDLE_FROM_IDX(stream_handle);
 			isr_rx_iso_data_valid(lll, handle, node_rx);
@@ -1240,7 +1240,7 @@ isr_rx_next_subevent:
 			/* By design, there shall always be one free node rx
 			 * available for setting up radio for new PDU reception.
 			 */
-			node_rx = ull_iso_pdu_rx_alloc_peek(1U);
+			node_rx = ull_iso_pdu_lll_rx_alloc_peek(1U);
 			LL_ASSERT_DBG(node_rx);
 
 			pdu = (void *)node_rx->pdu;
@@ -1267,7 +1267,7 @@ isr_rx_next_subevent:
 			/* By design, there shall always be one free node rx
 			 * available for setting up radio for new PDU reception.
 			 */
-			node_rx = ull_iso_pdu_rx_alloc_peek(1U);
+			node_rx = ull_iso_pdu_lll_rx_alloc_peek(1U);
 			LL_ASSERT_DBG(node_rx);
 
 			pdu = (void *)node_rx->pdu;
@@ -1487,12 +1487,12 @@ static void isr_rx_done(void *param)
 					 * be setup for the radio DMA to receive in the
 					 * next sub_interval/iso_interval.
 					 */
-					node_rx = ull_iso_pdu_rx_alloc_peek(2U);
+					node_rx = ull_iso_pdu_lll_rx_alloc_peek(2U);
 					if (node_rx) {
 						struct pdu_bis *pdu;
 						uint16_t handle;
 
-						ull_iso_pdu_rx_alloc();
+						ull_iso_pdu_lll_rx_alloc();
 
 						pdu = (void *)node_rx->pdu;
 						pdu->ll_id = PDU_BIS_LLID_COMPLETE_END;
@@ -1525,7 +1525,7 @@ static void isr_rx_done(void *param)
 		iso_rx_sched();
 	}
 
-	e = ull_event_done_extra_get();
+	e = ull_event_lll_done_extra_get();
 	LL_ASSERT_ERR(e);
 
 	/* Check if BIG terminate procedure received */

@@ -136,7 +136,7 @@ void lll_sync_aux_prepare_cb(struct lll_sync *lll,
 	radio_pkt_configure(RADIO_PKT_CONF_LENGTH_8BIT, LL_EXT_OCTETS_RX_MAX,
 			    RADIO_PKT_CONF_PHY(lll_aux->phy));
 
-	node_rx = ull_pdu_rx_alloc_peek(1);
+	node_rx = ull_pdu_lll_rx_alloc_peek(1);
 	LL_ASSERT_DBG(node_rx);
 
 	radio_pkt_rx_set(node_rx->pdu);
@@ -455,7 +455,7 @@ static int prepare_cb_common(struct lll_prepare_param *p, uint8_t chan_idx)
 
 	lll_chan_set(chan_idx);
 
-	node_rx = ull_pdu_rx_alloc_peek(1);
+	node_rx = ull_pdu_lll_rx_alloc_peek(1);
 	LL_ASSERT_DBG(node_rx);
 
 	radio_pkt_rx_set(node_rx->pdu);
@@ -634,7 +634,7 @@ static void abort_cb(struct lll_prepare_param *prepare_param, void *param)
 	}
 
 	/* Extra done event, to check sync lost */
-	e = ull_event_done_extra_get();
+	e = ull_event_lll_done_extra_get();
 	LL_ASSERT_ERR(e);
 
 	e->type = EVENT_DONE_EXTRA_TYPE_SYNC;
@@ -812,16 +812,16 @@ static int isr_rx(struct lll_sync *lll, uint8_t node_type, uint8_t crc_ok,
 		 * again a node_rx for periodic report incomplete.
 		 */
 		if (node_type != NODE_RX_TYPE_EXT_AUX_REPORT) {
-			node_rx = ull_pdu_rx_alloc_peek(4);
+			node_rx = ull_pdu_lll_rx_alloc_peek(4);
 		} else {
-			node_rx = ull_pdu_rx_alloc_peek(3);
+			node_rx = ull_pdu_lll_rx_alloc_peek(3);
 		}
 
 		if (node_rx) {
 			struct node_rx_ftr *ftr;
 			struct pdu_adv *pdu;
 
-			ull_pdu_rx_alloc();
+			ull_pdu_lll_rx_alloc();
 
 			node_rx->hdr.type = node_type;
 
@@ -840,7 +840,7 @@ static int isr_rx(struct lll_sync *lll, uint8_t node_type, uint8_t crc_ok,
 			ftr->sync_rx_enabled = lll->is_rx_enabled;
 
 			if (node_type != NODE_RX_TYPE_EXT_AUX_REPORT) {
-				ftr->extra = ull_pdu_rx_alloc();
+				ftr->extra = ull_pdu_lll_rx_alloc();
 			}
 
 			pdu = (void *)node_rx->pdu;
@@ -859,7 +859,7 @@ static int isr_rx(struct lll_sync *lll, uint8_t node_type, uint8_t crc_ok,
 				err = 0;
 			}
 
-			ull_rx_put(node_rx->hdr.link, node_rx);
+			ull_lll_rx_put(node_rx->hdr.link, node_rx);
 
 #if defined(CONFIG_BT_CTLR_DF_SCAN_CTE_RX)
 			if (cte_ready) {
@@ -902,7 +902,7 @@ static int isr_rx(struct lll_sync *lll, uint8_t node_type, uint8_t crc_ok,
 	}
 
 	if (sched) {
-		ull_rx_sched();
+		ull_lll_rx_sched();
 	}
 
 	return err;
@@ -978,11 +978,11 @@ static void isr_rx_adv_sync_estab(void *param)
 		 * - a buffer for receiving data in a connection
 		 * - a buffer for receiving empty PDU
 		 */
-		node_rx = ull_pdu_rx_alloc_peek(3);
+		node_rx = ull_pdu_lll_rx_alloc_peek(3);
 		if (node_rx) {
 			struct node_rx_ftr *ftr;
 
-			ull_pdu_rx_alloc();
+			ull_pdu_lll_rx_alloc();
 
 			node_rx->hdr.type = NODE_RX_TYPE_SYNC;
 
@@ -990,7 +990,7 @@ static void isr_rx_adv_sync_estab(void *param)
 			ftr->param = lll;
 			ftr->sync_status = SYNC_STAT_TERM;
 
-			ull_rx_put_sched(node_rx->hdr.link, node_rx);
+			ull_lll_rx_put_sched(node_rx->hdr.link, node_rx);
 		}
 	}
 
@@ -1136,7 +1136,7 @@ isr_rx_aux_chain_done:
 		/* Generate message to release aux context and flag the report
 		 * generated thereafter by HCI as incomplete.
 		 */
-		node_rx = ull_pdu_rx_alloc();
+		node_rx = ull_pdu_lll_rx_alloc();
 		LL_ASSERT_ERR(node_rx);
 
 		node_rx->hdr.type = NODE_RX_TYPE_EXT_AUX_RELEASE;
@@ -1145,7 +1145,7 @@ isr_rx_aux_chain_done:
 		node_rx->rx_ftr.lll_aux = lll->lll_aux;
 		node_rx->rx_ftr.aux_failed = 1U;
 
-		ull_rx_put(node_rx->hdr.link, node_rx);
+		ull_lll_rx_put(node_rx->hdr.link, node_rx);
 
 		if (!crc_ok) {
 #if defined(CONFIG_BT_CTLR_DF_SAMPLE_CTE_FOR_PDU_WITH_BAD_CRC)
@@ -1163,7 +1163,7 @@ isr_rx_aux_chain_done:
 #endif /* CONFIG_BT_CTLR_DF_SCAN_CTE_RX */
 		}
 
-		ull_rx_sched();
+		ull_lll_rx_sched();
 	}
 
 	if (lll->is_aux_sched) {
@@ -1187,7 +1187,7 @@ static void isr_rx_done_cleanup(struct lll_sync *lll, uint8_t crc_ok, bool sync_
 	lll->lll_aux = NULL;
 
 	/* Calculate and place the drift information in done event */
-	e = ull_event_done_extra_get();
+	e = ull_event_lll_done_extra_get();
 	LL_ASSERT_ERR(e);
 
 	e->type = EVENT_DONE_EXTRA_TYPE_SYNC;
@@ -1239,7 +1239,7 @@ static void isr_done(void *param)
 		/* Generate message to release aux context and flag the report
 		 * generated thereafter by HCI as incomplete.
 		 */
-		node_rx = ull_pdu_rx_alloc();
+		node_rx = ull_pdu_lll_rx_alloc();
 		LL_ASSERT_ERR(node_rx);
 
 		node_rx->hdr.type = NODE_RX_TYPE_EXT_AUX_RELEASE;
@@ -1248,7 +1248,7 @@ static void isr_done(void *param)
 		node_rx->rx_ftr.lll_aux = lll->lll_aux;
 		node_rx->rx_ftr.aux_failed = 1U;
 
-		ull_rx_put_sched(node_rx->hdr.link, node_rx);
+		ull_lll_rx_put_sched(node_rx->hdr.link, node_rx);
 	}
 
 	isr_rx_done_cleanup(param, ((trx_cnt) ? 1U : 0U), false);
@@ -1355,7 +1355,7 @@ static int iq_report_create_put(struct lll_sync *lll, uint8_t rssi_ready, uint8_
 	}
 
 	if (!err) {
-		ull_rx_put(iq_report->rx.hdr.link, iq_report);
+		ull_lll_rx_put(iq_report->rx.hdr.link, iq_report);
 
 		cfg->cte_count += 1U;
 	}
@@ -1381,7 +1381,7 @@ static int iq_report_incomplete_create_put(struct lll_sync *lll)
 			iq_report_incomplete_create(lll, iq_report);
 
 			lll->node_cte_incomplete = NULL;
-			ull_rx_put(iq_report->rx.hdr.link, iq_report);
+			ull_lll_rx_put(iq_report->rx.hdr.link, iq_report);
 
 			return 0;
 		} else {
@@ -1401,7 +1401,7 @@ static void iq_report_incomplete_release_put(struct lll_sync *lll)
 
 		iq_report->rx.hdr.type = NODE_RX_TYPE_IQ_SAMPLE_REPORT_LLL_RELEASE;
 
-		ull_rx_put(iq_report->rx.hdr.link, iq_report);
+		ull_lll_rx_put(iq_report->rx.hdr.link, iq_report);
 		lll->node_cte_incomplete = NULL;
 	}
 }

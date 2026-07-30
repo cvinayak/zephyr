@@ -390,7 +390,7 @@ static int common_prepare_cb(struct lll_prepare_param *p, bool is_resume)
 			    RADIO_PKT_CONF_PHY(RADIO_PKT_CONF_PHY_LEGACY));
 #endif /* !CONFIG_BT_CTLR_ADV_EXT */
 
-	node_rx = ull_pdu_rx_alloc_peek(1);
+	node_rx = ull_pdu_lll_rx_alloc_peek(1);
 	LL_ASSERT_DBG(node_rx);
 
 	radio_pkt_rx_set(node_rx->pdu);
@@ -713,7 +713,7 @@ static void isr_rx(void *param)
 		goto isr_rx_do_close;
 	}
 
-	node_rx = ull_pdu_rx_alloc_peek(1);
+	node_rx = ull_pdu_lll_rx_alloc_peek(1);
 	LL_ASSERT_DBG(node_rx);
 
 	pdu = (void *)node_rx->pdu;
@@ -791,7 +791,7 @@ static void isr_tx(void *param)
 	/* Complete currently setup Rx and disable radio */
 	radio_switch_complete_and_disable();
 
-	node_rx = ull_pdu_rx_alloc_peek(1);
+	node_rx = ull_pdu_lll_rx_alloc_peek(1);
 	LL_ASSERT_DBG(node_rx);
 	radio_pkt_rx_set(node_rx->pdu);
 
@@ -879,7 +879,7 @@ static void isr_common_done(void *param)
 		radio_switch_complete_and_disable();
 	}
 
-	node_rx = ull_pdu_rx_alloc_peek(1);
+	node_rx = ull_pdu_lll_rx_alloc_peek(1);
 	LL_ASSERT_DBG(node_rx);
 	radio_pkt_rx_set(node_rx->pdu);
 
@@ -1020,7 +1020,7 @@ static void isr_abort(void *param)
 	/* Generate Scan done events so that duration and max expiry is
 	 * detected in ULL.
 	 */
-	extra = ull_done_extra_type_set(EVENT_DONE_EXTRA_TYPE_SCAN);
+	extra = ull_lll_done_extra_type_set(EVENT_DONE_EXTRA_TYPE_SCAN);
 	LL_ASSERT_ERR(extra);
 #endif  /* CONFIG_BT_CTLR_ADV_EXT */
 
@@ -1070,14 +1070,14 @@ static void isr_done_cleanup(void *param)
 	 * 3. Keep one available free for reception on ACL connection to NACK
 	 *    the PDU
 	 */
-	node_rx = ull_pdu_rx_alloc_peek(3);
+	node_rx = ull_pdu_lll_rx_alloc_peek(3);
 	if (node_rx) {
-		ull_pdu_rx_alloc();
+		ull_pdu_lll_rx_alloc();
 
 		/* TODO: add other info by defining a payload struct */
 		node_rx->hdr.type = NODE_RX_TYPE_SCAN_INDICATION;
 
-		ull_rx_put_sched(node_rx->hdr.link, node_rx);
+		ull_lll_rx_put_sched(node_rx->hdr.link, node_rx);
 	}
 #endif /* CONFIG_BT_CTLR_SCAN_INDICATION */
 
@@ -1098,7 +1098,7 @@ static void isr_done_cleanup(void *param)
 		/* Generate Scan done events so that duration and max expiry is
 		 * detected in ULL.
 		 */
-		extra = ull_done_extra_type_set(EVENT_DONE_EXTRA_TYPE_SCAN);
+		extra = ull_lll_done_extra_type_set(EVENT_DONE_EXTRA_TYPE_SCAN);
 		LL_ASSERT_ERR(extra);
 	}
 
@@ -1117,7 +1117,7 @@ static void isr_done_cleanup(void *param)
 
 		lll->is_aux_sched = 0U;
 
-		node_rx2 = ull_pdu_rx_alloc();
+		node_rx2 = ull_pdu_lll_rx_alloc();
 		LL_ASSERT_ERR(node_rx2);
 
 		node_rx2->hdr.type = NODE_RX_TYPE_EXT_AUX_RELEASE;
@@ -1125,7 +1125,7 @@ static void isr_done_cleanup(void *param)
 		node_rx2->rx_ftr.param = lll;
 		node_rx2->rx_ftr.lll_aux = lll->lll_aux;
 
-		ull_rx_put_sched(node_rx2->hdr.link, node_rx2);
+		ull_lll_rx_put_sched(node_rx2->hdr.link, node_rx2);
 	}
 #endif  /* CONFIG_BT_CTLR_ADV_EXT */
 
@@ -1178,9 +1178,9 @@ static inline int isr_rx_pdu(struct lll_scan *lll, struct pdu_adv *pdu_adv_rx,
 #endif /* CONFIG_BT_CTLR_PRIVACY */
 
 		if (IS_ENABLED(CONFIG_BT_CTLR_CHAN_SEL_2)) {
-			rx = ull_pdu_rx_alloc_peek(4);
+			rx = ull_pdu_lll_rx_alloc_peek(4);
 		} else {
-			rx = ull_pdu_rx_alloc_peek(3);
+			rx = ull_pdu_lll_rx_alloc_peek(3);
 		}
 
 		if (!rx) {
@@ -1281,7 +1281,7 @@ static inline int isr_rx_pdu(struct lll_scan *lll, struct pdu_adv *pdu_adv_rx,
 		/* Stop further initiating events */
 		lll->is_stop = 1U;
 
-		rx = ull_pdu_rx_alloc();
+		rx = ull_pdu_lll_rx_alloc();
 
 		rx->hdr.type = NODE_RX_TYPE_CONNECTION;
 		rx->hdr.handle = 0xffff;
@@ -1307,10 +1307,10 @@ static inline int isr_rx_pdu(struct lll_scan *lll, struct pdu_adv *pdu_adv_rx,
 #endif /* CONFIG_BT_CTLR_PRIVACY */
 
 		if (IS_ENABLED(CONFIG_BT_CTLR_CHAN_SEL_2)) {
-			ftr->extra = ull_pdu_rx_alloc();
+			ftr->extra = ull_pdu_lll_rx_alloc();
 		}
 
-		ull_rx_put_sched(rx->hdr.link, rx);
+		ull_lll_rx_put_sched(rx->hdr.link, rx);
 
 		if (IS_ENABLED(CONFIG_BT_CTLR_PROFILE_ISR)) {
 			lll_prof_send();
@@ -1556,11 +1556,11 @@ static int isr_rx_scan_report(struct lll_scan *lll, uint8_t devmatch_ok,
 	struct node_rx_pdu *node_rx;
 	int err = 0;
 
-	node_rx = ull_pdu_rx_alloc_peek(3);
+	node_rx = ull_pdu_lll_rx_alloc_peek(3);
 	if (!node_rx) {
 		return -ENOBUFS;
 	}
-	ull_pdu_rx_alloc();
+	ull_pdu_lll_rx_alloc();
 
 	/* Prepare the report (adv or scan resp) */
 	node_rx->hdr.handle = 0xffff;
@@ -1662,7 +1662,7 @@ static int isr_rx_scan_report(struct lll_scan *lll, uint8_t devmatch_ok,
 	}
 #endif /* CONFIG_BT_CTLR_EXT_SCAN_FP */
 
-	ull_rx_put_sched(node_rx->hdr.link, node_rx);
+	ull_lll_rx_put_sched(node_rx->hdr.link, node_rx);
 
 	return err;
 }
