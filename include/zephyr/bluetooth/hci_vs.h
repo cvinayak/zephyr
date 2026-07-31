@@ -35,6 +35,7 @@ extern "C" {
 #define BT_VS_CMD_BIT_SET_SCAN_REP_ENABLE          12
 #define BT_VS_CMD_BIT_WRITE_TX_POWER               13
 #define BT_VS_CMD_BIT_READ_TX_POWER                14
+#define BT_VS_CMD_BIT_SET_ADV_REP_ENABLE           17
 
 #define BT_VS_CMD_SUP_FEAT(cmd)                 BT_LE_FEAT_TEST(cmd, \
 						BT_VS_CMD_BIT_SUP_FEAT)
@@ -169,6 +170,13 @@ struct bt_hci_rp_vs_read_host_stack_cmds {
 #define BT_HCI_VS_SCAN_REQ_REPORTS_ENABLED      0x01
 #define BT_HCI_OP_VS_SET_SCAN_REQ_REPORTS       BT_OP(BT_OGF_VS, 0x000d)
 struct bt_hci_cp_vs_set_scan_req_reports {
+	uint8_t  enable;
+} __packed;
+
+#define BT_HCI_VS_ADV_REPORTS_DISABLED      0x00
+#define BT_HCI_VS_ADV_REPORTS_ENABLED       0x01
+#define BT_HCI_OP_VS_SET_ADV_REPORTS        BT_OP(BT_OGF_VS, 0x0013)
+struct bt_hci_cp_vs_set_adv_reports {
 	uint8_t  enable;
 } __packed;
 
@@ -317,6 +325,19 @@ struct bt_hci_evt_vs_le_connection_iq_report {
 	struct bt_hci_le_iq_sample16 sample[0];
 } __packed;
 
+#define BT_HCI_EVT_VS_LE_ADV_REPORT            0x07
+struct bt_hci_evt_vs_le_adv_info {
+	uint8_t      evt_type;
+	bt_addr_le_t addr;
+	uint8_t      length;
+	uint8_t      data[0]; /* Followed by rssi (int8_t) and chan_idx (uint8_t) */
+} __packed;
+
+struct bt_hci_evt_vs_le_adv_report {
+	uint8_t num_reports;
+	struct bt_hci_evt_vs_le_adv_info adv_info[0];
+} __packed;
+
 /* Event mask bits */
 
 #define BT_EVT_MASK_VS_FATAL_ERROR             BT_EVT_BIT(1)
@@ -324,6 +345,7 @@ struct bt_hci_evt_vs_le_connection_iq_report {
 #define BT_EVT_MASK_VS_SCAN_REQ_RX             BT_EVT_BIT(3)
 #define BT_EVT_MASK_VS_LE_CONNECTIONLESS_IQ_REPORT BT_EVT_BIT(4)
 #define BT_EVT_MASK_VS_LE_CONNECTION_IQ_REPORT	   BT_EVT_BIT(5)
+#define BT_EVT_MASK_VS_LE_ADV_REPORT           BT_EVT_BIT(6)
 
 #define DEFAULT_VS_EVT_MASK                                                                        \
 	BT_EVT_MASK_VS_FATAL_ERROR | BT_EVT_MASK_VS_TRACE_INFO | BT_EVT_MASK_VS_SCAN_REQ_RX |      \
