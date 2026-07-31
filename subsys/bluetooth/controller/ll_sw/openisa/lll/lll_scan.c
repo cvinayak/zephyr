@@ -1140,6 +1140,11 @@ static uint32_t isr_rx_scan_report(struct lll_scan *lll, uint8_t rssi_ready,
 	}
 #endif /* CONFIG_BT_CTLR_EXT_SCAN_FP */
 
+#if defined(CONFIG_BT_CTLR_VS_ADV_REPORT_RX)
+	/* Save advertising channel index for VS advertising report. */
+	node_rx->rx_ftr.adv_chan_idx = 37U + lll->chan;
+#endif /* CONFIG_BT_CTLR_VS_ADV_REPORT_RX */
+
 	ull_rx_put_sched(node_rx->hdr.link, node_rx);
 
 	return 0;

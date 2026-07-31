@@ -1245,6 +1245,14 @@ config BT_CTLR_VS_SCAN_REQ_RX
 	help
 	  Enables usage of VS Scan Request Reports Command and Scan Request Received Event
 
+config BT_CTLR_VS_ADV_REPORT_RX
+	bool "Use vendor-specific advertising report events"
+	depends on BT_HCI_VS && BT_OBSERVER && !BT_CTLR_ADV_EXT
+	help
+	  Enables usage of VS Set Advertising Reports Command and
+	  LE Advertising Report vendor-specific event which augments
+	  the standard LE Advertising Report with a channel index field.
+
 endif # HAS_BT_CTLR
 
 config BT_CTLR_DEBUG_PINS_CPUAPP
