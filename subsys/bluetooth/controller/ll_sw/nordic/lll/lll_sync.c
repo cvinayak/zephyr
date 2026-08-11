@@ -54,6 +54,7 @@ static void abort_cb(struct lll_prepare_param *prepare_param, void *param);
 static int isr_rx(struct lll_sync *lll, uint8_t node_type, uint8_t crc_ok,
 		  uint8_t phy_flags_rx, uint8_t cte_ready, uint8_t rssi_ready,
 		  enum sync_status status);
+static uint8_t isr_rx_crc_ok_get(uint8_t crc_ok);
 static void isr_rx_adv_sync_estab(void *param);
 static void isr_rx_adv_sync(void *param);
 static void isr_rx_aux_chain(void *param);
@@ -908,6 +909,28 @@ static int isr_rx(struct lll_sync *lll, uint8_t node_type, uint8_t crc_ok,
 	return err;
 }
 
+static uint8_t isr_rx_crc_ok_get(uint8_t crc_ok)
+{
+	/* Force CRC failure for received PDU with length that exceeds the
+	 * configured maximum receive data length used to setup the radio
+	 * packet reception.
+	 */
+	if (crc_ok) {
+		struct node_rx_pdu *node_rx;
+		struct pdu_adv *pdu;
+
+		node_rx = ull_pdu_rx_alloc_peek(1);
+		LL_ASSERT_DBG(node_rx);
+
+		pdu = (void *)node_rx->pdu;
+		if (pdu->len > LL_EXT_OCTETS_RX_MAX) {
+			crc_ok = 0U;
+		}
+	}
+
+	return crc_ok;
+}
+
 static void isr_rx_adv_sync_estab(void *param)
 {
 	enum sync_status sync_ok;
@@ -942,6 +965,8 @@ static void isr_rx_adv_sync_estab(void *param)
 		 */
 		sync_ok = SYNC_STAT_ALLOWED;
 	}
+
+	crc_ok = isr_rx_crc_ok_get(crc_ok);
 
 	/* Clear radio rx status and events */
 	lll_isr_rx_status_reset();
@@ -1032,6 +1057,8 @@ static void isr_rx_adv_sync(void *param)
 		crc_ok = phy_flags_rx = rssi_ready = cte_ready = 0U;
 	}
 
+	crc_ok = isr_rx_crc_ok_get(crc_ok);
+
 	/* Clear radio rx status and events */
 	lll_isr_rx_status_reset();
 
@@ -1105,6 +1132,8 @@ static void isr_rx_aux_chain(void *param)
 	} else {
 		crc_ok = phy_flags_rx = rssi_ready = cte_ready = 0U;
 	}
+
+	crc_ok = isr_rx_crc_ok_get(crc_ok);
 
 	/* Clear radio rx status and events */
 	lll_isr_rx_status_reset();
