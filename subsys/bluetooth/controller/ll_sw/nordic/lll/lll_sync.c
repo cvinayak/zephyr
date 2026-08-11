@@ -911,9 +911,9 @@ static int isr_rx(struct lll_sync *lll, uint8_t node_type, uint8_t crc_ok,
 
 static uint8_t isr_rx_crc_ok_get(uint8_t crc_ok)
 {
-	/* Force CRC failure for received PDU with length that exceeds the
-	 * configured maximum receive data length used to setup the radio
-	 * packet reception.
+	/* Discard received PDU with length that exceeds the configured
+	 * maximum receive data length used to setup the radio packet
+	 * reception.
 	 */
 	if (crc_ok) {
 		struct node_rx_pdu *node_rx;
