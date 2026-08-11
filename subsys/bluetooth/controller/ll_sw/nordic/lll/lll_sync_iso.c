@@ -694,6 +694,13 @@ static void isr_rx(void *param)
 
 		pdu = (void *)node_rx->pdu;
 
+		/* Force CRC failure for received PDU with length that exceeds
+		 * the configured maximum data length.
+		 */
+		if (pdu->len > lll->max_pdu) {
+			goto isr_rx_done;
+		}
+
 		/* Check for new control PDU in control subevent */
 		if (pdu->cstf && (pdu->cssn != lll->cssn_curr)) {
 			lll->cssn_next = pdu->cssn;

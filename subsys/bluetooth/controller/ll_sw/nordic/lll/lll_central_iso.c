@@ -775,6 +775,14 @@ static void isr_rx(void *param)
 		LL_ASSERT_DBG(node_rx);
 		pdu_rx = (void *)node_rx->pdu;
 
+		/* Force CRC failure for received PDU with length that exceeds
+		 * the configured maximum data length by closing the radio
+		 * event.
+		 */
+		if (pdu_rx->len > cis_lll->rx.max_pdu) {
+			goto isr_rx_done;
+		}
+
 		/* Tx ACK */
 		if ((pdu_rx->nesn != cis_lll->sn) && (cis_lll->tx.bn_curr <= cis_lll->tx.bn)) {
 			cis_lll->sn++;

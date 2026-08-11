@@ -590,6 +590,17 @@ static void isr_rx(void *param)
 
 		pdu_rx = (void *)node_rx->pdu;
 
+		/* Force CRC failure for received PDU with length that exceeds
+		 * the configured maximum data length by disabling the radio
+		 * trx switch and closing the radio event.
+		 */
+		if (pdu_rx->len > cis_lll->rx.max_pdu) {
+			radio_isr_set(isr_done, cis_lll);
+			radio_disable();
+
+			return;
+		}
+
 		/* Tx ACK */
 		if ((pdu_rx->nesn != cis_lll->sn) && (cis_lll->tx.bn_curr <= cis_lll->tx.bn)) {
 			cis_lll->sn++;
