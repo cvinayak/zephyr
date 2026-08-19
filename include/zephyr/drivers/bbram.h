@@ -20,6 +20,8 @@
 /**
  * @brief Interfaces for Battery-Backed RAM (BBRAM).
  * @defgroup bbram_interface BBRAM
+ * @since 3.0
+ * @version 0.8.0
  * @ingroup io_interfaces
  * @{
  */
