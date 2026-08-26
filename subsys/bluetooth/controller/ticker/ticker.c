@@ -837,6 +837,10 @@ static uint32_t ticker_dequeue(struct ticker_instance *instance, uint8_t id)
  *      a) Current node can be rescheduled later in the ticks slot window when
  *         next node can not be rescheduled later in its ticks slot window
  *
+ * Only next nodes with reserved time (ticks_slot != 0) are considered, i.e. a
+ * next node with ticks_slot_window and no reserved time (ticks_slot == 0) never
+ * causes the current node to be skipped.
+ *
  * @param nodes         Pointer to ticker node array
  * @param ticker        Pointer to ticker to resolve
  *
@@ -892,15 +896,14 @@ static uint8_t ticker_resolve_collision(struct ticker_node *nodes, struct ticker
 			}
 
 			/* We only care about nodes with slot reservation,
-			 * continue accumulating. As a special case, when the
-			 * current ticker has ticks_slot_window and the next
-			 * ticker also has ticks_slot_window (with ticks_slot
-			 * == 0), treat it as a colliding node so that only one
-			 * window-based ticker expires within the overlap.
+			 * continue accumulating. A next ticker without
+			 * reserved time (ticks_slot == 0), with or without
+			 * ticks_slot_window, never causes the current ticker
+			 * to be skipped; such a next ticker is instead skipped
+			 * to its next periodic interval when it is found to
+			 * overlap the current expiring ticker.
 			 */
-			if ((ticker_next->ticks_slot == 0U) &&
-			    !(TICKER_HAS_SLOT_WINDOW(ticker) &&
-			      TICKER_HAS_SLOT_WINDOW(ticker_next))) {
+			if (ticker_next->ticks_slot == 0U) {
 				id_head = ticker_next->next;
 				continue;
 			}
@@ -1344,6 +1347,18 @@ void ticker_worker(void *param)
 		slot_reserved = 1U;
 		slot_forced = instance->ticks_slot_previous_forced;
 	}
+
+#if defined(CONFIG_BT_TICKER_EXT)
+	/* Check if the previous ticker node which had no reserved time but a
+	 * ticks_slot_window, is still active and has its window reserved
+	 */
+	uint8_t slot_window_reserved = 0U;
+
+	if (instance->ticks_slot_window_previous > ticks_elapsed) {
+		/* This node intersects reserved slot window */
+		slot_window_reserved = 1U;
+	}
+#endif /* CONFIG_BT_TICKER_EXT */
 #endif /* !CONFIG_BT_TICKER_LOW_LAT &&
 	* !CONFIG_BT_TICKER_SLOT_AGNOSTIC
 	*/
@@ -1389,6 +1404,25 @@ void ticker_worker(void *param)
 	!defined(CONFIG_BT_TICKER_SLOT_AGNOSTIC)
 		uint8_t oust = 0U;
 
+#if defined(CONFIG_BT_TICKER_EXT)
+		/* A ticker with ticks_slot_window and no reserved time
+		 * (ticks_slot == 0) must yield if another such ticker has
+		 * already expired and its window reservation still overlaps.
+		 * Being unreserved, both can not drift out of each other's
+		 * way, hence this ticker is skipped to its next periodic
+		 * interval instead of being re-scheduled (drifted) inside its
+		 * ticks_slot_window. Tickers with reserved time are not
+		 * affected by slot_window_reserved.
+		 */
+		uint8_t slot_window_collide = 0U;
+
+		if (TICKER_HAS_SLOT_WINDOW(ticker) && (ticker->ticks_slot == 0U) &&
+		    ((slot_window_reserved != 0U) ||
+		     (instance->ticks_slot_window_previous > ticks_expired))) {
+			slot_window_collide = 1U;
+		}
+#endif /* CONFIG_BT_TICKER_EXT */
+
 		/* Check if node has slot reservation and resolve any collision
 		 * with other ticker nodes
 		 */
@@ -1396,20 +1430,14 @@ void ticker_worker(void *param)
 		    ((slot_reserved != 0U) ||
 		     (instance->ticks_slot_previous > ticks_expired) ||
 #if defined(CONFIG_BT_TICKER_EXT)
-		     /* A window-based ticker (ticks_slot_window != 0) must
-		      * yield if another window-based ticker has already
-		      * expired and its window reservation still overlaps.
-		      * Normal (non-window) tickers are not affected by
-		      * slot_window_reserved.
-		      */
-		     ((ticker->ticks_slot == 0U) &&
-		      (instance->ticks_slot_window_previous > ticks_expired)) ||
+		     (slot_window_collide != 0U) ||
 #endif /* CONFIG_BT_TICKER_EXT */
 		     (ticker_resolve_collision(node, ticker, &oust) != 0U))) {
 #if defined(CONFIG_BT_TICKER_EXT)
 			struct ticker_ext *ext_data = ticker->ext_data;
 
 			if ((ext_data != NULL) && (ext_data->ticks_slot_window != 0U) &&
+			    (slot_window_collide == 0U) &&
 			    (ext_data->reschedule_state == TICKER_RESCHEDULE_STATE_NONE) &&
 			    (ticker->lazy_periodic <= ticker->lazy_current)) {
 				/* Mark node for re-scheduling in ticker_job */
@@ -1551,6 +1579,16 @@ void ticker_worker(void *param)
 					slot_reserved = 1U;
 					slot_forced = ticker->force;
 				}
+
+#if defined(CONFIG_BT_TICKER_EXT)
+				if (TICKER_HAS_SLOT_WINDOW(ticker) && (ticker->ticks_slot == 0U)) {
+					/* Any further unreserved node with
+					 * ticks_slot_window will be skipped to
+					 * its next periodic interval
+					 */
+					slot_window_reserved = 1U;
+				}
+#endif /* CONFIG_BT_TICKER_EXT */
 #endif /* !CONFIG_BT_TICKER_LOW_LAT &&
 	* !CONFIG_BT_TICKER_SLOT_AGNOSTIC
 	*/
@@ -2674,14 +2712,15 @@ static uint8_t ticker_job_reschedule_in_window(struct ticker_instance *instance)
 		/* Ensure that resched ticker is expired */
 		LL_ASSERT_DBG(ticker_resched->ticks_to_expire == 0U);
 
-		/* Window start after intersection with already active node */
-		window_start_ticks = instance->ticks_slot_previous;
-		if (TICKER_HAS_SLOT_WINDOW(ticker_resched) && (ticker_resched->ticks_slot == 0U)) {
-			if (window_start_ticks < instance->ticks_slot_window_previous) {
-				window_start_ticks = instance->ticks_slot_window_previous;
-			}
-		}
-		window_start_ticks += HAL_TICKER_RESCHEDULE_MARGIN;
+		/* Window start after intersection with already active node.
+		 * NOTE: A ticker with ticks_slot_window and no reserved time
+		 *       (ticks_slot == 0) only drifts to not overlap with
+		 *       tickers that have reserved time, hence the window
+		 *       reservation of another unreserved ticker
+		 *       (ticks_slot_window_previous) is not considered here.
+		 */
+		window_start_ticks = instance->ticks_slot_previous +
+				     HAL_TICKER_RESCHEDULE_MARGIN;
 
 		/* If drift was applied to this node, this must be
 		 * taken into consideration. Reduce the window with
