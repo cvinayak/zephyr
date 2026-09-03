@@ -10,14 +10,14 @@ set -ue
 
 source ${ZEPHYR_BASE}/tests/bsim/compile.source
 
-app=tests/bsim/bluetooth/ll/cis conf_overlay=overlay.conf compile
-app=tests/bsim/bluetooth/ll/cis conf_overlay=overlay-acl_first.conf compile
-app=tests/bsim/bluetooth/ll/cis conf_overlay=overlay-legacy_adv.conf compile
-app=tests/bsim/bluetooth/ll/cis conf_overlay=overlay-legacy_adv_acl_first.conf compile
-app=tests/bsim/bluetooth/ll/cis conf_overlay=overlay-acl_group.conf compile
-app=tests/bsim/bluetooth/ll/cis conf_overlay=overlay-acl_group_acl_first.conf compile
-app=tests/bsim/bluetooth/ll/cis conf_overlay=overlay-peripheral_cis.conf compile
-app=tests/bsim/bluetooth/ll/cis conf_overlay=overlay_interleaved.conf compile
+app=tests/bsim/bluetooth/ll/cis conf_overlay=overlay-sequential.conf compile
+app=tests/bsim/bluetooth/ll/cis conf_overlay=overlay-acl_first_sequential.conf compile
+app=tests/bsim/bluetooth/ll/cis conf_overlay=overlay-legacy_adv_sequential.conf compile
+app=tests/bsim/bluetooth/ll/cis conf_overlay=overlay-legacy_adv_acl_first_sequential.conf compile
+app=tests/bsim/bluetooth/ll/cis conf_overlay=overlay-acl_group_sequential.conf compile
+app=tests/bsim/bluetooth/ll/cis conf_overlay=overlay-acl_group_acl_first_sequential.conf compile
+app=tests/bsim/bluetooth/ll/cis conf_overlay=overlay-peripheral_cis_sequential.conf compile
+app=tests/bsim/bluetooth/ll/cis conf_overlay=overlay-interleaved.conf compile
 app=tests/bsim/bluetooth/ll/cis conf_overlay=overlay-acl_first_interleaved.conf compile
 app=tests/bsim/bluetooth/ll/cis conf_overlay=overlay-legacy_adv_interleaved.conf compile
 app=tests/bsim/bluetooth/ll/cis conf_overlay=overlay-legacy_adv_acl_first_interleaved.conf compile
