@@ -293,6 +293,12 @@ __net_socket struct net_context {
 	/** BSD socket private data */
 	void *socket_data;
 
+	/** Pending socket error (positive errno) reported asynchronously by
+	 *  the network stack. Valid only while the SOCK_ERROR flag is set;
+	 *  consumed via SO_ERROR or by the next blocking socket call.
+	 */
+	int sock_error;
+
 	/** Per-socket packet or connection queues */
 	union {
 		struct k_fifo recv_q;
@@ -793,6 +799,7 @@ struct net_if *net_context_get_iface(struct net_context *context)
 static inline void net_context_set_iface(struct net_context *context,
 					 struct net_if *iface)
 {
+	NET_ASSERT(context);
 	NET_ASSERT(iface);
 
 	context->iface = (uint8_t)net_if_get_by_iface(iface);
@@ -809,6 +816,7 @@ static inline void net_context_set_iface(struct net_context *context,
 static inline void net_context_bind_iface(struct net_context *context,
 					  struct net_if *iface)
 {
+	NET_ASSERT(context);
 	NET_ASSERT(iface);
 
 	context->flags |= NET_CONTEXT_BOUND_TO_IFACE;

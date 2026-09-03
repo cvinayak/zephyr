@@ -9,7 +9,10 @@
 
 #include <broadcom/bcm2711.dtsi>
 #include <broadcom/bcm2711-pinctrl.dtsi>
+
+#include <zephyr/dt-bindings/display/panel.h>
 #include <zephyr/dt-bindings/mbox/brcm-bcm2711-mbox.h>
+#include <zephyr/dt-bindings/power/rpi_bcm283x_power.h>
 #include <zephyr/dt-bindings/gpio/gpio.h>
 #include <zephyr/dt-bindings/i2c/i2c.h>
 
@@ -21,6 +24,7 @@
 		led0 = &led_act;
 		led1 = &led_pwr;
 		i2c-1 = &i2c1;
+		die-temp0 = &vc_thermal;
 	};
 
 	chosen {
@@ -68,7 +72,7 @@
 		};
 	};
 
-	firmware {
+	firmware: firmware {
 		compatible = "raspberrypi,bcm283x-firmware";
 		mboxes = <&mbox0 BCM2711_MBOX0_CH_ARM_TO_VC>;
 		mbox-names = "vc";
@@ -76,8 +80,10 @@
 
 		fb0: framebuffer {
 			compatible = "raspberrypi,bcm2711-framebuffer";
+			pixel-format = <PANEL_PIXEL_FORMAT_ARGB_8888>;
 			width = <640>;
 			height = <480>;
+			red-blue-swap;
 		};
 
 		exp_gpio: gpio {
@@ -85,6 +91,20 @@
 			gpio-controller;
 			#gpio-cells = <2>;
 			ngpios = <8>;
+		};
+
+		vc_thermal: vc-thermal {
+			compatible = "raspberrypi,bcm283x-vc-thermal";
+			status = "okay";
+		};
+	};
+
+	power-domains {
+		usb_hcd: power-domain-usb {
+			compatible = "raspberrypi,bcm283x-power";
+			firmware = <&firmware>;
+			#power-domain-cells = <0>;
+			power-domain-id = <RPI_POWER_DOMAIN_USB_HCD>;
 		};
 	};
 };

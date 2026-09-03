@@ -10,11 +10,12 @@ testing:
 supported:
   - counter
   - entropy
-  - ethernet
   - gpio
   - hwinfo
   - i2c
   - input
+  - netif:eth
+  - ptp_clock
   - sdhc
   - uart
   - watchdog

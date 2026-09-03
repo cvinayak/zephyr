@@ -812,6 +812,30 @@ struct net_ipv6_mreq {
 };
 
 /**
+ * @brief Struct used when setting a packet socket multicast filtering.
+ */
+struct net_packet_mreq {
+	/** Network interface index */
+	int mr_ifindex;
+
+	/** Packet type (action) */
+	uint16_t mr_type;
+
+	/** Address length */
+	uint16_t mr_alen;
+
+	/** Physical layer address */
+	uint8_t mr_address[NET_LINK_ADDR_MAX_LENGTH];
+};
+
+/**
+ * @brief Packet socket multicast filtering types.
+ */
+#define NET_PACKET_MR_MULTICAST 0 /**< Packet will receive only certain multicast packets */
+#define NET_PACKET_MR_PROMISC   1 /**< Packet will receive all packets */
+#define NET_PACKET_MR_ALLMULTI  2 /**< Packet will receive all multicast packets */
+
+/**
  * @brief Incoming IPv6 packet information.
  *
  * Used as ancillary data when calling recvmsg() and IPV6_RECVPKTINFO socket
@@ -2170,6 +2194,46 @@ int net_port_set(struct net_sockaddr *addr, uint16_t port);
  * @return 0 if ok, < 0 if error
  */
 int net_port_get(struct net_sockaddr *addr, uint16_t *port);
+
+/**
+ * @brief Compare socket addresses.
+ *
+ * @param a First address
+ * @param b Second address
+ *
+ * @return true if a and b are equal, false otherwise.
+ */
+static inline bool net_sockaddr_cmp(const struct net_sockaddr *a, const struct net_sockaddr *b)
+{
+	if (a->sa_family != b->sa_family) {
+		return false;
+	}
+
+	if (a->sa_family == NET_AF_INET) {
+		const struct net_sockaddr_in *a4 = net_sin(a);
+		const struct net_sockaddr_in *b4 = net_sin(b);
+
+		if (a4->sin_port != b4->sin_port) {
+			return false;
+		}
+
+		return net_ipv4_addr_cmp(&a4->sin_addr, &b4->sin_addr);
+	}
+
+	if (b->sa_family == NET_AF_INET6) {
+		const struct net_sockaddr_in6 *a6 = net_sin6(a);
+		const struct net_sockaddr_in6 *b6 = net_sin6(b);
+
+		if (a6->sin6_port != b6->sin6_port) {
+			return false;
+		}
+
+		return net_ipv6_addr_cmp(&a6->sin6_addr, &b6->sin6_addr);
+	}
+
+	/* Invalid address family */
+	return false;
+}
 
 /**
  * @brief Compare TCP sequence numbers.

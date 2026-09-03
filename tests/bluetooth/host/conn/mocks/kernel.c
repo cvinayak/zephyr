@@ -22,8 +22,6 @@ DEFINE_FAKE_VALUE_FUNC(int, k_work_cancel_delayable, struct k_work_delayable *);
 DEFINE_FAKE_VALUE_FUNC(bool, k_work_flush, struct k_work *, struct k_work_sync *);
 DEFINE_FAKE_VALUE_FUNC(int, k_work_submit, struct k_work *);
 DEFINE_FAKE_VALUE_FUNC(int, k_work_submit_to_queue, struct k_work_q *, struct k_work *);
-DEFINE_FAKE_VALUE_FUNC(int, k_work_reschedule, struct k_work_delayable *, k_timeout_t);
-DEFINE_FAKE_VALUE_FUNC(int, k_work_schedule, struct k_work_delayable *, k_timeout_t);
 DEFINE_FAKE_VALUE_FUNC(int, k_work_busy_get, const struct k_work *);
 DEFINE_FAKE_VOID_FUNC(k_queue_init, struct k_queue *);
 DEFINE_FAKE_VOID_FUNC(k_queue_append, struct k_queue *, void *);
@@ -34,6 +32,8 @@ DEFINE_FAKE_VALUE_FUNC(void *, k_heap_alloc, struct k_heap *, size_t, k_timeout_
 DEFINE_FAKE_VOID_FUNC(k_heap_free, struct k_heap *, void *);
 DEFINE_FAKE_VOID_FUNC(k_sched_lock);
 DEFINE_FAKE_VOID_FUNC(k_sched_unlock);
+DEFINE_FAKE_VALUE_FUNC(int, k_mutex_lock, struct k_mutex *, k_timeout_t);
+DEFINE_FAKE_VALUE_FUNC(int, k_mutex_unlock, struct k_mutex *);
 DEFINE_FAKE_VALUE_FUNC(void *, k_heap_aligned_alloc, struct k_heap *,
 			size_t, size_t, k_timeout_t);
 

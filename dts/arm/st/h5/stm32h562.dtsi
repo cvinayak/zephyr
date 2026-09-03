@@ -133,6 +133,7 @@
 			ranges;
 			clocks = <&rcc STM32_CLOCK(APB2, 21)>,
 				 <&rcc STM32_SRC_PLL1_Q SAI1_SEL(0)>;
+			clock-names = "sai_ck", "sai_ker_ck";
 			status = "disabled";
 
 			sai1_a: sai1a@40015404 {
@@ -553,6 +554,11 @@
 			};
 		};
 
+		hash: crypto@420c0400 {
+			st,has-sha384-algorithm;
+			st,has-sha512-algorithm;
+		};
+
 		rng: rng@420c0800 {
 			nist-config = <0xf00e00>;
 			health-test-config = <0x6a91>;
@@ -584,6 +590,26 @@
 			resets = <&rctl STM32_RESET(APB3, 20)>;
 			ref-voltages = <2500000>, <2048000>, <1800000>;
 			status = "disabled";
+		};
+
+		pwr: power@44020800 {
+			wakeup-controller {
+				wkup@3 {
+					wkup-gpios = <&gpioi 8 STM32_PWR_WKUP_EVT_SRC_0>;
+				};
+
+				wkup@6 {
+					wkup-gpios = <&gpioc 1 STM32_PWR_WKUP_EVT_SRC_0>;
+				};
+
+				wkup@7 {
+					wkup-gpios = <&gpiod 2 STM32_PWR_WKUP_EVT_SRC_0>;
+				};
+
+				wkup@8 {
+					wkup-gpios = <&gpiod 3 STM32_PWR_WKUP_EVT_SRC_0>;
+				};
+			};
 		};
 	};
 

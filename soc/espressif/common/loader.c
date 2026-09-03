@@ -56,12 +56,12 @@
 #include <soc/system_reg.h>
 #endif
 
-#include "memory.h"
-#include "hw_init.h"
-#include "soc_init.h"
-#include "soc_random.h"
+#include <memory.h>
+#include <hw_init.h>
+#include <soc_init.h>
+#include <soc_random.h>
 
-#if defined(CONFIG_SOC_ESP32S3_APPCPU) || defined(CONFIG_SOC_ESP32_APPCPU)
+#if defined(CONFIG_SOC_ESP32_APPCPU_TARGET)
 #error "APPCPU does not need this file!"
 #endif
 
@@ -90,7 +90,7 @@
 
 #define HDR_ATTR __attribute__((section(".entry_addr"))) __attribute__((used))
 
-#if !defined(CONFIG_SOC_ESP32_APPCPU) && !defined(CONFIG_SOC_ESP32S3_APPCPU)
+#if !defined(CONFIG_SOC_ESP32_APPCPU_TARGET)
 #if DT_NODE_EXISTS(DT_CHOSEN(zephyr_code_partition))
 #define PART_OFFSET DT_REG_ADDR(DT_CHOSEN(zephyr_code_partition))
 #else
