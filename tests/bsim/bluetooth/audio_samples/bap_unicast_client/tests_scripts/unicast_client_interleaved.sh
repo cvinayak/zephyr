@@ -17,12 +17,13 @@ EXECUTE_TIMEOUT=100
 
 cd ${BSIM_OUT_PATH}/bin
 
+client="tests_bsim_bluetooth_audio_samples_bap_unicast_client"
+
 Execute ./bs_${BOARD_TS}_samples_bluetooth_audio_bap_unicast_server_prj_conf \
   -v=${verbosity_level} -s=${simulation_id} -d=0 -RealEncryption=1 \
   -start_offset=2e3
 
-Execute \
-  ./bs_${BOARD_TS}_tests_bsim_bluetooth_audio_samples_bap_unicast_client_prj_conf_overlay-interleaved_conf \
+Execute ./bs_${BOARD_TS}_${client}_prj_conf_overlay-interleaved_conf \
   -v=${verbosity_level} -s=${simulation_id} -d=1 -RealEncryption=1 \
   -testid=unicast_client
 

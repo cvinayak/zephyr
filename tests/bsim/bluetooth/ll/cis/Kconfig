@@ -11,7 +11,7 @@ config TEST_CONNECT_ACL_FIRST
 	help
 	  Connect ACLs first
 
-config TEST_MULTIPLE_PERIPERAL_CIS
+config TEST_MULTIPLE_PERIPHERAL_CIS
 	bool "Multiple Peripheral CIS"
 	help
 	  Multiple Peripheral CIS establishment.

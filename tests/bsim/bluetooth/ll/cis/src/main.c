@@ -462,7 +462,7 @@ static void test_cis_central(void)
 	}
 #endif
 
-#if !defined(CONFIG_TEST_MULTIPLE_PERIPERAL_CIS)
+#if !defined(CONFIG_TEST_MULTIPLE_PERIPHERAL_CIS)
 	for (int i = 0; i < CONFIG_BT_MAX_CONN; i++) {
 #else
 		int i = 0;
@@ -524,7 +524,7 @@ static void test_cis_central(void)
 	     (conn_index < conn_count) && (chan < CONFIG_BT_ISO_MAX_CHAN);
 	     conn_index++, chan++) {
 
-#elif defined(CONFIG_TEST_MULTIPLE_PERIPERAL_CIS)
+#elif defined(CONFIG_TEST_MULTIPLE_PERIPHERAL_CIS)
 	for (int chan = 0, conn_index = 0;
 	     (chan < CONFIG_BT_ISO_MAX_CHAN); chan++) {
 #endif
@@ -613,7 +613,7 @@ static void test_cis_central(void)
 
 	bt_conn_foreach(BT_CONN_TYPE_LE, disconnect, NULL);
 
-#if !defined(CONFIG_TEST_MULTIPLE_PERIPERAL_CIS)
+#if !defined(CONFIG_TEST_MULTIPLE_PERIPHERAL_CIS)
 	for (int i = 0; i < CONFIG_BT_MAX_CONN; i++) {
 #endif
 
@@ -625,7 +625,7 @@ static void test_cis_central(void)
 		}
 		printk("Disconnected from peer device %d.\n", i);
 
-#if !defined(CONFIG_TEST_MULTIPLE_PERIPERAL_CIS)
+#if !defined(CONFIG_TEST_MULTIPLE_PERIPHERAL_CIS)
 	}
 #endif
 
@@ -758,7 +758,7 @@ static void test_cis_peripheral(void)
 	}
 	printk("connected to peer central.\n");
 
-#if defined(CONFIG_TEST_MULTIPLE_PERIPERAL_CIS)
+#if defined(CONFIG_TEST_MULTIPLE_PERIPHERAL_CIS)
 	for (int chan = 0; chan < CONFIG_BT_ISO_MAX_CHAN; chan++) {
 #endif
 
@@ -770,7 +770,7 @@ static void test_cis_peripheral(void)
 		}
 		printk("connected to peer ISO channel.\n");
 
-#if defined(CONFIG_TEST_MULTIPLE_PERIPERAL_CIS)
+#if defined(CONFIG_TEST_MULTIPLE_PERIPHERAL_CIS)
 	}
 #endif
 
@@ -812,7 +812,7 @@ static void test_cis_peripheral(void)
 		}
 	}
 
-#if defined(CONFIG_TEST_MULTIPLE_PERIPERAL_CIS)
+#if defined(CONFIG_TEST_MULTIPLE_PERIPHERAL_CIS)
 	for (int chan = 0; chan < CONFIG_BT_ISO_MAX_CHAN; chan++) {
 #endif
 
@@ -824,7 +824,7 @@ static void test_cis_peripheral(void)
 		}
 		printk("disconnected to peer ISO channel.\n");
 
-#if defined(CONFIG_TEST_MULTIPLE_PERIPERAL_CIS)
+#if defined(CONFIG_TEST_MULTIPLE_PERIPHERAL_CIS)
 	}
 #endif
 
@@ -837,7 +837,7 @@ static void test_cis_peripheral(void)
 	printk("disconnected from peer device.\n");
 
 #if !defined(CONFIG_TEST_FT_SKIP_SUBEVENTS) || defined(CONFIG_TEST_FT_PER_SKIP_SUBEVENTS)
-#if defined(CONFIG_TEST_MULTIPLE_PERIPERAL_CIS)
+#if defined(CONFIG_TEST_MULTIPLE_PERIPHERAL_CIS)
 	for (int chan = 0; chan < CONFIG_BT_ISO_MAX_CHAN; chan++) {
 #else
 		int  chan = 0;
@@ -847,7 +847,7 @@ static void test_cis_peripheral(void)
 			     SEQ_NUM_MAX);
 			return;
 		}
-#if defined(CONFIG_TEST_MULTIPLE_PERIPERAL_CIS)
+#if defined(CONFIG_TEST_MULTIPLE_PERIPHERAL_CIS)
 	}
 #endif
 #endif
