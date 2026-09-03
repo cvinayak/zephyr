@@ -432,7 +432,9 @@ static void test_cis_central(void)
 	cig_param.cis_channels = channels;
 	cig_param.num_cis = ARRAY_SIZE(channels);
 	cig_param.sca = BT_GAP_SCA_UNKNOWN;
-	cig_param.packing = 0U;
+	cig_param.packing = IS_ENABLED(CONFIG_TEST_CIS_PACKING_INTERLEAVED) ?
+			    BT_ISO_PACKING_INTERLEAVED :
+			    BT_ISO_PACKING_SEQUENTIAL;
 	cig_param.framing = 0U;
 	cig_param.c_to_p_interval = ISO_INTERVAL_US;
 	cig_param.p_to_c_interval = ISO_INTERVAL_US;
