@@ -27,6 +27,7 @@
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/kernel.h>
 #include <zephyr/net_buf.h>
+#include <zephyr/drivers/gpio.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/sys/util.h>
@@ -50,7 +51,6 @@
 #if TLV320_AUDIO_OUTPUT_ENABLED
 #include <zephyr/drivers/clock_control.h>
 #include <zephyr/drivers/clock_control/nrf_clock_control.h>
-#include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/i2c.h>
 #include <zephyr/drivers/pinctrl.h>
 #include <zephyr/sys/ring_buffer.h>
@@ -447,7 +447,6 @@ void tlv320_setup(void)
 #define LED1_NODE DT_ALIAS(led1)
 
 #if DT_NODE_HAS_STATUS_OKAY(LED0_NODE) || DT_NODE_HAS_STATUS_OKAY(LED1_NODE)
-#include <zephyr/drivers/gpio.h>
 #define HAS_LED     1
 static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
 static const struct gpio_dt_spec led1 = GPIO_DT_SPEC_GET(LED1_NODE, gpios);
@@ -602,7 +601,9 @@ static void stream_started_cb(struct bt_bap_stream *bap_stream)
 	bt_iso_chan_get_info(&bap_stream->ep->iso->chan, &bt_iso_info_test);
 	printk("-------latency = %d\n", bt_iso_info_test.sync_receiver.latency);
 	k_sem_give(&sem_stream_started);
+#if defined(HAS_LED)
 	gpio_pin_set_dt(&led, 1);
+#endif /* defined(HAS_LED) */
 }
 
 static void stream_stopped_cb(struct bt_bap_stream *bap_stream, uint8_t reason)
@@ -616,7 +617,9 @@ static void stream_stopped_cb(struct bt_bap_stream *bap_stream, uint8_t reason)
 		printk("Failed to take sem_stream_started: %d\n", err);
 	}
 
+#if defined(HAS_LED)
 	gpio_pin_set_dt(&led, 0);
+#endif /* defined(HAS_LED) */
 }
 
 #if TLV320_AUDIO_OUTPUT_ENABLED
@@ -1237,7 +1240,9 @@ static void connected(struct bt_conn *conn, uint8_t err)
 
 	k_sem_give(&sem_connected);
 
+#if defined(HAS_LED)
 	gpio_pin_set(led1.port, led1.pin, 1);
+#endif /* defined(HAS_LED) */
 }
 
 static void disconnected(struct bt_conn *conn, uint8_t reason)
@@ -1253,7 +1258,9 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 
 	k_sem_give(&sem_disconnected);
 
+#if defined(HAS_LED)
 	gpio_pin_set(led1.port, led1.pin, 0);
+#endif /* defined(HAS_LED) */
 }
 
 static void recycled(void)
