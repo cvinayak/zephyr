@@ -33,21 +33,32 @@
 #include <zephyr/sys/util_macro.h>
 #include <zephyr/sys/clock.h>
 #include <zephyr/toolchain.h>
-#include <zephyr/sys/ring_buffer.h>
-#include <zephyr/drivers/pinctrl.h>
-#include <zephyr/drivers/gpio.h>
-#include <zephyr/sys_clock.h>
-#include <zephyr/drivers/clock_control.h>
-#include <zephyr/drivers/clock_control/nrf_clock_control.h>
-#include <nrfx_i2s.h>
-#include <nrfx_clock.h>
 
 #include "lc3.h"
 
+#if defined(CONFIG_BOARD_NRF54L15DK_NRF54L15_CPUAPP)
+#define TLV320_AUDIO_OUTPUT_ENABLED 1
+#else
+#define TLV320_AUDIO_OUTPUT_ENABLED 0
+#endif
+#define SDU_METRICS_INTERVAL_SECONDS 10U
+
+#if defined(CONFIG_SOC_NRF5340_CPUAPP)
+#include <nrfx_clock.h>
+#endif /* CONFIG_SOC_NRF5340_CPUAPP */
+
+#if TLV320_AUDIO_OUTPUT_ENABLED
+#include <zephyr/drivers/clock_control.h>
+#include <zephyr/drivers/clock_control/nrf_clock_control.h>
+#include <zephyr/drivers/gpio.h>
+#include <zephyr/drivers/i2c.h>
+#include <zephyr/drivers/pinctrl.h>
+#include <zephyr/sys/ring_buffer.h>
+#include <zephyr/sys_clock.h>
+#include <nrfx_i2s.h>
 #if defined(NRF54L15_XXAA)
 #include <hal/nrf_clock.h>
 #endif /* defined(NRF54L15_XXAA) */
-#include <zephyr/drivers/i2c.h>
 #define I2C_NODE DT_NODELABEL(tlv320)
 
 static const struct gpio_dt_spec rst = GPIO_DT_SPEC_GET(DT_ALIAS(led3), gpios);
@@ -79,13 +90,16 @@ static uint16_t i2s_rx_buf_a[I2S_SAMPLES_NUM * 2] __aligned(4) = {0}; // 2 chann
 static uint16_t i2s_rx_buf_b[I2S_SAMPLES_NUM * 2] __aligned(4) = {0}; // 2 channels, 16 bits each
 #define BUFFER_SPACE 60 // 20 buffers of size I2S_SAMPLES_NUM * 2 * sizeof(uint16_t) = 10ms
 RING_BUF_DECLARE(i2s_tx_ring_buf, I2S_SAMPLES_NUM * 2 * sizeof(uint16_t) * BUFFER_SPACE);
+#endif /* TLV320_AUDIO_OUTPUT_ENABLED */
 
 #define MAX_SAMPLE_RATE	      48000
 #define MAX_FRAME_DURATION_US 10000
 #define MAX_NUM_SAMPLES	      ((MAX_FRAME_DURATION_US * MAX_SAMPLE_RATE) / USEC_PER_SEC)
 
+#if TLV320_AUDIO_OUTPUT_ENABLED
 static lc3_decoder_t lc3_decoder[2];
 static lc3_decoder_mem_48k_t lc3_decoder_mem[2];
+#endif /* TLV320_AUDIO_OUTPUT_ENABLED */
 
 BUILD_ASSERT(IS_ENABLED(CONFIG_SCAN_SELF) || IS_ENABLED(CONFIG_SCAN_OFFLOAD),
 	     "Either SCAN_SELF or SCAN_OFFLOAD must be enabled");
@@ -136,7 +150,112 @@ static struct bt_conn *broadcast_assistant_conn;
 static struct bt_le_ext_adv *ext_adv;
 static struct bt_bap_stream bis_stream[CONFIG_BT_BAP_BROADCAST_SNK_STREAM_COUNT];
 static uint32_t configured_sampling_freq;
+static int stream_num_get(struct bt_bap_stream *stream);
+struct sdu_reception_metrics {
+	uint64_t received_cnt;
+	uint64_t valid_cnt;
+	uint64_t invalid_cnt;
+	uint64_t empty_cnt;
+	uint64_t error_cnt;
+	uint64_t lost_cnt;
+	uint64_t duplicate_ts_cnt;
+	uint64_t duplicate_seq_cnt;
+	uint64_t bytes_cnt;
+	uint32_t last_ts;
+	uint16_t last_seq;
+	bool has_last;
+};
 
+static struct sdu_reception_metrics
+	sdu_metrics[CONFIG_BT_BAP_BROADCAST_SNK_STREAM_COUNT];
+static int64_t sdu_metrics_next_report_ms;
+
+static void sdu_metrics_maybe_log(void)
+{
+	const int64_t now_ms = k_uptime_get();
+
+	if (now_ms < sdu_metrics_next_report_ms) {
+		return;
+	}
+
+	printk("SDU reception metrics (%u s interval)\n", SDU_METRICS_INTERVAL_SECONDS);
+	for (size_t i = 0U; i < ARRAY_SIZE(sdu_metrics); i++) {
+		const struct sdu_reception_metrics *metrics = &sdu_metrics[i];
+
+		printk("  stream[%u]: rx=%llu valid=%llu invalid=%llu empty=%llu "
+		       "error=%llu lost=%llu dup_ts=%llu dup_seq=%llu bytes=%llu\n",
+		       (unsigned int)i,
+		       (unsigned long long)metrics->received_cnt,
+		       (unsigned long long)metrics->valid_cnt,
+		       (unsigned long long)metrics->invalid_cnt,
+		       (unsigned long long)metrics->empty_cnt,
+		       (unsigned long long)metrics->error_cnt,
+		       (unsigned long long)metrics->lost_cnt,
+		       (unsigned long long)metrics->duplicate_ts_cnt,
+		       (unsigned long long)metrics->duplicate_seq_cnt,
+		       (unsigned long long)metrics->bytes_cnt);
+	}
+
+	sdu_metrics_next_report_ms = now_ms + ((int64_t)SDU_METRICS_INTERVAL_SECONDS * MSEC_PER_SEC);
+}
+
+static void sdu_metrics_update(struct bt_bap_stream *bap_stream,
+			       const struct bt_iso_recv_info *info, struct net_buf *buf)
+{
+	const int stream_idx = stream_num_get(bap_stream);
+	struct sdu_reception_metrics *metrics;
+
+	if (stream_idx < 0 || stream_idx >= (int)ARRAY_SIZE(sdu_metrics)) {
+		return;
+	}
+
+	metrics = &sdu_metrics[stream_idx];
+	metrics->received_cnt++;
+	metrics->bytes_cnt += buf->len;
+
+	if ((info->flags & BT_ISO_FLAGS_VALID) != 0U) {
+		if (buf->len == 0U) {
+			metrics->empty_cnt++;
+		} else {
+			metrics->valid_cnt++;
+		}
+	} else {
+		metrics->invalid_cnt++;
+	}
+
+	if ((info->flags & BT_ISO_FLAGS_ERROR) != 0U) {
+		metrics->error_cnt++;
+	}
+
+	if ((info->flags & BT_ISO_FLAGS_LOST) != 0U) {
+		metrics->lost_cnt++;
+	}
+
+	if (metrics->has_last) {
+		if (metrics->last_ts == info->ts) {
+			metrics->duplicate_ts_cnt++;
+		}
+
+		if (metrics->last_seq == info->seq_num) {
+			metrics->duplicate_seq_cnt++;
+		}
+	}
+
+	metrics->has_last = true;
+	metrics->last_ts = info->ts;
+	metrics->last_seq = info->seq_num;
+
+	sdu_metrics_maybe_log();
+}
+
+static void sdu_metrics_reset(void)
+{
+	(void)memset(sdu_metrics, 0, sizeof(sdu_metrics));
+	sdu_metrics_next_report_ms =
+		k_uptime_get() + ((int64_t)SDU_METRICS_INTERVAL_SECONDS * MSEC_PER_SEC);
+}
+
+#if TLV320_AUDIO_OUTPUT_ENABLED
 void audio_i2s_set_next_buf(const uint8_t *tx_buf, uint32_t *rx_buf)
 {
 	const nrfx_i2s_buffers_t i2s_buf = {.p_rx_buffer = rx_buf,
@@ -320,6 +439,7 @@ void tlv320_setup(void)
 	dac_i2c_write(&dev_i2c, 0x40, 0x00);
 	dac_i2c_write(&dev_i2c, 0x00, 0x00);
 }
+#endif /* TLV320_AUDIO_OUTPUT_ENABLED */
 
 #if defined(CONFIG_GPIO)
 /* The devicetree node identifier for the "led0" alias. */
@@ -390,7 +510,7 @@ static void blink_stop(void)
 #endif /* LED0_NODE */
 #endif /* CONFIG_GPIO */
 
-uint8_t stream_num_get(struct bt_bap_stream * stream)
+static int stream_num_get(struct bt_bap_stream *stream)
 {
 	for (int i = 0; i < CONFIG_BT_BAP_BROADCAST_SNK_STREAM_COUNT; i++) {
 		if (bap_streams_p[i] == stream) {
@@ -499,6 +619,7 @@ static void stream_stopped_cb(struct bt_bap_stream *bap_stream, uint8_t reason)
 	gpio_pin_set_dt(&led, 0);
 }
 
+#if TLV320_AUDIO_OUTPUT_ENABLED
 struct recv_pkt_info {
 	uint32_t sdu_ref_us;
 	bool bad_frame;
@@ -510,10 +631,14 @@ struct recv_pkt_info {
 #define JITTER_BUFFER_CHECK 4
 K_MSGQ_DEFINE(recv_pkt_msgq_l, sizeof(struct recv_pkt_info), JITTER_BUFFER_SIZE, 4U);
 K_MSGQ_DEFINE(recv_pkt_msgq_r, sizeof(struct recv_pkt_info), JITTER_BUFFER_SIZE, 4U);
+#endif /* TLV320_AUDIO_OUTPUT_ENABLED */
 
 static void stream_recv_cb(struct bt_bap_stream *bap_stream, const struct bt_iso_recv_info *info,
 			   struct net_buf *buf)
 {
+	sdu_metrics_update(bap_stream, info, buf);
+
+#if TLV320_AUDIO_OUTPUT_ENABLED
 	static int i;
 	i++;
 	struct recv_pkt_info dummy_pkt_info = {0};
@@ -614,6 +739,7 @@ static void stream_recv_cb(struct bt_bap_stream *bap_stream, const struct bt_iso
 			break;
 		}
 	}
+#endif /* TLV320_AUDIO_OUTPUT_ENABLED */
 }
 
 static struct bt_bap_stream_ops stream_ops = {
@@ -691,13 +817,12 @@ static bool subgroup_get_valid_bis_indexes_cb(const struct bt_bap_base_subgroup 
 		configured_sampling_freq = ret;
 	}
 	printk("------sampling freq------: %d\n", ret);
+#if TLV320_AUDIO_OUTPUT_ENABLED
 	for (int i = 0; i < 2; i++) {
-		//if (lc3_decoder[i] == NULL) {
-			lc3_decoder[i] = lc3_setup_decoder(10000, configured_sampling_freq, 48000,
-							&lc3_decoder_mem[i]);
-		//}
-
+		lc3_decoder[i] = lc3_setup_decoder(10000, configured_sampling_freq, 48000,
+						   &lc3_decoder_mem[i]);
 	}
+#endif /* TLV320_AUDIO_OUTPUT_ENABLED */
 	if (codec_cfg.id != BT_HCI_CODING_FORMAT_LC3) {
 		printk("Only LC3 codec supported (%u)\n", codec_cfg.id);
 		goto next_subgroup;
@@ -821,11 +946,13 @@ static void broadcast_sink_stopped_cb(struct bt_bap_broadcast_sink *sink, uint8_
 {
 	printk("Broadcast sink %p stopped with reason 0x%02X\n", sink, reason);
 
+#if TLV320_AUDIO_OUTPUT_ENABLED
 	for (int i = 0; i < 2; i++) {
 		lc3_decoder[i] = NULL;
 	}
 	k_msgq_purge(&recv_pkt_msgq_l);
 	k_msgq_purge(&recv_pkt_msgq_r);
+#endif /* TLV320_AUDIO_OUTPUT_ENABLED */
 	big_synced = false;
 	k_sem_give(&sem_broadcast_sink_stopped);
 
@@ -1439,6 +1566,7 @@ static int reset(void)
 	(void)memset(&broadcaster_info, 0, sizeof(broadcaster_info));
 	(void)memset(&broadcaster_addr, 0, sizeof(broadcaster_addr));
 	broadcaster_broadcast_id = BT_BAP_INVALID_BROADCAST_ID;
+	sdu_metrics_reset();
 
 	if (broadcast_sink != NULL) {
 		err = bt_bap_broadcast_sink_delete(broadcast_sink);
@@ -1681,6 +1809,7 @@ int main(void)
 	}
 #endif /* CONFIG_SOC_NRF5340_CPUAPP */
 
+#if TLV320_AUDIO_OUTPUT_ENABLED
 	clocks_start();
 
 	gpio_pin_configure_dt(&rst, GPIO_OUTPUT);
@@ -1694,6 +1823,7 @@ int main(void)
 	audio_i2s_init();
 	audio_i2s_start((uint8_t *)i2s_tx_buf_a, (uint32_t *)i2s_rx_buf_a);
 	audio_i2s_set_next_buf((const uint8_t *)i2s_tx_buf_b, (uint32_t *)i2s_rx_buf_b);
+#endif /* TLV320_AUDIO_OUTPUT_ENABLED */
 
 	err = init();
 	if (err != 0) {
