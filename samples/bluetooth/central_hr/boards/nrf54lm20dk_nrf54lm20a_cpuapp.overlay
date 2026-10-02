@@ -1,0 +1,110 @@
+/*
+ * Copyright (c) 2026 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#include <nordic/nrf54lm20_a_b_ipc_shared_ram.dtsi>
+
+/ {
+	chosen {
+		zephyr,bt-hci = &bt_hci_ipc0;
+		zephyr,console = &uart30;
+	};
+
+	soc {
+		cpuflpr_sram_code_data: memory@20067c00 {
+			compatible = "mmio-sram";
+			reg = <0x20067c00 DT_SIZE_K(96)>;
+			ranges = <0x0 0x20067c00 DT_SIZE_K(96)>;
+			status = "reserved";
+			#address-cells = <1>;
+			#size-cells = <1>;
+		};
+	};
+};
+
+&ipc0 {
+	tx-region = <&cpuapp_cpuflpr_ipc_shm>;
+	rx-region = <&cpuflpr_cpuapp_ipc_shm>;
+	status = "okay";
+
+	bt_hci_ipc0: bt_hci_ipc0 {
+		compatible = "zephyr,bt-hci-ipc";
+		status = "okay";
+	};
+};
+
+/* 411 KB (APP RAM) + 4 KB (IPC memory) + 96 KB (FLPR RAM) = 511 KB */
+&cpuapp_sram {
+	reg = <0x20000000 DT_SIZE_K(411)>;
+	ranges = <0x0 0x20000000 DT_SIZE_K(411)>;
+};
+
+&cpuapp_sram_app {
+	reg = <0x60 (DT_SIZE_K(411) - 0x60)>;
+};
+
+/* 1780 KB (APP RRAM) + 256 KB (FLPR RRAM) = 2036 KB */
+&cpuapp_rram {
+	reg = <0x0 DT_SIZE_K(1780)>;
+	ranges = <0x0 0x0 DT_SIZE_K(1780)>;
+
+	/delete-node/ partitions;
+
+	partitions {
+		ranges;
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		slot0_partition: partition@0 {
+			compatible = "zephyr,mapped-partition";
+			label = "image-0";
+			reg = <0x0 DT_SIZE_K(1744)>;
+		};
+
+		storage_partition: partition@1b4000 {
+			compatible = "zephyr,mapped-partition";
+			label = "storage";
+			reg = <0x1b4000 DT_SIZE_K(36)>;
+		};
+	};
+};
+
+&rram_controller {
+	cpuflpr_rram: rram@1bd000 {
+		compatible = "soc-nv-flash";
+		reg = <0x1bd000 DT_SIZE_K(256)>;
+		ranges = <0x0 0x1bd000 DT_SIZE_K(256)>;
+		erase-block-size = <0x1000>;
+		write-block-size = <0x10>;
+		#address-cells = <1>;
+		#size-cells = <1>;
+	};
+};
+
+&cpuflpr_vpr {
+	status = "okay";
+	execution-memory = <&cpuflpr_rram>;
+};
+
+&uart30 {
+	current-speed = <1000000>;
+	status = "okay";
+};
+
+&uart20 {
+	status = "disabled";
+};
+
+&cpuapp_vevif_rx {
+	status = "okay";
+};
+
+&cpuapp_vevif_tx {
+	status = "okay";
+};
+
+&bt_hci_controller {
+	status = "disabled";
+};
