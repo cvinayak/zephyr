@@ -340,7 +340,7 @@ config RISCV_HAS_CLIC
 	bool
 	depends on RISCV_PRIVILEGED
 	select RISCV_ALWAYS_SWITCH_THROUGH_ECALL if MULTITHREADING
-	select CLIC_SUPPORT_INTERRUPT_LEVEL if !NRFX_CLIC
+	select CLIC_SUPPORT_INTERRUPT_LEVEL if !RISCV_SOC_HAS_ISR_STACKING
 	help
 	  Does the SOC provide support for a Core-Local Interrupt Controller (CLIC).
 
@@ -360,6 +360,22 @@ config CLIC_SUPPORT_INTERRUPT_LEVEL
 	  higher-numbered interrupt levels can preempt lower-numbered interrupt
 	  levels. This option handles interrupt level in ISR to ensure proper
 	  nested ISR exits.
+
+config RISCV_NESTED_INTERRUPTS
+	bool "Nested interrupts"
+	depends on CLIC_SUPPORT_INTERRUPT_LEVEL
+	depends on !RISCV_SOC_HAS_CUSTOM_IRQ_HANDLING
+	help
+	  Allow a higher level CLIC interrupt to preempt a running ISR.
+
+	  The hardware clears the global interrupt enable on trap entry. With
+	  this option the common interrupt wrapper sets it again just around
+	  the call of the ISR, i.e. only after the interrupted context
+	  (caller-saved registers, mepc, mstatus, mcause and the SoC context)
+	  has been saved by software and the interrupt stack is in use. The
+	  global interrupt enable is cleared again before that context is
+	  restored, and the previous interrupt level is restored on exit
+	  through the saved mcause.
 
 config RISCV_SOC_INTERRUPT_INIT
 	bool "SOC-based interrupt initialization"

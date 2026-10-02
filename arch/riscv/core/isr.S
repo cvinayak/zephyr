@@ -822,8 +822,21 @@ on_irq_stack:
 	li a0, 0
 #endif
 
+#ifdef CONFIG_RISCV_NESTED_INTERRUPTS
+	/*
+	 * The interrupted context is fully saved and we run on the IRQ
+	 * stack: allow higher level interrupts to preempt this ISR.
+	 */
+	csrs RV_STATUS, STATUS_IE
+#endif /* CONFIG_RISCV_NESTED_INTERRUPTS */
+
 	/* Call ISR function */
 	jalr ra, t1, 0
+
+#ifdef CONFIG_RISCV_NESTED_INTERRUPTS
+	/* Mask interrupts again before unwinding the saved context */
+	csrc RV_STATUS, STATUS_IE
+#endif /* CONFIG_RISCV_NESTED_INTERRUPTS */
 
 #ifdef CONFIG_TRACING_ISR
 	call sys_trace_isr_exit
