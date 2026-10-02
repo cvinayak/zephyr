@@ -6,7 +6,6 @@ config RISCV_CORE_NORDIC_VPR
 	select RISCV
 	select RISCV_PRIVILEGED
 	select RISCV_VECTORED_MODE
-	select RISCV_SOC_HAS_ISR_STACKING
 	select RISCV_SOC_HAS_GP_RELATIVE_ADDRESSING
 	select RISCV_HAS_CLIC
 	select RISCV_SOC_CONTEXT_SAVE
@@ -18,6 +17,22 @@ config RISCV_CORE_NORDIC_VPR
 	imply SHELL_REMOTE_CLI_SKIP_RO_STRINGS
 	help
 	  Enable support for the RISC-V Nordic VPR core.
+
+config NORDIC_VPR_HW_STACKING
+	bool "Hardware register stacking on interrupts"
+	depends on RISCV_CORE_NORDIC_VPR
+	select RISCV_SOC_HAS_ISR_STACKING
+	help
+	  Use the VPR hardware to save and restore part of the interrupted
+	  context (ra, t0-t2, a0-a5, mcause and mepc) on interrupt entry and
+	  exit.
+
+	  When disabled (default), hardware register stacking is turned off
+	  at boot and the Zephyr kernel saves and restores the complete
+	  interrupted context in software when handling interrupts. This
+	  allows interrupts to be re-enabled only once the context has been
+	  fully saved, which is required for nested interrupts, see
+	  RISCV_NESTED_INTERRUPTS.
 
 choice NORDIC_VPR_SLEEP_MODE
 	prompt "Default sleep mode"
