@@ -30,7 +30,7 @@ static uint16_t const sca_ppm_lut[] = {500, 250, 150, 100, 75, 50, 30, 20};
 
 static atomic_val_t hf_refcnt;
 
-#if !defined(CONFIG_SOC_NRF54L15_CPUFLPR)
+#if !defined(CONFIG_RISCV_CORE_NORDIC_VPR)
 struct lll_clock_state {
 	struct onoff_client cli;
 	struct k_sem sem;
@@ -138,7 +138,7 @@ int lll_clock_wait(void)
 	return 0;
 }
 
-#else /* CONFIG_SOC_NRF54L15_CPUFLPR */
+#else /* CONFIG_RISCV_CORE_NORDIC_VPR */
 int lll_clock_init(void)
 {
 	/* FIXME: Add implementation alternative for clock control */
@@ -156,7 +156,7 @@ int lll_clock_wait(void)
 	/* FIXME: Add implementation alternative for clock control */
 	return 0;
 }
-#endif /* CONFIG_SOC_NRF54L15_CPUFLPR */
+#endif /* CONFIG_RISCV_CORE_NORDIC_VPR */
 
 int lll_hfclock_on(void)
 {
@@ -164,13 +164,13 @@ int lll_hfclock_on(void)
 		return 0;
 	}
 
-#if !defined(CONFIG_SOC_NRF54L15_CPUFLPR)
+#if !defined(CONFIG_RISCV_CORE_NORDIC_VPR)
 	z_nrf_clock_bt_ctlr_hf_request();
 
-#else /* CONFIG_SOC_NRF54L15_CPUFLPR */
+#else /* CONFIG_RISCV_CORE_NORDIC_VPR */
 	/* FIXME: Add implementation alternative for clock control */
 	NRF_CLOCK->TASKS_XOSTART = 1U;
-#endif /* CONFIG_SOC_NRF54L15_CPUFLPR */
+#endif /* CONFIG_RISCV_CORE_NORDIC_VPR */
 
 	DEBUG_RADIO_XTAL(1);
 
@@ -189,7 +189,7 @@ int lll_hfclock_on_wait(void)
 
 	err = blocking_on(mgr, HFCLOCK_TIMEOUT_MS);
 
-#elif !defined(CONFIG_SOC_NRF54L15_CPUFLPR)
+#elif !defined(CONFIG_RISCV_CORE_NORDIC_VPR)
 	const struct device *clk_dev = DEVICE_DT_GET_ONE(COND_CODE_1(NRF_CLOCK_HAS_HFCLK,
 							       (nordic_nrf_clock_hfclk),
 							       (nordic_nrf_clock_xo)));
@@ -218,13 +218,13 @@ int lll_hfclock_off(void)
 		return 0;
 	}
 
-#if !defined(CONFIG_SOC_NRF54L15_CPUFLPR)
+#if !defined(CONFIG_RISCV_CORE_NORDIC_VPR)
 	z_nrf_clock_bt_ctlr_hf_release();
 
-#else /* CONFIG_SOC_NRF54L15_CPUFLPR */
+#else /* CONFIG_RISCV_CORE_NORDIC_VPR */
 	/* FIXME: Add implementation alternative for clock control */
 	NRF_CLOCK->TASKS_XOSTOP = 1U;
-#endif /* CONFIG_SOC_NRF54L15_CPUFLPR */
+#endif /* CONFIG_RISCV_CORE_NORDIC_VPR */
 
 	DEBUG_RADIO_XTAL(0);
 
@@ -236,7 +236,7 @@ uint8_t lll_clock_sca_local_get(void)
 #if defined(CONFIG_CLOCK_CONTROL_NRF)
 	return CLOCK_CONTROL_NRF_K32SRC_ACCURACY;
 
-#elif !defined(CONFIG_SOC_NRF54L15_CPUFLPR)
+#elif !defined(CONFIG_RISCV_CORE_NORDIC_VPR)
 	return DT_ENUM_IDX(DT_COMPAT_GET_ANY_STATUS_OKAY(nordic_nrf_clock_lfclk),
 			   k32src_accuracy_ppm);
 
@@ -254,7 +254,7 @@ uint32_t lll_clock_ppm_local_get(void)
 #if defined(CONFIG_CLOCK_CONTROL_NRF)
 	return sca_ppm_lut[CLOCK_CONTROL_NRF_K32SRC_ACCURACY];
 
-#elif !defined(CONFIG_SOC_NRF54L15_CPUFLPR)
+#elif !defined(CONFIG_RISCV_CORE_NORDIC_VPR)
 	return sca_ppm_lut[DT_ENUM_IDX(DT_COMPAT_GET_ANY_STATUS_OKAY(nordic_nrf_clock_lfclk),
 				       k32src_accuracy_ppm)];
 
