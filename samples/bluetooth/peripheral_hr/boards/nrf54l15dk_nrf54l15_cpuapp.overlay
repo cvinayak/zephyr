@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+/* SRAM:  127 KB (APP) + 2 KB (IPC) + 127 KB (FLPR) = 256 KB
+ * RRAM: 1140 KB (APP) + 384 KB (FLPR) = 1524 KB
+ */
+
 / {
 	chosen {
 		zephyr,bt-hci = &bt_hci_ipc0;
@@ -15,19 +19,19 @@
 			#address-cells = <1>;
 			#size-cells = <1>;
 
-			sram_rx: memory@2001f800 {
-				reg = <0x2001f800 DT_SIZE_K(1)>;
+			sram_rx: memory@2001fc00 {
+				reg = <0x2001fc00 DT_SIZE_K(1)>;
 			};
 
-			sram_tx: memory@2001fc00 {
-				reg = <0x2001fc00 DT_SIZE_K(1)>;
+			sram_tx: memory@20020000 {
+				reg = <0x20020000 DT_SIZE_K(1)>;
 			};
 		};
 
-		cpuflpr_sram_code_data: memory@20020000 {
+		cpuflpr_sram_code_data: memory@20020400 {
 			compatible = "mmio-sram";
-			reg = <0x20020000 DT_SIZE_K(128)>;
-			ranges = <0x0 0x20020000 DT_SIZE_K(128)>;
+			reg = <0x20020400 DT_SIZE_K(127)>;
+			ranges = <0x0 0x20020400 DT_SIZE_K(127)>;
 			status = "reserved";
 			#address-cells = <1>;
 			#size-cells = <1>;
@@ -55,21 +59,44 @@
 };
 
 &cpuapp_sram {
-	reg = <0x20000000 DT_SIZE_K(126)>;
-	ranges = <0x0 0x20000000 DT_SIZE_K(126)>;
+	reg = <0x20000000 DT_SIZE_K(127)>;
+	ranges = <0x0 0x20000000 DT_SIZE_K(127)>;
+};
+
+&cpuapp_sram_app {
+	reg = <0x60 (DT_SIZE_K(127) - 0x60)>;
+};
+
+&cpuapp_rram {
+	reg = <0x0 DT_SIZE_K(1140)>;
+	ranges = <0x0 0x0 DT_SIZE_K(1140)>;
+
+	/delete-node/ partitions;
+
+	partitions {
+		ranges;
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		slot0_partition: partition@0 {
+			compatible = "zephyr,mapped-partition";
+			label = "image-0";
+			reg = <0x0 DT_SIZE_K(1104)>;
+		};
+
+		storage_partition: partition@114000 {
+			compatible = "zephyr,mapped-partition";
+			label = "storage";
+			reg = <0x114000 DT_SIZE_K(36)>;
+		};
+	};
 };
 
 &rram_controller {
-	cpuapp_rram: rram@0 {
+	cpuflpr_rram: rram@11d000 {
 		compatible = "soc-nv-flash";
-		reg = <0x0 DT_SIZE_K(1152)>;
-		ranges = <0x0 0 DT_SIZE_K(1152)>;
-	};
-
-	cpuflpr_rram: rram@120000 {
-		compatible = "soc-nv-flash";
-		reg = <0x120000 DT_SIZE_K(384)>;
-		ranges = <0x0 0x120000 DT_SIZE_K(384)>;
+		reg = <0x11d000 DT_SIZE_K(384)>;
+		ranges = <0x0 0x11d000 DT_SIZE_K(384)>;
 		erase-block-size = <0x1000>;
 		write-block-size = <0x10>;
 		#address-cells = <1>;
@@ -80,10 +107,6 @@
 &cpuflpr_vpr {
 	status = "okay";
 	execution-memory = <&cpuflpr_rram>;
-	/*
-	 * execution-memory = <&cpuflpr_sram_code_data>;
-	 * source-memory = <&cpuflpr_rram>;
-	 */
 };
 
 &uart30 {
