@@ -4,7 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <nordic/nrf54lm20_a_b_ipc_shared_ram.dtsi>
+/* SRAM:  382 KB (APP) + 2 KB (IPC) + 127 KB (FLPR) = 511 KB
+ * RRAM: 1652 KB (APP) + 384 KB (FLPR) = 2036 KB
+ */
 
 / {
 	chosen {
@@ -13,42 +15,61 @@
 	};
 
 	soc {
-		cpuflpr_sram_code_data: memory@20067c00 {
+		reserved-memory {
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			sram_rx: memory@2005f800 {
+				reg = <0x2005f800 DT_SIZE_K(1)>;
+			};
+
+			sram_tx: memory@2005fc00 {
+				reg = <0x2005fc00 DT_SIZE_K(1)>;
+			};
+		};
+
+		cpuflpr_sram_code_data: memory@20060000 {
 			compatible = "mmio-sram";
-			reg = <0x20067c00 DT_SIZE_K(96)>;
-			ranges = <0x0 0x20067c00 DT_SIZE_K(96)>;
+			reg = <0x20060000 DT_SIZE_K(127)>;
+			ranges = <0x0 0x20060000 DT_SIZE_K(127)>;
 			status = "reserved";
 			#address-cells = <1>;
 			#size-cells = <1>;
 		};
 	};
-};
 
-&ipc0 {
-	tx-region = <&cpuapp_cpuflpr_ipc_shm>;
-	rx-region = <&cpuflpr_cpuapp_ipc_shm>;
-	status = "okay";
+	ipc {
+		ipc0: ipc0 {
+			compatible = "zephyr,ipc-icbmsg";
+			tx-blocks = <16>;
+			rx-blocks = <16>;
+			dcache-alignment = <32>;
+			tx-region = <&sram_tx>;
+			rx-region = <&sram_rx>;
+			mboxes = <&cpuapp_vevif_rx 20>, <&cpuapp_vevif_tx 21>;
+			mbox-names = "rx", "tx";
+			status = "okay";
 
-	bt_hci_ipc0: bt_hci_ipc0 {
-		compatible = "zephyr,bt-hci-ipc";
-		status = "okay";
+			bt_hci_ipc0: bt_hci_ipc0 {
+				compatible = "zephyr,bt-hci-ipc";
+				status = "okay";
+			};
+		};
 	};
 };
 
-/* 411 KB (APP RAM) + 4 KB (IPC memory) + 96 KB (FLPR RAM) = 511 KB */
 &cpuapp_sram {
-	reg = <0x20000000 DT_SIZE_K(411)>;
-	ranges = <0x0 0x20000000 DT_SIZE_K(411)>;
+	reg = <0x20000000 DT_SIZE_K(382)>;
+	ranges = <0x0 0x20000000 DT_SIZE_K(382)>;
 };
 
 &cpuapp_sram_app {
-	reg = <0x60 (DT_SIZE_K(411) - 0x60)>;
+	reg = <0x60 (DT_SIZE_K(382) - 0x60)>;
 };
 
-/* 1780 KB (APP RRAM) + 256 KB (FLPR RRAM) = 2036 KB */
 &cpuapp_rram {
-	reg = <0x0 DT_SIZE_K(1780)>;
-	ranges = <0x0 0x0 DT_SIZE_K(1780)>;
+	reg = <0x0 DT_SIZE_K(1652)>;
+	ranges = <0x0 0x0 DT_SIZE_K(1652)>;
 
 	/delete-node/ partitions;
 
@@ -60,22 +81,22 @@
 		slot0_partition: partition@0 {
 			compatible = "zephyr,mapped-partition";
 			label = "image-0";
-			reg = <0x0 DT_SIZE_K(1744)>;
+			reg = <0x0 DT_SIZE_K(1616)>;
 		};
 
-		storage_partition: partition@1b4000 {
+		storage_partition: partition@194000 {
 			compatible = "zephyr,mapped-partition";
 			label = "storage";
-			reg = <0x1b4000 DT_SIZE_K(36)>;
+			reg = <0x194000 DT_SIZE_K(36)>;
 		};
 	};
 };
 
 &rram_controller {
-	cpuflpr_rram: rram@1bd000 {
+	cpuflpr_rram: rram@19d000 {
 		compatible = "soc-nv-flash";
-		reg = <0x1bd000 DT_SIZE_K(256)>;
-		ranges = <0x0 0x1bd000 DT_SIZE_K(256)>;
+		reg = <0x19d000 DT_SIZE_K(384)>;
+		ranges = <0x0 0x19d000 DT_SIZE_K(384)>;
 		erase-block-size = <0x1000>;
 		write-block-size = <0x10>;
 		#address-cells = <1>;
