@@ -1,0 +1,31 @@
+/*
+ * Copyright (c) 2026 Nordic Semiconductor ASA
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/ {
+	chosen {
+		zephyr,bt-hci-ipc = &ipc0;
+		zephyr,console = &uart20;
+	};
+};
+
+/* Last 256 KB of RRAM for the FLPR Bluetooth controller image, executed in place */
+&cpuflpr_rram {
+	reg = <0x1bd000 DT_SIZE_K(256)>;
+	ranges = <0x0 0x1bd000 DT_SIZE_K(256)>;
+};
+
+&cpuflpr_code_partition {
+	reg = <0x0 DT_SIZE_K(256)>;
+};
+
+&uart30 {
+	status = "disabled";
+};
+
+&uart20 {
+	current-speed = <1000000>;
+	status = "okay";
+};
