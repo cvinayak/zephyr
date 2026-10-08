@@ -203,6 +203,13 @@ void arm_core_mpu_configure_dynamic_mpu_regions(
 	const struct z_arm_mpu_partition *dynamic_regions,
 	uint8_t regions_num);
 
+#if defined(CONFIG_MPU_GAP_FILLING)
+uint8_t arm_core_mpu_get_static_regions_num(void);
+
+void arm_core_mpu_reapply_static_mpu_regions(const struct z_arm_mpu_partition *static_regions,
+					     uint8_t regions_num, uint8_t start_reg_index);
+#endif /* CONFIG_MPU_GAP_FILLING */
+
 /**
  * @brief configure the base address and size for an MPU region
  *
