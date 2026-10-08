@@ -64,6 +64,12 @@ extern char _sram_vector_start[];
 extern char _sram_vector_size[];
 #endif
 
+#if defined(CONFIG_MPU_GAP_FILLING) &&                                             \
+	(defined(CONFIG_CODE_DATA_RELOCATION_SRAM) || defined(CONFIG_SRAM_VECTOR_TABLE))
+static uint8_t z_arm_exec_static_mpu_start;
+static bool z_arm_exec_static_mpu_valid;
+#endif
+
 static const struct z_arm_mpu_partition static_regions[] = {
 #if defined(CONFIG_COVERAGE_GCOV) && defined(CONFIG_USERSPACE)
 	{
@@ -136,6 +142,19 @@ static const struct z_arm_mpu_partition static_regions[] = {
 #endif /* !CONFIG_MULTITHREADING && CONFIG_MPU_STACK_GUARD */
 };
 
+#if defined(CONFIG_MPU_GAP_FILLING) &&                                             \
+	(defined(CONFIG_CODE_DATA_RELOCATION_SRAM) || defined(CONFIG_SRAM_VECTOR_TABLE))
+static void z_arm_reapply_exec_static_mpu(void)
+{
+	if (!z_arm_exec_static_mpu_valid) {
+		return;
+	}
+
+	arm_core_mpu_reapply_static_mpu_regions(static_regions, ARRAY_SIZE(static_regions),
+						z_arm_exec_static_mpu_start);
+}
+#endif
+
 /**
  * @brief Use the HW-specific MPU driver to program
  *        the static MPU regions.
@@ -158,6 +177,11 @@ void z_arm_configure_static_mpu_regions(void)
 	 */
 #ifdef CONFIG_AARCH32_ARMV8_R
 	arm_core_mpu_disable();
+#endif
+#if defined(CONFIG_MPU_GAP_FILLING) &&                                             \
+	(defined(CONFIG_CODE_DATA_RELOCATION_SRAM) || defined(CONFIG_SRAM_VECTOR_TABLE))
+	z_arm_exec_static_mpu_start = arm_core_mpu_get_static_regions_num();
+	z_arm_exec_static_mpu_valid = true;
 #endif
 	arm_core_mpu_configure_static_mpu_regions(static_regions,
 		ARRAY_SIZE(static_regions),
@@ -339,6 +363,10 @@ void z_arm_configure_dynamic_mpu_regions(struct k_thread *thread)
 #endif
 	arm_core_mpu_configure_dynamic_mpu_regions(dynamic_regions,
 						   region_num);
+#if defined(CONFIG_MPU_GAP_FILLING) &&                                             \
+	(defined(CONFIG_CODE_DATA_RELOCATION_SRAM) || defined(CONFIG_SRAM_VECTOR_TABLE))
+	z_arm_reapply_exec_static_mpu();
+#endif
 #ifdef CONFIG_AARCH32_ARMV8_R
 	arm_core_mpu_enable();
 #endif

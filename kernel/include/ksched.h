@@ -119,6 +119,20 @@ static inline void z_sched_set_current(struct k_thread *new_thread)
 	z_current_thread_set(new_thread);
 }
 
+#ifdef CONFIG_USE_NANOBE_SWITCH
+/* Scheduling decision deferred from ISR context to thread mode */
+#define Z_SCHED_DEFERRED_UPDATE     BIT(0)
+#define Z_SCHED_DEFERRED_PREEMPT_OK BIT(1)
+
+extern uint8_t z_sched_deferred;
+
+/* Thread mode, called on return from an interrupt that deferred a
+ * scheduling decision: run time slicing, decide the next thread and
+ * switch to it.
+ */
+void z_sched_deferred_reschedule(void);
+#endif /* CONFIG_USE_NANOBE_SWITCH */
+
 /* Wrapper around z_get_next_switch_handle() for the benefit of
  * non-SMP platforms that always pass a NULL interrupted handle.
  * Exposes the (extremely) common early exit case in a context that

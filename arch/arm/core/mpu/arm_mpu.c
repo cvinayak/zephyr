@@ -381,6 +381,19 @@ void arm_core_mpu_configure_dynamic_mpu_regions(const struct z_arm_mpu_partition
 	}
 }
 
+#if defined(CONFIG_MPU_GAP_FILLING)
+uint8_t arm_core_mpu_get_static_regions_num(void)
+{
+	return static_regions_num;
+}
+
+void arm_core_mpu_reapply_static_mpu_regions(const struct z_arm_mpu_partition *regions,
+					     uint8_t regions_num, uint8_t start_reg_index)
+{
+	(void)mpu_configure_regions_and_partition(regions, regions_num, start_reg_index, false);
+}
+#endif /* CONFIG_MPU_GAP_FILLING */
+
 #if defined(CONFIG_CPU_CORTEX_M)
 /**
  * @brief Save the current MPU configuration into the provided context struct.
