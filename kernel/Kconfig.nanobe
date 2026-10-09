@@ -4,7 +4,7 @@
 menuconfig USE_NANOBE_SWITCH
 	bool "Nanobe threads [EXPERIMENTAL]"
 	depends on (CPU_CORTEX_M && ARMV7_M_ARMV8_M_MAINLINE && !USE_SWITCH && \
-		    !ARM_STORE_EXC_RETURN && !ARM_PAC_PER_THREAD) || \
+		    !ARM_PAC_PER_THREAD) || \
 		   (RISCV && !RISCV_S_MODE && !SMP && !FPU)
 	depends on MULTITHREADING
 	select EXPERIMENTAL
