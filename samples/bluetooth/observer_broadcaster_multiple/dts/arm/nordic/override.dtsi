@@ -4,4 +4,4 @@
  * ARM Cortex-M0 lowest priority value of 3, i.e. we use it as Zephyr has no
  * support for ZLI on Cortex-M0.
  */
-#define NRF_DEFAULT_IRQ_PRIORITY 3
+#define NRF_DEFAULT_IRQ_PRIORITY 0
