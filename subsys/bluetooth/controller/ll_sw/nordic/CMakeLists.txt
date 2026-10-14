@@ -76,6 +76,11 @@ zephyr_library_sources_ifdef(
   lll/lll_test.c
 )
 zephyr_library_sources_ifdef(
+  CONFIG_BT_CTLR_CHANNEL_SOUNDING
+  lll/lll_cs.c
+  hal/nrf5/radio/radio_cs.c
+)
+zephyr_library_sources_ifdef(
   CONFIG_BT_CTLR_PROFILE_ISR
   lll/lll_prof.c
 )

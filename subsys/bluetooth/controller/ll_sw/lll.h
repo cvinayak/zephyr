@@ -75,6 +75,9 @@ enum {
 	TICKER_ID_ADV_ISO_BASE,
 	TICKER_ID_ADV_ISO_LAST = ((TICKER_ID_ADV_ISO_BASE) +
 				  (CONFIG_BT_CTLR_ADV_ISO_SET) - 1),
+	TICKER_ID_ADV_ISO_RESUME_BASE,
+	TICKER_ID_ADV_ISO_RESUME_LAST = ((TICKER_ID_ADV_ISO_RESUME_BASE) +
+					 (CONFIG_BT_CTLR_ADV_ISO_SET) - 1),
 #endif /* CONFIG_BT_CTLR_ADV_ISO */
 #endif /* CONFIG_BT_CTLR_ADV_PERIODIC */
 #endif /* CONFIG_BT_CTLR_ADV_AUX_SET > 0 */
@@ -124,6 +127,12 @@ enum {
 	TICKER_ID_CONN_ISO_RESUME_LAST = ((TICKER_ID_CONN_ISO_RESUME_BASE) +
 					  (CONFIG_BT_CTLR_CONN_ISO_GROUPS) - 1),
 #endif /* CONFIG_BT_CTLR_CONN_ISO */
+
+#if defined(CONFIG_BT_CTLR_CHANNEL_SOUNDING)
+	TICKER_ID_CS_BASE,
+	TICKER_ID_CS_LAST = ((TICKER_ID_CS_BASE) + (CONFIG_BT_MAX_CONN) - 1),
+	TICKER_ID_CS_TEST,
+#endif /* CONFIG_BT_CTLR_CHANNEL_SOUNDING */
 
 #if defined(CONFIG_BT_CTLR_USER_EXT) && \
 	(CONFIG_BT_CTLR_USER_TICKER_ID_RANGE > 0)
@@ -242,6 +251,12 @@ struct lll_hdr {
 
 struct lll_prepare_param {
 	uint32_t ticks_at_expire;
+#if defined(CONFIG_BT_CTLR_ADV_ISO_SLOT_WINDOW_JITTER) || \
+	defined(CONFIG_BT_CTLR_SYNC_ISO_SLOT_WINDOW_JITTER)
+	uint32_t ticks_drift;
+#endif /* CONFIG_BT_CTLR_ADV_ISO_SLOT_WINDOW_JITTER ||
+	* CONFIG_BT_CTLR_SYNC_ISO_SLOT_WINDOW_JITTER
+	*/
 	uint32_t remainder;
 	uint16_t lazy;
 #if defined(CONFIG_BT_CTLR_JIT_SCHEDULING)
@@ -322,6 +337,12 @@ enum node_rx_type {
 	NODE_RX_TYPE_IQ_SAMPLE_REPORT_LLL_RELEASE,
 	NODE_RX_TYPE_SYNC_TRANSFER_RECEIVED,
 	NODE_RX_TYPE_PATH_LOSS,
+	NODE_RX_TYPE_CS_READ_REMOTE_SUPPORTED_CAPABILITIES_COMPLETE,
+	NODE_RX_TYPE_CS_READ_REMOTE_FAE_TABLE_COMPLETE,
+	NODE_RX_TYPE_CS_SECURITY_ENABLE_COMPLETE,
+	NODE_RX_TYPE_CS_CONFIG_COMPLETE,
+	NODE_RX_TYPE_CS_PROCEDURE_ENABLE_COMPLETE,
+	NODE_RX_TYPE_CS_SUBEVENT_RESULT,
 	/* Signals retention (ie non-release) of rx node */
 	NODE_RX_TYPE_RETAIN,
 
@@ -574,15 +595,6 @@ static inline void lll_hdr_init(void *lll, void *parent)
 #endif /* CONFIG_BT_CTLR_JIT_SCHEDULING */
 }
 
-/* If ISO vendor data path is not used, queue directly to ll_iso_rx */
-#if defined(CONFIG_BT_CTLR_ISO_VENDOR_DATA_PATH)
-#define iso_rx_put(link, rx) ull_iso_rx_put(link, rx)
-#define iso_rx_sched() ull_iso_rx_sched()
-#else
-#define iso_rx_put(link, rx) ll_iso_rx_put(link, rx)
-#define iso_rx_sched() ll_rx_sched()
-#endif /* CONFIG_BT_CTLR_ISO_VENDOR_DATA_PATH */
-
 struct node_tx_iso;
 
 void lll_done_score(void *param, uint8_t result);
@@ -605,13 +617,23 @@ int lll_csrand_isr_get(void *buf, size_t len);
 int lll_rand_get(void *buf, size_t len);
 int lll_rand_isr_get(void *buf, size_t len);
 
+int lll_prepare(lll_is_abort_cb_t is_abort_cb,
+		lll_abort_cb_t abort_cb,
+		lll_prepare_cb_t prepare_cb, int8_t event_prio,
+		struct lll_prepare_param *prepare_param);
+int lll_resume_enqueue(lll_prepare_cb_t resume_cb, int resume_prio);
+int lll_prepare_resolve(lll_is_abort_cb_t is_abort_cb, lll_abort_cb_t abort_cb,
+			lll_prepare_cb_t prepare_cb,
+			struct lll_prepare_param *prepare_param,
+			uint8_t is_resume, uint8_t is_dequeue);
+
 struct lll_event *ull_prepare_enqueue(lll_is_abort_cb_t is_abort_cb,
 				      lll_abort_cb_t abort_cb,
 				      struct lll_prepare_param *prepare_param,
 				      lll_prepare_cb_t prepare_cb,
 				      uint8_t is_resume);
 void *ull_prepare_dequeue_get(void);
-void *ull_prepare_dequeue_iter(uint8_t *idx);
+void *ull_prepare_dequeue_iter(void **idx);
 void ull_prepare_dequeue(uint8_t caller_id);
 void *ull_pdu_rx_alloc_peek(uint8_t count);
 void *ull_pdu_rx_alloc_peek_iter(uint8_t *idx);
@@ -631,12 +653,14 @@ struct event_done_extra *ull_event_done_extra_get(void);
 struct event_done_extra *ull_done_extra_type_set(uint8_t type);
 void *ull_event_done(void *param);
 
-int lll_prepare(lll_is_abort_cb_t is_abort_cb,
-		lll_abort_cb_t abort_cb,
-		lll_prepare_cb_t prepare_cb, int8_t event_prio,
-		struct lll_prepare_param *prepare_param);
-int lll_resume_enqueue(lll_prepare_cb_t resume_cb, int resume_prio);
-int lll_prepare_resolve(lll_is_abort_cb_t is_abort_cb, lll_abort_cb_t abort_cb,
-			lll_prepare_cb_t prepare_cb,
-			struct lll_prepare_param *prepare_param,
-			uint8_t is_resume, uint8_t is_dequeue);
+/* If ISO vendor data path is not used, queue directly to ll_iso_rx */
+#if defined(CONFIG_BT_CTLR_ISO_VENDOR_DATA_PATH)
+#define iso_rx_put(link, rx) ull_iso_rx_put(link, rx)
+#define iso_rx_sched() ull_iso_rx_sched()
+#else
+void ll_iso_rx_sched(void);
+#define iso_rx_put(link, rx) ll_iso_rx_put(link, rx)
+#define iso_rx_sched() ll_iso_rx_sched()
+#endif /* CONFIG_BT_CTLR_ISO_VENDOR_DATA_PATH */
+
+void ll_rx_sched(void);
