@@ -1,0 +1,22 @@
+# Copyright (c) 2025 Nordic Semiconductor ASA
+# SPDX-License-Identifier: Apache-2.0
+
+# some of the control procedures in the BT LL depend on
+# the following configs been set
+
+config SOC_COMPATIBLE_NRF
+	default y
+
+config BT_CTLR_CHANNEL_SOUNDING_SUPPORT
+	default y
+
+config ENTROPY_NRF_FORCE_ALT
+	default n
+
+config ENTROPY_NRF5_RNG
+	default n
+
+source "tests/bluetooth/controller/common/Kconfig"
+
+# Include Zephyr's Kconfig
+source "Kconfig"
