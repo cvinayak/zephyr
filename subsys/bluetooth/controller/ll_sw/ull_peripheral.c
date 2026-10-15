@@ -39,11 +39,18 @@
 #include "lll_filter.h"
 #include "lll_conn_iso.h"
 
-#include "ll_sw/ull_tx_queue.h"
+#include "ull_tx_queue.h"
+
+#include "isoal.h"
 
 #include "ull_adv_types.h"
+#include "ull_iso_types.h"
+#include "ull_cs_types.h"
 #include "ull_conn_types.h"
+#include "ull_conn_iso_types.h"
+
 #include "ull_filter.h"
+#include "ull_llcp.h"
 
 #include "ull_internal.h"
 #include "ull_adv_internal.h"
@@ -51,12 +58,6 @@
 #include "ull_peripheral_internal.h"
 
 #include "ll.h"
-
-#include "ll_sw/isoal.h"
-#include "ll_sw/ull_iso_types.h"
-#include "ll_sw/ull_conn_iso_types.h"
-
-#include "ll_sw/ull_llcp.h"
 
 #include "hal/debug.h"
 
