@@ -1510,6 +1510,59 @@ uint32_t radio_tmr_isr_clear(void **param)
 }
 #endif /* CONFIG_BT_CTLR_RADIO_TIMER_ISR */
 
+#if defined(HAL_RADIO_CS_TONES_START_PPI)
+uint32_t radio_tmr_cs_tones_start_us(uint32_t start_us)
+{
+	hal_radio_cs_tones_start_ppi_config_and_enable();
+
+#if defined(CONFIG_BT_CTLR_SW_SWITCH_SINGLE_TIMER)
+	/* As timer is reset on every radio end, remove the accumulated
+	 * last_pdu_end_us in the given start_us.
+	 */
+	start_us -= last_pdu_end_us;
+#endif /* CONFIG_BT_CTLR_SW_SWITCH_SINGLE_TIMER */
+
+	/* start_us could be the current count in the timer */
+	uint32_t now_us = start_us;
+	uint32_t actual_us;
+
+	uint32_t cc = EVENT_TIMER->CC[HAL_EVENT_TIMER_SAMPLE_CC_OFFSET];
+
+	/* Setup timer compare while determining the latency in doing so */
+	do {
+		/* Set start to be, now plus the determined latency */
+		start_us = (now_us << 1) - start_us;
+
+		/* Setup compare event with min. 1 us offset */
+		actual_us = start_us + 1U;
+
+		nrf_timer_event_clear(EVENT_TIMER, HAL_EVENT_TIMER_CS_TONES_EVENT);
+		nrf_timer_cc_set(EVENT_TIMER, HAL_EVENT_TIMER_CS_TONES_CC_OFFSET,
+				 HAL_EVENT_TIMER_US_TO_TICKS(actual_us));
+
+		/* Capture the current time */
+		nrf_timer_task_trigger(EVENT_TIMER, HAL_EVENT_TIMER_SAMPLE_TASK);
+
+		now_us = EVENT_TIMER->CC[HAL_EVENT_TIMER_SAMPLE_CC_OFFSET];
+	} while ((now_us > start_us) &&
+		 (EVENT_TIMER->EVENTS_COMPARE[HAL_EVENT_TIMER_CS_TONES_CC_OFFSET] == 0U));
+
+	nrf_timer_cc_set(EVENT_TIMER, HAL_EVENT_TIMER_SAMPLE_CC_OFFSET, cc);
+
+#if defined(CONFIG_BT_CTLR_SW_SWITCH_SINGLE_TIMER)
+	actual_us += last_pdu_end_us;
+#endif /* CONFIG_BT_CTLR_SW_SWITCH_SINGLE_TIMER */
+
+	return actual_us;
+}
+
+void radio_tmr_cs_tones_start_clear(void)
+{
+	hal_radio_cs_tones_start_ppi_disable();
+	nrf_timer_event_clear(EVENT_TIMER, HAL_EVENT_TIMER_CS_TONES_EVENT);
+}
+#endif /* HAL_RADIO_CS_TONES_START_PPI */
+
 void radio_tmr_status_reset(void)
 {
 #if defined(CONFIG_BT_CTLR_NRF_GRTC)
