@@ -189,6 +189,48 @@ static inline void hal_radio_end_time_capture_ppi_config(void)
 #endif /* !(CONFIG_SOC_COMPATIBLE_NRF54LX && !CONFIG_BT_CTLR_SW_SWITCH_SINGLE_TIMER) */
 }
 
+#if defined(HAL_RADIO_CS_TONES_START_PPI)
+/*******************************************************************************
+ * Start Channel Sounding tone measurement on Event Timer tick:
+ * wire the EVENT_TIMER EVENTS_COMPARE[<CS tones timer>] event to the
+ * RADIO TASKS_CSTONESSTART task.
+ */
+static inline void hal_radio_cs_tones_start_ppi_config_and_enable(void)
+{
+#if defined(CONFIG_SOC_COMPATIBLE_NRF54LX) && !defined(CONFIG_BT_CTLR_SW_SWITCH_SINGLE_TIMER)
+	/* Dual-timer mode: EVENT_TIMER = NRF_TIMER00 (DPPIC00), Radio on DPPIC10.
+	 * Bridge: DPPIC00 ch HAL_NRF54LX_DUAL_TIMER_CS_TONES_START_DPPIC00
+	 *      -> PPIB00 SEND_0 -> PPIB10 RECEIVE_0
+	 *      -> DPPIC10 ch HAL_RADIO_CS_TONES_START_PPI.
+	 * The DPPIC00 channel is enabled by the EVENT_TIMER start configuration.
+	 */
+	nrf_timer_publish_set(EVENT_TIMER, HAL_EVENT_TIMER_CS_TONES_EVENT,
+			      HAL_NRF54LX_DUAL_TIMER_CS_TONES_START_DPPIC00);
+	nrf_ppib_subscribe_set(NRF_PPIB00, HAL_PPIB_SEND_CS_TONES_START_DPPIC00,
+			       HAL_NRF54LX_DUAL_TIMER_CS_TONES_START_DPPIC00);
+	nrf_ppib_publish_set(NRF_PPIB10, HAL_PPIB_RECEIVE_CS_TONES_START_DPPIC00,
+			     HAL_RADIO_CS_TONES_START_PPI);
+#else /* !(CONFIG_SOC_COMPATIBLE_NRF54LX && !CONFIG_BT_CTLR_SW_SWITCH_SINGLE_TIMER) */
+	nrf_timer_publish_set(EVENT_TIMER, HAL_EVENT_TIMER_CS_TONES_EVENT,
+			      HAL_RADIO_CS_TONES_START_PPI);
+#endif /* !(CONFIG_SOC_COMPATIBLE_NRF54LX && !CONFIG_BT_CTLR_SW_SWITCH_SINGLE_TIMER) */
+	nrf_radio_subscribe_set(NRF_RADIO, NRF_RADIO_TASKS_CSTONESSTART,
+				HAL_RADIO_CS_TONES_START_PPI);
+	nrf_dppi_channels_enable(NRF_DPPIC, BIT(HAL_RADIO_CS_TONES_START_PPI));
+}
+
+static inline void hal_radio_cs_tones_start_ppi_disable(void)
+{
+	nrf_dppi_channels_disable(NRF_DPPIC, BIT(HAL_RADIO_CS_TONES_START_PPI));
+	nrf_radio_subscribe_clear(NRF_RADIO, NRF_RADIO_TASKS_CSTONESSTART);
+	nrf_timer_publish_clear(EVENT_TIMER, HAL_EVENT_TIMER_CS_TONES_EVENT);
+#if defined(CONFIG_SOC_COMPATIBLE_NRF54LX) && !defined(CONFIG_BT_CTLR_SW_SWITCH_SINGLE_TIMER)
+	nrf_ppib_subscribe_clear(NRF_PPIB00, HAL_PPIB_SEND_CS_TONES_START_DPPIC00);
+	nrf_ppib_publish_clear(NRF_PPIB10, HAL_PPIB_RECEIVE_CS_TONES_START_DPPIC00);
+#endif /* CONFIG_SOC_COMPATIBLE_NRF54LX && !CONFIG_BT_CTLR_SW_SWITCH_SINGLE_TIMER */
+}
+#endif /* HAL_RADIO_CS_TONES_START_PPI */
+
 /*******************************************************************************
  * Start event timer on RTC tick:
  * wire the RTC0 EVENTS_COMPARE[2] event to EVENT_TIMER  TASKS_START task.

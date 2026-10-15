@@ -1218,6 +1218,7 @@ config BT_CTLR_CHANNEL_SOUNDING
 	depends on BT_CTLR_CHANNEL_SOUNDING_SUPPORT
 	depends on BT_CTLR_LE_ENC
 	select BT_CTLR_SET_HOST_FEATURE
+	select BT_CTLR_RADIO_TIMER_ISR if BT_LL_SW_SPLIT && SOC_COMPATIBLE_NRF54LX
 	default y if BT_CHANNEL_SOUNDING
 	help
 	  Enable support for Bluetooth 6.0 Channel Sounding in the
