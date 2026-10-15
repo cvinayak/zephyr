@@ -240,7 +240,7 @@ config BT_CTLR_DUP_FILTER_ADV_SET_MAX
 config BT_CTLR_RX_BUFFERS
 	int "Number of Rx buffers"
 	depends on BT_LL_SW_SPLIT
-	default 6 if BT_HCI_RAW
+	default 6 if BT_HCI_RAW || BT_CTLR_CHANNEL_SOUNDING
 	default 1
 	range 1 18
 	help
@@ -1196,11 +1196,59 @@ config BT_CTLR_FRAME_SPACE_UPDATE
 config BT_CTLR_CHANNEL_SOUNDING
 	bool "Channel Sounding support"
 	depends on BT_CTLR_CHANNEL_SOUNDING_SUPPORT
+	depends on BT_CTLR_LE_ENC
 	select BT_CTLR_SET_HOST_FEATURE
 	default y if BT_CHANNEL_SOUNDING
 	help
 	  Enable support for Bluetooth 6.0 Channel Sounding in the
 	  Controller.
+
+config BT_CTLR_CHANNEL_SOUNDING_MAX_CONFIG
+	int "Maximum number of CS configurations per connection"
+	depends on BT_CTLR_CHANNEL_SOUNDING
+	range 1 4
+	default 4
+	help
+	  Maximum number of Channel Sounding configurations that can be
+	  created per connection.
+
+config BT_CTLR_CS_TEST
+	bool "LE CS Test HCI commands"
+	depends on BT_CTLR_CHANNEL_SOUNDING
+	default y
+	help
+	  Enable the LE CS Test and LE CS Test End HCI commands.
+
+config BT_CTLR_CS_STEP_MODE3
+	bool "Channel Sounding step mode-3"
+	depends on BT_CTLR_CHANNEL_SOUNDING
+	default n
+	help
+	  Enable Channel Sounding step mode-3 (combined RTT and tone).
+
+config BT_CTLR_CS_SYNC_2M
+	bool "2M CS_SYNC PHY"
+	depends on BT_CTLR_CHANNEL_SOUNDING
+	depends on BT_CTLR_PHY_2M
+	default n
+	help
+	  Enable LE 2M PHY for CS_SYNC packets.
+
+config BT_CTLR_CS_MAX_ANTENNA_PATHS
+	int "Maximum CS antenna paths"
+	depends on BT_CTLR_CHANNEL_SOUNDING
+	range 1 4
+	default 1
+	help
+	  Maximum number of antenna paths supported in CS mode-2 steps.
+
+config BT_CTLR_CS_CHSEL_3C
+	bool "Channel selection algorithm #3c"
+	depends on BT_CTLR_CHANNEL_SOUNDING
+	default n
+	help
+	  Enable Channel Sounding channel selection algorithm #3c.
+	  Algorithm #3b is always supported.
 
 config BT_CTLR_EXTENDED_FEAT_SET
 	bool "LL Extended Feature Set support"
