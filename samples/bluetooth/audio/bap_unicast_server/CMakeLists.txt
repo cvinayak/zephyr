@@ -11,4 +11,9 @@ target_sources(app PRIVATE
 zephyr_sources_ifdef(CONFIG_LIBLC3 src/stream_lc3.c)
 zephyr_sources_ifdef(CONFIG_BT_AUDIO_TX src/stream_tx.c)
 
+if(CONFIG_USE_USB_AUDIO)
+  include(${ZEPHYR_BASE}/samples/subsys/usb/common/common.cmake)
+  target_sources(app PRIVATE src/usb.c)
+endif()
+
 zephyr_library_include_directories(${ZEPHYR_BASE}/samples/bluetooth)
