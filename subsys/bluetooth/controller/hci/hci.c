@@ -5112,6 +5112,10 @@ static void vs_read_supported_commands(struct net_buf *buf,
 	/* Write Tx Power, Read Tx Power */
 	rp->commands[1] |= BIT(5) | BIT(6);
 #endif /* CONFIG_BT_CTLR_TX_PWR_DYNAMIC_CONTROL */
+#if defined(CONFIG_BT_CTLR_VS_ADV_REPORT_RX)
+	/* Set Advertising Reports */
+	rp->commands[2] |= BIT(1);
+#endif /* CONFIG_BT_CTLR_VS_ADV_REPORT_RX */
 }
 
 static void vs_read_supported_features(struct net_buf *buf,
@@ -5219,6 +5223,20 @@ static void vs_set_scan_req_reports(struct net_buf *buf, struct net_buf **evt)
 	*evt = cmd_complete_status(0x00);
 }
 #endif /* CONFIG_BT_CTLR_VS_SCAN_REQ_RX */
+
+#if defined(CONFIG_BT_CTLR_VS_ADV_REPORT_RX)
+static void vs_set_adv_reports(struct net_buf *buf, struct net_buf **evt)
+{
+	struct bt_hci_cp_vs_set_adv_reports *cmd = (void *)buf->data;
+
+	if (cmd->enable) {
+		vs_events_mask |= BT_EVT_MASK_VS_LE_ADV_REPORT;
+	} else {
+		vs_events_mask &= ~BT_EVT_MASK_VS_LE_ADV_REPORT;
+	}
+	*evt = cmd_complete_status(0x00);
+}
+#endif /* CONFIG_BT_CTLR_VS_ADV_REPORT_RX */
 
 #if defined(CONFIG_BT_CTLR_TX_PWR_DYNAMIC_CONTROL)
 static void vs_write_tx_power_level(struct net_buf *buf, struct net_buf **evt)
@@ -5780,6 +5798,12 @@ int hci_vendor_cmd_handle_common(uint16_t ocf, struct net_buf *cmd,
 		vs_set_scan_req_reports(cmd, evt);
 		break;
 #endif /* CONFIG_BT_CTLR_VS_SCAN_REQ_RX */
+
+#if defined(CONFIG_BT_CTLR_VS_ADV_REPORT_RX)
+	case BT_OCF(BT_HCI_OP_VS_SET_ADV_REPORTS):
+		vs_set_adv_reports(cmd, evt);
+		break;
+#endif /* CONFIG_BT_CTLR_VS_ADV_REPORT_RX */
 
 #if defined(CONFIG_BT_CTLR_TX_PWR_DYNAMIC_CONTROL)
 	case BT_OCF(BT_HCI_OP_VS_WRITE_TX_POWER_LEVEL):
@@ -6659,6 +6683,67 @@ static inline void le_mesh_scan_report(struct pdu_adv *adv,
 }
 #endif /* CONFIG_BT_HCI_MESH_EXT */
 
+#if defined(CONFIG_BT_CTLR_VS_ADV_REPORT_RX)
+static void le_vs_advertising_report(struct pdu_adv *adv,
+				     struct node_rx_pdu *node_rx,
+				     struct net_buf *buf, uint8_t evt_type,
+				     int8_t rssi, uint8_t data_len)
+{
+	struct bt_hci_evt_vs_le_adv_report *sep;
+	struct bt_hci_evt_vs_le_adv_info *adv_info;
+	uint8_t info_len;
+	int8_t *prssi;
+	uint8_t *pchan;
+	struct net_buf *vs_buf;
+
+#if defined(CONFIG_BT_CTLR_PRIVACY)
+	uint8_t rl_idx = node_rx->rx_ftr.rl_idx;
+#endif /* CONFIG_BT_CTLR_PRIVACY */
+
+	if (!(vs_events_mask & BT_EVT_MASK_VS_LE_ADV_REPORT)) {
+		return;
+	}
+
+	vs_buf = bt_buf_get_rx(BT_BUF_EVT, K_FOREVER);
+	info_len = sizeof(struct bt_hci_evt_vs_le_adv_info) + data_len +
+		   sizeof(*prssi) + sizeof(*pchan);
+	sep = vs_event(vs_buf, BT_HCI_EVT_VS_LE_ADV_REPORT,
+		       sizeof(*sep) + info_len);
+
+	sep->num_reports = 1U;
+	adv_info = (void *)(((uint8_t *)sep) + sizeof(*sep));
+
+	adv_info->evt_type = evt_type;
+
+#if defined(CONFIG_BT_CTLR_PRIVACY)
+	if (rl_idx < ll_rl_size_get()) {
+		/* Store identity address */
+		ll_rl_id_addr_get(rl_idx, &adv_info->addr.type,
+				  &adv_info->addr.a.val[0]);
+		/* Mark it as identity address from RPA (0x02, 0x03) */
+		MARK_AS_IDENTITY_ADDR(adv_info->addr.type);
+	} else {
+#else
+	if (1) {
+#endif /* CONFIG_BT_CTLR_PRIVACY */
+		adv_info->addr.type = adv->tx_addr;
+		memcpy(&adv_info->addr.a.val[0], &adv->adv_ind.addr[0],
+		       sizeof(bt_addr_t));
+	}
+
+	adv_info->length = data_len;
+	memcpy(&adv_info->data[0], &adv->adv_ind.data[0], data_len);
+	/* RSSI */
+	prssi = (int8_t *)(&adv_info->data[0] + data_len);
+	*prssi = rssi;
+	/* Channel index */
+	pchan = (uint8_t *)(prssi + 1);
+	*pchan = node_rx->rx_ftr.adv_chan_idx;
+
+	net_buf_frag_add(buf, vs_buf);
+}
+#endif /* CONFIG_BT_CTLR_VS_ADV_REPORT_RX */
+
 static void le_advertising_report(struct pdu_data *pdu_data,
 				  struct node_rx_pdu *node_rx,
 				  struct net_buf *buf)
@@ -6761,6 +6846,11 @@ static void le_advertising_report(struct pdu_data *pdu_data,
 	/* RSSI */
 	prssi = &adv_info->data[0] + data_len;
 	*prssi = rssi;
+
+#if defined(CONFIG_BT_CTLR_VS_ADV_REPORT_RX)
+	le_vs_advertising_report(adv, node_rx, buf, c_adv_type[adv->type],
+				 rssi, data_len);
+#endif /* CONFIG_BT_CTLR_VS_ADV_REPORT_RX */
 }
 
 #if defined(CONFIG_BT_CTLR_ADV_EXT)

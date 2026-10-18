@@ -402,6 +402,10 @@ struct node_rx_ftr {
 #if defined(CONFIG_BT_HCI_MESH_EXT)
 	uint8_t  chan_idx;
 #endif /* CONFIG_BT_HCI_MESH_EXT */
+
+#if defined(CONFIG_BT_CTLR_VS_ADV_REPORT_RX)
+	uint8_t  adv_chan_idx;
+#endif /* CONFIG_BT_CTLR_VS_ADV_REPORT_RX */
 };
 
 /* Meta-information for isochronous PDUs in node_rx_hdr */
