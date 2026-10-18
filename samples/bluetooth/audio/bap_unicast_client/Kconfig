@@ -15,4 +15,73 @@ config ISO_PACKING_INTERLEAVED
 	help
 	  Use interleaved packing between CIS ISO stream subevents.
 
+choice AUDIO_IO
+	prompt "Audio input and output"
+	default USE_USB_AUDIO if DT_HAS_ZEPHYR_UAC2_ENABLED
+	default USE_SINE_AUDIO
+	help
+	  Source of the audio sent on the sink streams and destination of the
+	  audio received on the source streams.
+
+config USE_SINE_AUDIO
+	bool "Sine tone"
+	help
+	  Encode a sine tone when LC3 is enabled, and only count the received
+	  audio.
+
+config USE_USB_AUDIO
+	bool "USB headset"
+	depends on DT_HAS_ZEPHYR_UAC2_ENABLED
+	select LIBLC3
+	select FPU
+	select USB_DEVICE_STACK_NEXT
+	select USBD_AUDIO2_CLASS
+	help
+	  Appear as a USB headset to the USB host. Speaker audio from the host
+	  is encoded on the left and right sink streams; the source stream is
+	  decoded and sent to the host as the microphone.
+
+endchoice
+
+choice SINK_PRESET
+	prompt "LC3 preset of the sink streams"
+	default SINK_PRESET_48_2_1 if USE_USB_AUDIO && SOC_NRF5340_CPUAPP
+	default SINK_PRESET_24_2_1 if USE_USB_AUDIO
+	default SINK_PRESET_16_2_1
+
+config SINK_PRESET_16_2_1
+	bool "16_2_1"
+
+config SINK_PRESET_24_2_1
+	bool "24_2_1"
+
+config SINK_PRESET_48_2_1
+	bool "48_2_1"
+
+endchoice
+
+choice SOURCE_PRESET
+	prompt "LC3 preset of the source streams"
+	default SOURCE_PRESET_16_2_1
+
+config SOURCE_PRESET_16_2_1
+	bool "16_2_1"
+
+config SOURCE_PRESET_24_2_1
+	bool "24_2_1"
+
+endchoice
+
+if USE_USB_AUDIO
+
+config SAMPLE_USBD_PRODUCT
+	default "LE Audio Unicast Client headset"
+
+# Source common USB sample options used to initialize new experimental USB device stack.
+# The scope of these options is limited to USB samples in project tree,
+# you cannot use them in your own application.
+source "samples/subsys/usb/common/Kconfig.sample_usbd"
+
+endif # USE_USB_AUDIO
+
 source "Kconfig.zephyr"

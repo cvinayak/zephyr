@@ -29,6 +29,7 @@
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/kernel.h>
 #include <zephyr/net_buf.h>
+#include <zephyr/sys/atomic.h>
 #include <zephyr/sys/__assert.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/printk.h>
@@ -38,6 +39,13 @@
 #include <zephyr/types.h>
 
 #include "stream_tx.h"
+
+#if defined(CONFIG_USE_USB_AUDIO)
+#include <lc3.h>
+
+#include "stream_lc3.h"
+#include "usb.h"
+#endif /* CONFIG_USE_USB_AUDIO */
 
 static void start_scan(void);
 
@@ -60,12 +68,42 @@ static size_t configured_source_stream_count;
 #define configured_stream_count (configured_sink_stream_count + \
 				 configured_source_stream_count)
 
-/* Select a codec configuration to apply that is mandatory to support by both client and server.
+/* Select codec configurations to apply that are mandatory to support by both client and server.
  * Allows this sample application to work without logic to parse the codec capabilities of the
  * server and selection of an appropriate codec configuration.
  */
-static struct bt_bap_lc3_preset codec_configuration = BT_BAP_LC3_UNICAST_PRESET_16_2_1(
-	BT_AUDIO_LOCATION_FRONT_LEFT, BT_AUDIO_CONTEXT_TYPE_UNSPECIFIED);
+#if defined(CONFIG_SINK_PRESET_48_2_1)
+#define SINK_PRESET BT_BAP_LC3_UNICAST_PRESET_48_2_1
+#elif defined(CONFIG_SINK_PRESET_24_2_1)
+#define SINK_PRESET BT_BAP_LC3_UNICAST_PRESET_24_2_1
+#else
+#define SINK_PRESET BT_BAP_LC3_UNICAST_PRESET_16_2_1
+#endif
+
+#if defined(CONFIG_SOURCE_PRESET_24_2_1)
+#define SOURCE_PRESET BT_BAP_LC3_UNICAST_PRESET_24_2_1
+#else
+#define SOURCE_PRESET BT_BAP_LC3_UNICAST_PRESET_16_2_1
+#endif
+
+#if defined(CONFIG_USE_USB_AUDIO)
+#define SINK_CONTEXT   BT_AUDIO_CONTEXT_TYPE_MEDIA
+#define SOURCE_CONTEXT BT_AUDIO_CONTEXT_TYPE_CONVERSATIONAL
+#else
+#define SINK_CONTEXT   BT_AUDIO_CONTEXT_TYPE_UNSPECIFIED
+#define SOURCE_CONTEXT BT_AUDIO_CONTEXT_TYPE_UNSPECIFIED
+#endif
+
+/* Sink streams alternate between the left and right channel */
+static const struct bt_bap_lc3_preset sink_preset_left =
+	SINK_PRESET(BT_AUDIO_LOCATION_FRONT_LEFT, SINK_CONTEXT);
+static const struct bt_bap_lc3_preset sink_preset_right =
+	SINK_PRESET(BT_AUDIO_LOCATION_FRONT_RIGHT, SINK_CONTEXT);
+static const struct bt_bap_lc3_preset source_preset =
+	SOURCE_PRESET(BT_AUDIO_LOCATION_FRONT_LEFT, SOURCE_CONTEXT);
+
+/* Codec configuration of each stream, the stream keeps a reference to it */
+static struct bt_bap_lc3_preset stream_presets[ARRAY_SIZE(streams)];
 
 static K_SEM_DEFINE(sem_connected, 0U, 1U);
 static K_SEM_DEFINE(sem_disconnected, 0U, 1U);
@@ -78,6 +116,148 @@ static K_SEM_DEFINE(sem_stream_qos, 0U, ARRAY_SIZE(sinks) + ARRAY_SIZE(sources))
 static K_SEM_DEFINE(sem_stream_enabled, 0U, 1U);
 static K_SEM_DEFINE(sem_stream_started, 0U, 1U);
 static K_SEM_DEFINE(sem_stream_connected, 0U, 1U);
+
+#if defined(CONFIG_USE_USB_AUDIO)
+#define MIC_SDU_LEN_MAX     155U
+#define MIC_PCM_SAMPLES_MAX (USB_SAMPLE_RATE_HZ / 100U)
+#define MIC_SDU_COUNT       4U
+#define MIC_STACK_SIZE      4096U
+#define MIC_PRIO            K_PRIO_PREEMPT(5)
+
+struct mic_sdu {
+	uint32_t freq_hz;
+	uint32_t frame_dur_us;
+	uint16_t octets_per_frame;
+	uint16_t len;
+	uint8_t data[MIC_SDU_LEN_MAX];
+};
+
+K_MSGQ_DEFINE(mic_sdu_q, sizeof(struct mic_sdu), MIC_SDU_COUNT, 4);
+static struct bt_bap_stream *mic_stream;
+static struct mic_sdu mic_cfg;
+static atomic_t mic_sdu_dropped;
+
+/* Use the first source stream as the USB microphone */
+static void mic_stream_start(struct bt_bap_stream *stream)
+{
+	const struct bt_audio_codec_cfg *codec_cfg = stream->codec_cfg;
+	int ret;
+
+	if (mic_stream != NULL) {
+		return;
+	}
+
+	ret = bt_audio_codec_cfg_get_freq(codec_cfg);
+	if (ret < 0) {
+		printk("Could not get source stream frequency: %d\n", ret);
+		return;
+	}
+
+	mic_cfg.freq_hz = (uint32_t)bt_audio_codec_cfg_freq_to_freq_hz(ret);
+
+	ret = bt_audio_codec_cfg_get_frame_dur(codec_cfg);
+	if (ret < 0) {
+		printk("Could not get source stream frame duration: %d\n", ret);
+		return;
+	}
+
+	mic_cfg.frame_dur_us = (uint32_t)bt_audio_codec_cfg_frame_dur_to_frame_dur_us(ret);
+
+	ret = bt_audio_codec_cfg_get_octets_per_frame(codec_cfg);
+	if (ret <= 0 || ret > MIC_SDU_LEN_MAX) {
+		printk("Unsupported source stream octets per frame: %d\n", ret);
+		return;
+	}
+
+	mic_cfg.octets_per_frame = (uint16_t)ret;
+	mic_stream = stream;
+
+	printk("Source stream %p to USB microphone: %u Hz, %u us, %u octets\n", stream,
+	       mic_cfg.freq_hz, mic_cfg.frame_dur_us, mic_cfg.octets_per_frame);
+}
+
+static void mic_stream_stop(struct bt_bap_stream *stream)
+{
+	if (mic_stream == stream) {
+		mic_stream = NULL;
+		k_msgq_purge(&mic_sdu_q);
+	}
+}
+
+static void mic_sdu_recv(struct bt_bap_stream *stream, const struct bt_iso_recv_info *info,
+			 const struct net_buf *buf)
+{
+	struct mic_sdu sdu;
+
+	if (stream != mic_stream) {
+		return;
+	}
+
+	sdu = mic_cfg;
+	sdu.len = 0U;
+
+	/* An empty SDU makes the decoder conceal the lost frame */
+	if ((info->flags & BT_ISO_FLAGS_VALID) != 0U && buf->len == sdu.octets_per_frame) {
+		sdu.len = buf->len;
+		(void)memcpy(sdu.data, buf->data, buf->len);
+	}
+
+	if (k_msgq_put(&mic_sdu_q, &sdu, K_NO_WAIT) != 0) {
+		atomic_inc(&mic_sdu_dropped);
+	}
+}
+
+/* Decode the source stream to 48 kHz and send it to the USB microphone */
+static void mic_thread_func(void *p1, void *p2, void *p3)
+{
+	static lc3_decoder_mem_48k_t decoder_mem;
+	static int16_t pcm[MIC_PCM_SAMPLES_MAX];
+	static struct mic_sdu sdu;
+	lc3_decoder_t decoder = NULL;
+	uint32_t freq_hz = 0U;
+	uint32_t frame_dur_us = 0U;
+
+	ARG_UNUSED(p1);
+	ARG_UNUSED(p2);
+	ARG_UNUSED(p3);
+
+	while (true) {
+		size_t samples;
+		int err;
+
+		(void)k_msgq_get(&mic_sdu_q, &sdu, K_FOREVER);
+
+		if (decoder == NULL || sdu.freq_hz != freq_hz || sdu.frame_dur_us != frame_dur_us) {
+			decoder = lc3_setup_decoder(sdu.frame_dur_us, sdu.freq_hz,
+						    USB_SAMPLE_RATE_HZ, &decoder_mem);
+			if (decoder == NULL) {
+				printk("Failed to setup LC3 decoder for %u Hz %u us\n",
+				       sdu.freq_hz, sdu.frame_dur_us);
+				continue;
+			}
+
+			freq_hz = sdu.freq_hz;
+			frame_dur_us = sdu.frame_dur_us;
+		}
+
+		samples = ((size_t)frame_dur_us * USB_SAMPLE_RATE_HZ) / USEC_PER_SEC;
+		if (samples > ARRAY_SIZE(pcm)) {
+			continue;
+		}
+
+		err = lc3_decode(decoder, sdu.len > 0U ? sdu.data : NULL, sdu.len,
+				 LC3_PCM_FORMAT_S16, pcm, 1);
+		if (err < 0) {
+			printk("LC3 decode failed: %d\n", err);
+			continue;
+		}
+
+		usb_audio_pcm_put(pcm, samples, 1U);
+	}
+}
+
+K_THREAD_DEFINE(mic_thread, MIC_STACK_SIZE, mic_thread_func, NULL, NULL, NULL, MIC_PRIO, 0, 0);
+#endif /* CONFIG_USE_USB_AUDIO */
 
 static void print_hex(const uint8_t *ptr, size_t len)
 {
@@ -294,6 +474,14 @@ static void stream_started(struct bt_bap_stream *stream)
 		}
 	}
 
+#if defined(CONFIG_USE_USB_AUDIO)
+	struct bt_bap_ep_info ep_info;
+
+	if (bt_bap_ep_get_info(stream->ep, &ep_info) == 0 && ep_info.dir == BT_AUDIO_DIR_SOURCE) {
+		mic_stream_start(stream);
+	}
+#endif /* CONFIG_USE_USB_AUDIO */
+
 	k_sem_give(&sem_stream_started);
 }
 
@@ -319,6 +507,10 @@ static void stream_stopped(struct bt_bap_stream *stream, uint8_t reason)
 			printk("Failed to unregister stream %p for TX: %d", stream, err);
 		}
 	}
+
+#if defined(CONFIG_USE_USB_AUDIO)
+	mic_stream_stop(stream);
+#endif /* CONFIG_USE_USB_AUDIO */
 }
 
 static void stream_released(struct bt_bap_stream *stream)
@@ -337,8 +529,16 @@ static void stream_recv(struct bt_bap_stream *stream,
 		    (unicast_audio_recv_ctr % CONFIG_INFO_REPORTING_INTERVAL) == 0U) {
 			printk("Incoming audio on stream %p len %u (%" PRIu64 ")\n", stream,
 			       buf->len, unicast_audio_recv_ctr);
+#if defined(CONFIG_USE_USB_AUDIO)
+			printk("Microphone SDUs dropped: %ld\n", atomic_get(&mic_sdu_dropped));
+			usb_audio_stats_log();
+#endif /* CONFIG_USE_USB_AUDIO */
 		}
 	}
+
+#if defined(CONFIG_USE_USB_AUDIO)
+	mic_sdu_recv(stream, info, buf);
+#endif /* CONFIG_USE_USB_AUDIO */
 }
 
 static struct bt_bap_stream_ops stream_ops = {
@@ -564,6 +764,16 @@ static int init(void)
 		stream_tx_init();
 	}
 
+#if defined(CONFIG_USE_USB_AUDIO)
+	err = usb_audio_init();
+	if (err != 0) {
+		printk("USB audio init failed (err %d)\n", err);
+		return err;
+	}
+
+	stream_lc3_pcm_source_set(usb_audio_pcm_get);
+#endif /* CONFIG_USE_USB_AUDIO */
+
 	return 0;
 }
 
@@ -642,11 +852,15 @@ static int discover_sources(void)
 	return 0;
 }
 
-static int configure_stream(struct bt_bap_stream *stream, struct bt_bap_ep *ep)
+static int configure_stream(struct bt_bap_stream *stream, struct bt_bap_ep *ep,
+			    const struct bt_bap_lc3_preset *preset)
 {
+	struct bt_bap_lc3_preset *stream_preset = &stream_presets[ARRAY_INDEX(streams, stream)];
 	int err;
 
-	err = bt_bap_stream_config(default_conn, stream, ep, &codec_configuration.codec_cfg);
+	*stream_preset = *preset;
+
+	err = bt_bap_stream_config(default_conn, stream, ep, &stream_preset->codec_cfg);
 	if (err != 0) {
 		return err;
 	}
@@ -667,12 +881,15 @@ static int configure_streams(void)
 	for (size_t i = 0U; i < ARRAY_SIZE(sinks); i++) {
 		struct bt_bap_ep *ep = sinks[i].ep;
 		struct bt_bap_stream *stream = &streams[i];
+		const struct bt_bap_lc3_preset *preset;
 
 		if (ep == NULL) {
 			continue;
 		}
 
-		err = configure_stream(stream, ep);
+		preset = (configured_sink_stream_count % 2U) == 0U ? &sink_preset_left
+								   : &sink_preset_right;
+		err = configure_stream(stream, ep, preset);
 		if (err != 0) {
 			printk("Could not configure sink stream[%zu]: %d\n",
 			       i, err);
@@ -691,7 +908,7 @@ static int configure_streams(void)
 			continue;
 		}
 
-		err = configure_stream(stream, ep);
+		err = configure_stream(stream, ep, &source_preset);
 		if (err != 0) {
 			printk("Could not configure source stream[%zu]: %d\n",
 			       i, err);
@@ -716,7 +933,7 @@ static int create_group(void)
 
 	for (size_t i = 0U; i < configured_stream_count; i++) {
 		stream_params[i].stream = &streams[i];
-		stream_params[i].qos = &codec_configuration.qos;
+		stream_params[i].qos = &stream_presets[i].qos;
 	}
 
 	for (size_t i = 0U; i < params_count; i++) {
@@ -788,8 +1005,8 @@ static int enable_streams(void)
 	for (size_t i = 0U; i < configured_stream_count; i++) {
 		int err;
 
-		err = bt_bap_stream_enable(&streams[i], codec_configuration.codec_cfg.meta,
-					   codec_configuration.codec_cfg.meta_len);
+		err = bt_bap_stream_enable(&streams[i], stream_presets[i].codec_cfg.meta,
+					   stream_presets[i].codec_cfg.meta_len);
 		if (err != 0) {
 			printk("Unable to enable stream: %d\n", err);
 			return err;

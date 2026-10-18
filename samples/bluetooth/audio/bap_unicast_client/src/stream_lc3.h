@@ -7,6 +7,8 @@
 #ifndef STREAM_LC3_H
 #define STREAM_LC3_H
 
+#include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include <zephyr/bluetooth/assigned_numbers.h>
@@ -35,6 +37,27 @@ struct stream_lc3_tx {
 
 /* Opaque definition to avoid including stream_tx.h */
 struct tx_stream;
+
+/**
+ * @brief Callback providing PCM input for the LC3 encoder
+ *
+ * @param chan_allocation Audio location of the channel to provide
+ * @param freq_hz Sampling rate of the requested samples
+ * @param pcm Buffer to fill with 16-bit mono samples
+ * @param samples Number of samples to provide
+ *
+ * @retval true @p pcm filled with audio
+ * @retval false No audio available, @p pcm filled with silence
+ */
+typedef bool (*stream_lc3_pcm_get_t)(enum bt_audio_location chan_allocation, uint32_t freq_hz,
+				     int16_t *pcm, size_t samples);
+
+/**
+ * @brief Set the PCM input for the LC3 encoder
+ *
+ * @param pcm_get Callback providing PCM input, or NULL to encode a sine tone
+ */
+void stream_lc3_pcm_source_set(stream_lc3_pcm_get_t pcm_get);
 
 /*
  * @brief Initialize LC3 encoder for a stream

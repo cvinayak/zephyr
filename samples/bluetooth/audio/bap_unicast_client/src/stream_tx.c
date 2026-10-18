@@ -32,7 +32,7 @@
 
 LOG_MODULE_REGISTER(stream_tx, LOG_LEVEL_INF);
 
-static struct tx_stream tx_streams[CONFIG_BT_BAP_UNICAST_CLIENT_ASE_SRC_COUNT];
+static struct tx_stream tx_streams[CONFIG_BT_BAP_UNICAST_CLIENT_ASE_SNK_COUNT];
 
 static bool stream_is_streaming(const struct bt_bap_stream *bap_stream)
 {
