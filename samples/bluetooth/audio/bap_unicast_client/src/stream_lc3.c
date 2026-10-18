@@ -36,6 +36,31 @@ LOG_MODULE_REGISTER(lc3, LOG_LEVEL_INF);
 #define AUDIO_TONE_FREQUENCY_HZ   400U
 
 static int16_t audio_buf[LC3_MAX_NUM_SAMPLES];
+static stream_lc3_pcm_get_t pcm_source;
+
+void stream_lc3_pcm_source_set(stream_lc3_pcm_get_t pcm_get)
+{
+	pcm_source = pcm_get;
+}
+
+/* Location of the index'th channel in the channel allocation, or mono */
+static enum bt_audio_location chan_location(enum bt_audio_location chan_allocation, uint8_t index)
+{
+	for (uint8_t bit = 0U; bit < 32U; bit++) {
+		const enum bt_audio_location loc = (enum bt_audio_location)BIT(bit);
+
+		if ((chan_allocation & loc) != 0U) {
+			if (index == 0U) {
+				return loc;
+			}
+
+			index--;
+		}
+	}
+
+	return BT_AUDIO_LOCATION_MONO_AUDIO;
+}
+
 /**
  * Use the math lib to generate a sine-wave using 16 bit samples into a buffer.
  *
@@ -137,10 +162,16 @@ static bool encode_frame(struct tx_stream *stream, uint8_t index, struct net_buf
 	const uint16_t octets_per_frame = stream->lc3_tx.octets_per_frame;
 	int lc3_ret;
 
-	ARG_UNUSED(index);
+	if (pcm_source != NULL) {
+		const size_t num_samples =
+			(stream->lc3_tx.frame_duration_us * stream->lc3_tx.freq_hz) / USEC_PER_SEC;
 
-	/* Generate sine wave */
-	fill_audio_buf_sin(stream);
+		(void)pcm_source(chan_location(stream->lc3_tx.chan_allocation, index),
+				 stream->lc3_tx.freq_hz, audio_buf, num_samples);
+	} else {
+		/* Generate sine wave */
+		fill_audio_buf_sin(stream);
+	}
 
 	lc3_ret = lc3_encode(stream->lc3_tx.encoder, LC3_PCM_FORMAT_S16, audio_buf, 1,
 			     octets_per_frame, net_buf_tail(out_buf));
