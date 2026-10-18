@@ -10,4 +10,63 @@ config INFO_REPORTING_INTERVAL
 	  Determines how often information about received data is logged.
 	  Set to 0 to disable reporting.
 
+choice AUDIO_IO
+	prompt "Audio input and output"
+	default USE_TLV320_AUDIO if BOARD_NRF54L15DK_NRF54L15_CPUAPP
+	default USE_USB_AUDIO if DT_HAS_ZEPHYR_UAC2_ENABLED
+	default USE_SINE_AUDIO
+	help
+	  Destination of the audio received on the sink streams and source of
+	  the audio sent on the source stream.
+
+config USE_SINE_AUDIO
+	bool "Sine tone"
+	help
+	  Encode a sine tone on the source stream when LC3 is enabled, and
+	  decode the sink streams without playing them.
+
+config USE_USB_AUDIO
+	bool "USB headset"
+	depends on DT_HAS_ZEPHYR_UAC2_ENABLED
+	select LIBLC3
+	select FPU
+	select USB_DEVICE_STACK_NEXT
+	select USBD_AUDIO2_CLASS
+	help
+	  Appear as a USB headset to the USB host. The left and right sink
+	  streams are sent to the host as a stereo microphone; the speaker
+	  audio from the host is encoded on the source stream.
+
+config USE_TLV320_AUDIO
+	bool "TLV320 audio codec"
+	depends on BOARD_NRF54L15DK_NRF54L15_CPUAPP
+	select LIBLC3
+	select FPU
+	help
+	  Play the left and right sink streams on a TLV320AIC3100 family
+	  codec connected over I2S and I2C.
+
+endchoice
+
+config TLV320_MIC
+	bool "TLV320 microphone input"
+	default y
+	depends on USE_TLV320_AUDIO
+	help
+	  Power up the TLV320 microphone bias, PGA and ADC, receive the ADC
+	  output on I2S SDIN and encode it on the source stream. Requires a
+	  codec with an ADC, such as the TLV320AIC3100 or TLV320AIC3110.
+
+if USE_USB_AUDIO
+
+config SAMPLE_USBD_PRODUCT
+	default "LE Audio Unicast Server headset"
+
+# Source common USB sample options used to initialize new experimental USB device stack.
+# The scope of these options is limited to USB samples in project tree,
+# you cannot use them in your own application.
+source "samples/subsys/usb/common/Kconfig.sample_usbd"
+
+endif # USE_USB_AUDIO
+
 source "Kconfig.zephyr"

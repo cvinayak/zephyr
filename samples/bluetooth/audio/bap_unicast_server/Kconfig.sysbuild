@@ -8,8 +8,14 @@ config NET_CORE_BOARD
 	default "nrf5340dk/nrf5340/cpunet" if "$(BOARD)" = "nrf5340dk"
 	default "nrf5340_audio_dk/nrf5340/cpunet" if "$(BOARD)" = "nrf5340_audio_dk"
 	default "nrf5340bsim/nrf5340/cpunet" if $(BOARD_TARGET_STRING) = "NRF5340BSIM_NRF5340_CPUAPP"
+	default "$(BOARD)/nrf54l15/cpuflpr" if $(BOARD) = "nrf54l15dk"
 
 config NET_CORE_IMAGE_HCI_IPC
 	bool "HCI IPC image on network core"
 	default y
 	depends on NET_CORE_BOARD != ""
+	help
+	  Build the Bluetooth Controller as the hci_ipc image on the network
+	  core, or on the FLPR core of the nrf54l15dk. On the nrf54l15dk,
+	  disable to build the Bluetooth Controller into the application core
+	  image instead.
