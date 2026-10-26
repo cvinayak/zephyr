@@ -227,6 +227,26 @@ void ticker_job_sched(uint8_t instance_index, uint8_t user_id);
 uint32_t ticker_ticks_now_get(void);
 uint32_t ticker_ticks_diff_get(uint32_t ticks_now, uint32_t ticks_old);
 
+#if defined(CONFIG_BT_CTLR_PROFILE_ISR)
+#define TICKER_PROF_EXPIRE_MAX 4U
+
+/* Ticker node with ticks_slot expired with its timeout callback invoked */
+struct ticker_prof_expire {
+	uint32_t ticks_at_expire;
+	uint32_t ticks_slot;
+	uint32_t ticks_slot_previous;   /* Remaining reservation seen by worker */
+	uint32_t ticks_to_expire_minus; /* Lateness when started */
+	uint32_t ticks_drift;
+	uint16_t lazy;
+	uint8_t  ticker_id;
+	uint8_t  ticker_id_slot_previous;
+	uint8_t  slot_reserved;         /* Reserved by node expired in same pass */
+};
+
+/* Copy the most recent expiries, oldest first, returns the count copied */
+uint8_t ticker_prof_expire_get(struct ticker_prof_expire *expire);
+#endif /* CONFIG_BT_CTLR_PROFILE_ISR */
+
 #if !defined(CONFIG_BT_TICKER_LOW_LAT) && \
 	!defined(CONFIG_BT_TICKER_SLOT_AGNOSTIC)
 uint8_t ticker_priority_set(uint8_t instance_index, uint8_t user_id,

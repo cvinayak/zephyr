@@ -315,6 +315,10 @@ static int prepare_cb_common(struct lll_prepare_param *p)
 
 	lll = p->param;
 
+	if (IS_ENABLED(CONFIG_BT_CTLR_PROFILE_ISR) && (lll->is_lll_resume != 0U)) {
+		lll_prof_chain_resume();
+	}
+
 	/* Check if stopped (on disconnection between prepare and preempt)
 	 */
 	if (unlikely(lll->is_lll_stop != 0U)) {

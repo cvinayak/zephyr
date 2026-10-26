@@ -8,8 +8,10 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <errno.h>
+#include <string.h>
 
 #include <zephyr/toolchain.h>
+#include <zephyr/sys/util.h>
 
 #include "hal/ccm.h"
 #include "hal/radio.h"
@@ -101,17 +103,100 @@ static uint16_t cputime_ticks_ull_low;
 static uint16_t cputime_ticks_overhead;
 static uint16_t cputime_ticks_overhead_max;
 
-void lll_prof_enter_radio(void)
+/* Priority-0 handlers (radio, radio timer and LLL) execute back-to-back
+ * without nesting. A handler entered within LLL_PROF_CHAIN_GAP_US of the
+ * previous handler exit is accounted as continuing the same chain of
+ * continuous CPU usage; this covers the exception tail-chaining, ISR wrapper
+ * and profiling sample overheads at ticker tick resolution.
+ */
+#define LLL_PROF_CHAIN_GAP_US 2U
+
+static void chain_enter(uint8_t type);
+static void chain_exit(void);
+static void chain_copy(uint8_t *dst_dur, uint8_t len);
+
+static uint32_t chain_ticks_start;
+static uint32_t chain_ticks_exit;
+static uint32_t chain_ticks_handler;
+static uint16_t chain_seq;
+static uint8_t chain_cnt;
+static uint8_t chain_dur[PROFILE_CHAIN_LEN_MAX];
+static bool chain_valid;
+static bool chain_chg;
+
+static uint16_t chain_max_us;
+static uint16_t chain_max_seq;
+static uint8_t chain_max_cnt;
+static uint8_t chain_max_dur[PROFILE_CHAIN_LEN_MAX];
+
+static uint16_t overhead_max_chain_us;
+static int16_t overhead_max_chain_lead;
+static uint16_t overhead_max_chain_seq;
+static uint8_t overhead_max_chain_cnt;
+static uint8_t overhead_max_ticker_id;
+static uint8_t overhead_max_chain_dur[PROFILE_CHAIN_LEN_MAX];
+
+/* Ticker id of the prepare executed in each chain handler */
+static uint8_t chain_tag[PROFILE_CHAIN_LEN_MAX];
+static uint8_t chain_max_tag[PROFILE_CHAIN_LEN_MAX];
+static uint8_t overhead_max_chain_tag[PROFILE_CHAIN_LEN_MAX];
+
+/* Ticker expiry relative to chain start and ticks_slot of the tagged prepare */
+static int16_t chain_at[PROFILE_CHAIN_LEN_MAX];
+static uint16_t chain_slot[PROFILE_CHAIN_LEN_MAX];
+static int16_t chain_max_at[PROFILE_CHAIN_LEN_MAX];
+static uint16_t chain_max_slot[PROFILE_CHAIN_LEN_MAX];
+static int16_t overhead_max_chain_at[PROFILE_CHAIN_LEN_MAX];
+static uint16_t overhead_max_chain_slot[PROFILE_CHAIN_LEN_MAX];
+
+BUILD_ASSERT(TICKER_PROF_EXPIRE_MAX == PROFILE_TICKER_LEN_MAX);
+
+/* Reserved ticker expiries preceding the max chain */
+static struct ticker_prof_expire chain_max_tkr[TICKER_PROF_EXPIRE_MAX];
+static uint8_t chain_max_tkr_cnt;
+static uint32_t chain_max_ticks_start;
+
+/* Handler executing a resume prepare */
+static uint32_t chain_ticks_resume;
+static bool chain_resume_valid;
+
+static int16_t ticks_rel_us(uint32_t ticks, uint32_t ticks_ref);
+
+static inline void radio_enter(void)
 {
 	sample(&timestamp_radio);
 	sample_ticks(&timestamp_ticks_radio);
 }
 
-void lll_prof_exit_radio(void)
+static inline void radio_exit(void)
 {
 	delta(timestamp_radio, &cputime_radio);
 	delta_ticks(timestamp_ticks_radio, &cputime_ticks_radio);
 	LLL_PROF_ASSERT(cputime_ticks_radio, HAL_TICKER_US_TO_TICKS(LLL_PROF_RADIO_MAX_US));
+}
+
+void lll_prof_enter_radio(void)
+{
+	chain_enter(PROFILE_CHAIN_RADIO);
+	radio_enter();
+}
+
+void lll_prof_exit_radio(void)
+{
+	radio_exit();
+	chain_exit();
+}
+
+void lll_prof_enter_radio_tmr(void)
+{
+	chain_enter(PROFILE_CHAIN_RADIO_TMR);
+	radio_enter();
+}
+
+void lll_prof_exit_radio_tmr(void)
+{
+	radio_exit();
+	chain_exit();
 }
 
 uint16_t lll_prof_radio_get(void)
@@ -121,6 +206,8 @@ uint16_t lll_prof_radio_get(void)
 
 void lll_prof_enter_lll(void)
 {
+	chain_enter(PROFILE_CHAIN_LLL);
+
 	sample(&timestamp_lll);
 	sample_ticks(&timestamp_ticks_lll);
 }
@@ -130,6 +217,8 @@ void lll_prof_exit_lll(void)
 	delta(timestamp_lll, &cputime_lll);
 	delta_ticks(timestamp_ticks_lll, &cputime_ticks_lll);
 	LLL_PROF_ASSERT(cputime_ticks_lll, HAL_TICKER_US_TO_TICKS(LLL_PROF_LLL_MAX_US));
+
+	chain_exit();
 }
 
 uint16_t lll_prof_lll_get(void)
@@ -173,12 +262,158 @@ uint16_t lll_prof_ull_low_get(void)
 	return HAL_TICKER_TICKS_TO_US(cputime_ticks_ull_low);
 }
 
-void lll_prof_overhead(uint16_t overhead_ticks)
+void lll_prof_overhead(uint16_t overhead_ticks, uint32_t ticks_at_event, uint8_t ticker_id)
 {
+	uint32_t ticks_now;
+	uint32_t us;
+
 	cputime_ticks_overhead = overhead_ticks;
-	if (overhead_ticks > cputime_ticks_overhead_max) {
-		cputime_ticks_overhead_max = overhead_ticks;
+	if (overhead_ticks <= cputime_ticks_overhead_max) {
+		return;
 	}
+
+	cputime_ticks_overhead_max = overhead_ticks;
+	overhead_max_ticker_id = ticker_id;
+	chain_chg = true;
+
+	/* Overhead sampled outside a priority-0 handler, no chain to snapshot */
+	if (!chain_valid) {
+		return;
+	}
+
+	ticks_now = ticker_ticks_now_get();
+	overhead_max_chain_us = MIN(HAL_TICKER_TICKS_TO_US(ticks_now - chain_ticks_start),
+				    UINT16_MAX);
+
+	/* Positive lead when the chain started before the preempt timeout */
+	overhead_max_chain_lead = -ticks_rel_us(chain_ticks_start, ticks_at_event);
+
+	/* Current handler duration until the overhead sample */
+	if (chain_cnt <= PROFILE_CHAIN_LEN_MAX) {
+		us = HAL_TICKER_TICKS_TO_US(ticks_now - chain_ticks_handler);
+		chain_dur[chain_cnt - 1U] = MIN(us, UINT8_MAX);
+	}
+
+	overhead_max_chain_seq = chain_seq;
+	overhead_max_chain_cnt = chain_cnt;
+	chain_copy(overhead_max_chain_dur, chain_cnt);
+	(void)memcpy(overhead_max_chain_tag, chain_tag, sizeof(chain_tag));
+	(void)memcpy(overhead_max_chain_at, chain_at, sizeof(chain_at));
+	(void)memcpy(overhead_max_chain_slot, chain_slot, sizeof(chain_slot));
+}
+
+void lll_prof_chain_tag(uint8_t ticker_id, uint32_t ticks_at_expire, uint32_t ticks_slot)
+{
+	uint32_t us;
+
+	uint8_t tag = ticker_id & PROFILE_CHAIN_TAG_ID_MASK;
+
+	if (!chain_valid || (chain_cnt == 0U) || (chain_cnt > PROFILE_CHAIN_LEN_MAX)) {
+		return;
+	}
+
+	if (chain_resume_valid && (chain_ticks_resume == chain_ticks_handler)) {
+		tag |= PROFILE_CHAIN_TAG_RESUME;
+	}
+
+	chain_tag[chain_cnt - 1U] = tag;
+	chain_at[chain_cnt - 1U] = ticks_rel_us(ticks_at_expire, chain_ticks_start);
+
+	us = HAL_TICKER_TICKS_TO_US(ticks_slot);
+	chain_slot[chain_cnt - 1U] = MIN(us, UINT16_MAX);
+}
+
+void lll_prof_chain_resume(void)
+{
+	chain_ticks_resume = chain_ticks_handler;
+	chain_resume_valid = chain_valid;
+}
+
+static void chain_enter(uint8_t type)
+{
+	uint32_t ticks_now;
+	uint8_t idx;
+
+	ticks_now = ticker_ticks_now_get();
+	if (!chain_valid ||
+	    ((ticks_now - chain_ticks_exit) >
+	     HAL_TICKER_US_TO_TICKS_CEIL(LLL_PROF_CHAIN_GAP_US))) {
+		chain_ticks_start = ticks_now;
+		chain_seq = 0U;
+		chain_cnt = 0U;
+		chain_valid = true;
+	}
+
+	chain_ticks_handler = ticks_now;
+
+	idx = chain_cnt;
+	if (idx < PROFILE_CHAIN_LEN_MAX) {
+		chain_seq |= (uint16_t)(type & PROFILE_CHAIN_TYPE_MASK) <<
+			     (idx * PROFILE_CHAIN_TYPE_BITS);
+		chain_dur[idx] = 0U;
+		chain_tag[idx] = PROFILE_CHAIN_TAG_NONE;
+		chain_at[idx] = 0;
+		chain_slot[idx] = 0U;
+	}
+
+	if (chain_cnt < UINT8_MAX) {
+		chain_cnt++;
+	}
+}
+
+static void chain_exit(void)
+{
+	uint32_t ticks_now;
+	uint32_t us;
+
+	ticks_now = ticker_ticks_now_get();
+	chain_ticks_exit = ticks_now;
+
+	if (chain_cnt <= PROFILE_CHAIN_LEN_MAX) {
+		us = HAL_TICKER_TICKS_TO_US(ticks_now - chain_ticks_handler);
+		chain_dur[chain_cnt - 1U] = MIN(us, UINT8_MAX);
+	}
+
+	us = HAL_TICKER_TICKS_TO_US(ticks_now - chain_ticks_start);
+	if (us > chain_max_us) {
+		chain_max_us = MIN(us, UINT16_MAX);
+		chain_max_seq = chain_seq;
+		chain_max_cnt = chain_cnt;
+		chain_copy(chain_max_dur, chain_cnt);
+		(void)memcpy(chain_max_tag, chain_tag, sizeof(chain_tag));
+		(void)memcpy(chain_max_at, chain_at, sizeof(chain_at));
+		(void)memcpy(chain_max_slot, chain_slot, sizeof(chain_slot));
+
+		chain_max_ticks_start = chain_ticks_start;
+		chain_max_tkr_cnt = ticker_prof_expire_get(chain_max_tkr);
+
+		chain_chg = true;
+	}
+}
+
+static int16_t ticks_rel_us(uint32_t ticks, uint32_t ticks_ref)
+{
+	uint32_t diff;
+	uint32_t us;
+
+	diff = ticker_ticks_diff_get(ticks, ticks_ref);
+	if ((diff & BIT(HAL_TICKER_CNTR_MSBIT)) == 0U) {
+		us = HAL_TICKER_TICKS_TO_US(diff);
+
+		return MIN(us, INT16_MAX);
+	}
+
+	diff = ticker_ticks_diff_get(ticks_ref, ticks);
+	us = HAL_TICKER_TICKS_TO_US(diff);
+
+	return -(int16_t)MIN(us, INT16_MAX);
+}
+
+static void chain_copy(uint8_t *dst_dur, uint8_t len)
+{
+	len = MIN(len, PROFILE_CHAIN_LEN_MAX);
+	(void)memcpy(dst_dur, chain_dur, len);
+	(void)memset(&dst_dur[len], 0U, PROFILE_CHAIN_LEN_MAX - len);
 }
 
 void lll_prof_latency_capture(void)
@@ -365,6 +600,10 @@ static int send(struct node_rx_pdu *rx)
 		chg = 1U;
 	}
 
+	if (chain_chg) {
+		chg = 1U;
+	}
+
 	/* generate event if any change */
 	if (!chg) {
 		return -ENODATA;
@@ -397,6 +636,47 @@ static int send(struct node_rx_pdu *rx)
 	p->lll_ticks = cputime_ticks_lll;
 	p->ull_high_ticks = cputime_ticks_ull_high;
 	p->ull_low_ticks = cputime_ticks_ull_low;
+	p->ovh_chain_us = overhead_max_chain_us;
+	p->ovh_chain_lead = overhead_max_chain_lead;
+	p->ovh_chain_seq = overhead_max_chain_seq;
+	p->ovh_chain_cnt = overhead_max_chain_cnt;
+	p->ovh_ticker_id = overhead_max_ticker_id;
+	(void)memcpy(p->ovh_chain_dur, overhead_max_chain_dur, sizeof(p->ovh_chain_dur));
+	p->chain_max_us = chain_max_us;
+	p->chain_max_seq = chain_max_seq;
+	p->chain_max_cnt = chain_max_cnt;
+	(void)memcpy(p->chain_max_dur, chain_max_dur, sizeof(p->chain_max_dur));
+	(void)memcpy(p->ovh_chain_tag, overhead_max_chain_tag, sizeof(p->ovh_chain_tag));
+	(void)memcpy(p->chain_max_tag, chain_max_tag, sizeof(p->chain_max_tag));
+	(void)memcpy(p->ovh_chain_at, overhead_max_chain_at, sizeof(p->ovh_chain_at));
+	(void)memcpy(p->ovh_chain_slot, overhead_max_chain_slot, sizeof(p->ovh_chain_slot));
+	(void)memcpy(p->chain_max_at, chain_max_at, sizeof(p->chain_max_at));
+	(void)memcpy(p->chain_max_slot, chain_max_slot, sizeof(p->chain_max_slot));
+
+	p->tkr_cnt = chain_max_tkr_cnt;
+	for (uint8_t i = 0U; i < chain_max_tkr_cnt; i++) {
+		const struct ticker_prof_expire *e = &chain_max_tkr[i];
+		int16_t at;
+		uint16_t us;
+
+		p->tkr_id[i] = e->ticker_id;
+		p->tkr_prev_id[i] = e->ticker_id_slot_previous;
+		p->tkr_reserved[i] = e->slot_reserved;
+
+		at = ticks_rel_us(e->ticks_at_expire, chain_max_ticks_start);
+		(void)memcpy(&p->tkr_at[i], &at, sizeof(at));
+		us = MIN(HAL_TICKER_TICKS_TO_US(e->ticks_slot), UINT16_MAX);
+		(void)memcpy(&p->tkr_slot[i], &us, sizeof(us));
+		us = MIN(HAL_TICKER_TICKS_TO_US(e->ticks_slot_previous), UINT16_MAX);
+		(void)memcpy(&p->tkr_prev[i], &us, sizeof(us));
+		us = MIN(HAL_TICKER_TICKS_TO_US(e->ticks_to_expire_minus), UINT16_MAX);
+		(void)memcpy(&p->tkr_late[i], &us, sizeof(us));
+		us = MIN(HAL_TICKER_TICKS_TO_US(e->ticks_drift), UINT16_MAX);
+		(void)memcpy(&p->tkr_drift[i], &us, sizeof(us));
+		(void)memcpy(&p->tkr_lazy[i], &e->lazy, sizeof(e->lazy));
+	}
+
+	chain_chg = false;
 
 	ull_rx_put_sched(rx->hdr.link, rx);
 

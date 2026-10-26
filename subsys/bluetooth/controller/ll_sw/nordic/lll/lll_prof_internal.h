@@ -7,6 +7,8 @@
 void lll_prof_enter_radio(void);
 void lll_prof_exit_radio(void);
 uint16_t lll_prof_radio_get(void);
+void lll_prof_enter_radio_tmr(void);
+void lll_prof_exit_radio_tmr(void);
 void lll_prof_enter_lll(void);
 void lll_prof_exit_lll(void);
 uint16_t lll_prof_lll_get(void);
@@ -16,7 +18,9 @@ uint16_t lll_prof_ull_high_get(void);
 void lll_prof_enter_ull_low(void);
 void lll_prof_exit_ull_low(void);
 uint16_t lll_prof_ull_low_get(void);
-void lll_prof_overhead(uint16_t overhead_ticks);
+void lll_prof_overhead(uint16_t overhead_ticks, uint32_t ticks_at_event, uint8_t ticker_id);
+void lll_prof_chain_tag(uint8_t ticker_id, uint32_t ticks_at_expire, uint32_t ticks_slot);
+void lll_prof_chain_resume(void);
 
 void lll_prof_latency_capture(void);
 void lll_prof_latency_invalidate(void);

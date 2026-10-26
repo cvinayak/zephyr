@@ -9328,6 +9328,45 @@ static void mesh_adv_cplt(struct pdu_data *pdu_data,
 }
 #endif /* CONFIG_BT_HCI_MESH_EXT */
 
+#if defined(CONFIG_BT_CTLR_PROFILE_ISR)
+/* Decode a priority-0 handler chain as "<type><us> ...", R radio, T radio
+ * timer and L LLL, with "+<n>" for handlers beyond PROFILE_CHAIN_LEN_MAX.
+ * Tagged prepares append "#<id>[r]@<expire>/<slot>", the ticker expiry in us
+ * relative to the chain start and the reserved ticks_slot in us.
+ */
+static void profile_chain_str(char *str, size_t size, uint16_t seq, uint8_t cnt,
+			      const uint8_t *dur, const uint8_t *tag,
+			      const int16_t *at, const uint16_t *slot)
+{
+	static const char type_char[] = {'?', 'R', 'T', 'L'};
+	uint8_t len;
+	size_t pos;
+
+	len = MIN(cnt, PROFILE_CHAIN_LEN_MAX);
+	pos = 0U;
+	str[0] = '\0';
+
+	for (uint8_t i = 0U; (i < len) && (pos < size); i++) {
+		uint8_t type = (seq >> (i * PROFILE_CHAIN_TYPE_BITS)) & PROFILE_CHAIN_TYPE_MASK;
+
+		pos += snprintk(&str[pos], size - pos, "%s%c%u", (i != 0U) ? " " : "",
+				type_char[type], dur[i]);
+
+		/* Ticker id of the prepare in the handler, 'r' when resumed */
+		if ((tag[i] != PROFILE_CHAIN_TAG_NONE) && (pos < size)) {
+			pos += snprintk(&str[pos], size - pos, "#%u%s@%d/%u",
+					tag[i] & PROFILE_CHAIN_TAG_ID_MASK,
+					(tag[i] & PROFILE_CHAIN_TAG_RESUME) ? "r" : "",
+					at[i], slot[i]);
+		}
+	}
+
+	if ((cnt > len) && (pos < size)) {
+		(void)snprintk(&str[pos], size - pos, " +%u", cnt - len);
+	}
+}
+#endif /* CONFIG_BT_CTLR_PROFILE_ISR */
+
 /**
  * @brief Encode a control-PDU into an HCI buffer
  * @details Execution context: Host thread
@@ -9572,6 +9611,58 @@ static void encode_control(struct node_rx_pdu *node_rx,
 		       pdu_data->profile.ull_low, pdu_data->profile.ull_low_ticks,
 		       pdu_data->profile.overhead, pdu_data->profile.overhead_max,
 		       EVENT_OVERHEAD_START_US);
+		{
+			const struct profile *p = &pdu_data->profile;
+			/* Static, as the Controller's Rx thread stack is small */
+			static char ovh_chain[PROFILE_CHAIN_LEN_MAX * 24U + 8U];
+			static char max_chain[PROFILE_CHAIN_LEN_MAX * 24U + 8U];
+			/* Aligned copies of the packed members */
+			static int16_t at[PROFILE_CHAIN_LEN_MAX];
+			static uint16_t slot[PROFILE_CHAIN_LEN_MAX];
+
+			(void)memcpy(at, p->ovh_chain_at, sizeof(at));
+			(void)memcpy(slot, p->ovh_chain_slot, sizeof(slot));
+			profile_chain_str(ovh_chain, sizeof(ovh_chain), p->ovh_chain_seq,
+					  p->ovh_chain_cnt, p->ovh_chain_dur, p->ovh_chain_tag,
+					  at, slot);
+
+			(void)memcpy(at, p->chain_max_at, sizeof(at));
+			(void)memcpy(slot, p->chain_max_slot, sizeof(slot));
+			profile_chain_str(max_chain, sizeof(max_chain), p->chain_max_seq,
+					  p->chain_max_cnt, p->chain_max_dur, p->chain_max_tag,
+					  at, slot);
+
+			/* Reserved ticker expiries as "<id>@<expire>/<slot> p<prev id>:<prev
+			 * remaining> r<reserved> l<late> d<drift> z<lazy>", in us.
+			 */
+			static char tkr[PROFILE_TICKER_LEN_MAX * 48U + 8U];
+			uint8_t tkr_cnt = MIN(p->tkr_cnt, PROFILE_TICKER_LEN_MAX);
+			size_t pos = 0U;
+
+			tkr[0] = '\0';
+			for (uint8_t i = 0U; (i < tkr_cnt) && (pos < sizeof(tkr)); i++) {
+				int16_t tkr_at;
+				uint16_t tkr_slot, tkr_prev, tkr_late, tkr_drift, tkr_lazy;
+
+				(void)memcpy(&tkr_at, &p->tkr_at[i], sizeof(tkr_at));
+				(void)memcpy(&tkr_slot, &p->tkr_slot[i], sizeof(tkr_slot));
+				(void)memcpy(&tkr_prev, &p->tkr_prev[i], sizeof(tkr_prev));
+				(void)memcpy(&tkr_late, &p->tkr_late[i], sizeof(tkr_late));
+				(void)memcpy(&tkr_drift, &p->tkr_drift[i], sizeof(tkr_drift));
+				(void)memcpy(&tkr_lazy, &p->tkr_lazy[i], sizeof(tkr_lazy));
+
+				pos += snprintk(&tkr[pos], sizeof(tkr) - pos,
+						" %u@%d/%u p%d:%u r%u l%u d%u z%u",
+						p->tkr_id[i], tkr_at, tkr_slot,
+						(p->tkr_prev_id[i] == UINT8_MAX) ? -1 :
+						(int)p->tkr_prev_id[i], tkr_prev,
+						p->tkr_reserved[i], tkr_late, tkr_drift, tkr_lazy);
+			}
+
+			printk("p0: ovh %u id %u lead %d chain %u: %s; max %u: %s; tkr:%s\n",
+			       p->overhead_max, p->ovh_ticker_id, p->ovh_chain_lead,
+			       p->ovh_chain_us, ovh_chain, p->chain_max_us, max_chain, tkr);
+		}
 		return;
 #endif /* CONFIG_BT_CTLR_PROFILE_ISR */
 

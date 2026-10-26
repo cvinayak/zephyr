@@ -159,7 +159,7 @@ ISR_DIRECT_DECLARE(timer_nrf5_isr)
 	DEBUG_RADIO_ISR(1);
 
 	if (IS_ENABLED(CONFIG_BT_CTLR_PROFILE_ISR)) {
-		lll_prof_enter_radio();
+		lll_prof_enter_radio_tmr();
 	}
 
 	isr_radio_tmr();
@@ -169,7 +169,7 @@ ISR_DIRECT_DECLARE(timer_nrf5_isr)
 #endif /* !CONFIG_BT_CTLR_ZLI */
 
 	if (IS_ENABLED(CONFIG_BT_CTLR_PROFILE_ISR)) {
-		lll_prof_exit_radio();
+		lll_prof_exit_radio_tmr();
 	}
 
 	DEBUG_RADIO_ISR(0);
@@ -732,6 +732,12 @@ uint32_t lll_preempt_calc(struct ull_hdr *ull, uint8_t ticker_id,
 	uint32_t ticks_now;
 	uint32_t diff;
 
+	if (IS_ENABLED(CONFIG_BT_CTLR_PROFILE_ISR)) {
+		lll_prof_chain_tag(ticker_id,
+				   ticker_ticks_diff_get(ticks_at_event, lll_event_offset_get(ull)),
+				   ull->ticks_slot);
+	}
+
 	ticks_now = ticker_ticks_now_get();
 	diff = ticker_ticks_diff_get(ticks_now, ticks_at_event);
 	if (diff & BIT(HAL_TICKER_CNTR_MSBIT)) {
@@ -740,6 +746,14 @@ uint32_t lll_preempt_calc(struct ull_hdr *ull, uint8_t ticker_id,
 
 	diff += 1U + HAL_TICKER_CNTR_CMP_OFFSET_MIN +
 		HAL_TICKER_US_TO_TICKS_CEIL(HAL_RADIO_ISR_LATENCY_MAX_US);
+
+	/* Profile before the check so that overheads exceeding the start
+	 * overhead are recorded when not asserting on them.
+	 */
+	if (IS_ENABLED(CONFIG_BT_CTLR_PROFILE_ISR)) {
+		lll_prof_overhead(MIN(diff, UINT16_MAX), ticks_at_event, ticker_id);
+	}
+
 	if (diff > HAL_TICKER_US_TO_TICKS(EVENT_OVERHEAD_START_US)) {
 		/* TODO: for Low Latency Feature with Advanced XTAL feature.
 		 * 1. Release retained HF clock.
@@ -748,10 +762,6 @@ uint32_t lll_preempt_calc(struct ull_hdr *ull, uint8_t ticker_id,
 		 * 3. Increase the preempt to start ticks for future events.
 		 */
 		return diff;
-	}
-
-	if (IS_ENABLED(CONFIG_BT_CTLR_PROFILE_ISR)) {
-		lll_prof_overhead(diff);
 	}
 
 	return 0U;

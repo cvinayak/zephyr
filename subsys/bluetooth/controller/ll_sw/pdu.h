@@ -1244,6 +1244,19 @@ struct pdu_data_llctrl {
 				   sizeof(struct pdu_data_llctrl_ ## type))
 
 #if defined(CONFIG_BT_CTLR_PROFILE_ISR)
+#define PROFILE_CHAIN_LEN_MAX    8U
+#define PROFILE_TICKER_LEN_MAX   4U
+#define PROFILE_CHAIN_TYPE_BITS  2U
+#define PROFILE_CHAIN_TYPE_MASK  (BIT(PROFILE_CHAIN_TYPE_BITS) - 1U)
+#define PROFILE_CHAIN_RADIO      1U
+#define PROFILE_CHAIN_RADIO_TMR  2U
+#define PROFILE_CHAIN_LLL        3U
+
+/* Chain handler tag, ticker id of the prepare executed in the handler */
+#define PROFILE_CHAIN_TAG_NONE    0xFFU
+#define PROFILE_CHAIN_TAG_RESUME  BIT(7)
+#define PROFILE_CHAIN_TAG_ID_MASK 0x7FU
+
 struct profile {
 	uint16_t lcur;
 	uint16_t lmin;
@@ -1261,6 +1274,45 @@ struct profile {
 	uint16_t lll_ticks;
 	uint16_t ull_high_ticks;
 	uint16_t ull_low_ticks;
+
+	/* Back-to-back priority-0 handler chains, PROFILE_CHAIN_TYPE_BITS per
+	 * handler type in *_seq with the first handler in the LSBs, *_cnt is
+	 * the number of handlers and *_dur the per-handler duration in us.
+	 */
+	uint16_t ovh_chain_us;   /* chain start to overhead_max sample */
+	int16_t  ovh_chain_lead; /* chain start before the event start */
+	uint16_t ovh_chain_seq;
+	uint8_t  ovh_chain_cnt;
+	uint8_t  ovh_ticker_id;
+	uint8_t  ovh_chain_dur[PROFILE_CHAIN_LEN_MAX];
+	uint16_t chain_max_us;
+	uint16_t chain_max_seq;
+	uint8_t  chain_max_cnt;
+	uint8_t  chain_max_dur[PROFILE_CHAIN_LEN_MAX];
+	uint8_t  ovh_chain_tag[PROFILE_CHAIN_LEN_MAX];
+	uint8_t  chain_max_tag[PROFILE_CHAIN_LEN_MAX];
+
+	/* Tagged prepare ticker expiry relative to chain start, and its
+	 * reserved ticks_slot, in us.
+	 */
+	int16_t  ovh_chain_at[PROFILE_CHAIN_LEN_MAX];
+	uint16_t ovh_chain_slot[PROFILE_CHAIN_LEN_MAX];
+	int16_t  chain_max_at[PROFILE_CHAIN_LEN_MAX];
+	uint16_t chain_max_slot[PROFILE_CHAIN_LEN_MAX];
+
+	/* Reserved ticker expiries preceding the chain_max chain, oldest
+	 * first; expiry relative to chain start, times in us.
+	 */
+	uint8_t  tkr_cnt;
+	uint8_t  tkr_id[PROFILE_TICKER_LEN_MAX];
+	uint8_t  tkr_prev_id[PROFILE_TICKER_LEN_MAX];
+	uint8_t  tkr_reserved[PROFILE_TICKER_LEN_MAX];
+	int16_t  tkr_at[PROFILE_TICKER_LEN_MAX];
+	uint16_t tkr_slot[PROFILE_TICKER_LEN_MAX];
+	uint16_t tkr_prev[PROFILE_TICKER_LEN_MAX];
+	uint16_t tkr_late[PROFILE_TICKER_LEN_MAX];
+	uint16_t tkr_drift[PROFILE_TICKER_LEN_MAX];
+	uint16_t tkr_lazy[PROFILE_TICKER_LEN_MAX];
 } __packed;
 #endif /* CONFIG_BT_CTLR_PROFILE_ISR */
 

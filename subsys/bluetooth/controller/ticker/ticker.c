@@ -382,6 +382,26 @@ BUILD_ASSERT(sizeof(struct ticker_user_op) == TICKER_USER_OP_T_SIZE);
 #define TICKER_INSTANCE_MAX 1
 static struct ticker_instance _instance[TICKER_INSTANCE_MAX];
 
+#if defined(CONFIG_BT_CTLR_PROFILE_ISR)
+static struct ticker_prof_expire prof_expire[TICKER_PROF_EXPIRE_MAX];
+static uint8_t prof_expire_last;
+static uint8_t prof_expire_cnt;
+
+uint8_t ticker_prof_expire_get(struct ticker_prof_expire *expire)
+{
+	uint8_t idx;
+
+	idx = (prof_expire_last + TICKER_PROF_EXPIRE_MAX - prof_expire_cnt) %
+	      TICKER_PROF_EXPIRE_MAX;
+	for (uint8_t i = 0U; i < prof_expire_cnt; i++) {
+		expire[i] = prof_expire[idx];
+		idx = (idx + 1U) % TICKER_PROF_EXPIRE_MAX;
+	}
+
+	return prof_expire_cnt;
+}
+#endif /* CONFIG_BT_CTLR_PROFILE_ISR */
+
 /*****************************************************************************
  * Static Functions
  ****************************************************************************/
@@ -1545,6 +1565,32 @@ void ticker_worker(void *param)
 					   ticks_expired -
 					   ticker->ticks_to_expire_minus) &
 					   HAL_TICKER_CNTR_MASK;
+
+#if defined(CONFIG_BT_CTLR_PROFILE_ISR) && !defined(CONFIG_BT_TICKER_LOW_LAT) && \
+	!defined(CONFIG_BT_TICKER_SLOT_AGNOSTIC)
+			if ((must_expire_skip == 0U) && (ticker->ticks_slot != 0U)) {
+				struct ticker_prof_expire *e = &prof_expire[prof_expire_last];
+
+				e->ticks_at_expire = ticks_at_expire;
+				e->ticks_slot = ticker->ticks_slot;
+				e->ticks_slot_previous =
+					(instance->ticks_slot_previous > ticks_expired) ?
+					(instance->ticks_slot_previous - ticks_expired) : 0U;
+				e->ticks_to_expire_minus = ticker->ticks_to_expire_minus;
+				e->ticks_drift = ticks_drift;
+				e->lazy = lazy;
+				e->ticker_id = ticker - node;
+				e->ticker_id_slot_previous = instance->ticker_id_slot_previous;
+				e->slot_reserved = slot_reserved;
+
+				prof_expire_last = (prof_expire_last + 1U) % TICKER_PROF_EXPIRE_MAX;
+				if (prof_expire_cnt < TICKER_PROF_EXPIRE_MAX) {
+					prof_expire_cnt++;
+				}
+			}
+#endif /* CONFIG_BT_CTLR_PROFILE_ISR && !CONFIG_BT_TICKER_LOW_LAT &&
+	* !CONFIG_BT_TICKER_SLOT_AGNOSTIC
+	*/
 
 #if defined(CONFIG_BT_TICKER_REMAINDER_SUPPORT)
 			remainder_current = ticker->remainder_current;
