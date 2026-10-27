@@ -83,7 +83,7 @@
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/i2c.h>
 #include <zephyr/drivers/pinctrl.h>
-#include <zephyr/spinlock.h>
+#include <zephyr/sys/atomic.h>
 #include <zephyr/sys/ring_buffer.h>
 #include <nrfx_i2s.h>
 #if defined(NRF54L15_XXAA)
@@ -125,8 +125,12 @@ static int16_t i2s_tx_buf_a[I2S_SAMPLES_NUM * DAC_CHAN_CNT] __aligned(4);
 static int16_t i2s_tx_buf_b[I2S_SAMPLES_NUM * DAC_CHAN_CNT] __aligned(4);
 static int16_t i2s_rx_buf_a[I2S_SAMPLES_NUM * DAC_CHAN_CNT] __aligned(4);
 static int16_t i2s_rx_buf_b[I2S_SAMPLES_NUM * DAC_CHAN_CNT] __aligned(4);
+/* The audio thread is the only producer and the I2S interrupt the only consumer of the ring
+ * buffers, so no lock is needed and interrupts are not disabled while audio is copied.
+ */
 RING_BUF_DECLARE(i2s_tx_ring_buf, RING_BUF_SIZE);
-static struct k_spinlock i2s_ring_buf_lock;
+/* I2S TX ring buffer flush request, handled by the I2S interrupt (consumer) */
+static atomic_t i2s_tx_flush;
 /* Last ring buffer free space in percent, reported with the SDU metrics */
 static uint8_t ring_buf_free_percent;
 
@@ -139,8 +143,8 @@ static uint8_t ring_buf_free_percent;
 #define MIC_DRIFT_LOW_BLOCKS  5U
 #define MIC_DRIFT_HIGH_BLOCKS 35U
 
+/* Produced by the I2S interrupt, consumed by the TX thread */
 RING_BUF_DECLARE(mic_ring_buf, MIC_RING_BUF_SIZE);
-static struct k_spinlock mic_ring_buf_lock;
 static bool mic_primed;
 static uint32_t mic_underrun_cnt;
 static uint32_t mic_overrun_cnt;
@@ -399,11 +403,13 @@ static void audio_i2s_set_next_buf(int16_t *tx_buf, int16_t *rx_buf)
 
 static void i2s_fill_tx_buf(int16_t *tx_buf)
 {
-	k_spinlock_key_t key = k_spin_lock(&i2s_ring_buf_lock);
 	uint32_t len;
 
+	if (atomic_cas(&i2s_tx_flush, 1, 0)) {
+		ring_buf_consume(&i2s_tx_ring_buf, ring_buf_size_get(&i2s_tx_ring_buf));
+	}
+
 	len = ring_buf_get(&i2s_tx_ring_buf, (uint8_t *)tx_buf, I2S_BLOCK_SIZE);
-	k_spin_unlock(&i2s_ring_buf_lock, key);
 
 	if (len != I2S_BLOCK_SIZE) {
 		/* Underrun, play silence */
@@ -415,18 +421,14 @@ static void i2s_fill_tx_buf(int16_t *tx_buf)
 /* Queue a received I2S block for the source stream encoder, no processing in the interrupt */
 static void i2s_store_rx_buf(const int16_t *rx_buf)
 {
-	k_spinlock_key_t key;
-
 	if (rx_buf == NULL) {
 		return;
 	}
 
-	key = k_spin_lock(&mic_ring_buf_lock);
 	if (ring_buf_put(&mic_ring_buf, (const uint8_t *)rx_buf, I2S_BLOCK_SIZE) !=
 	    I2S_BLOCK_SIZE) {
 		mic_overrun_cnt++;
 	}
-	k_spin_unlock(&mic_ring_buf_lock, key);
 }
 
 /* Provide the TLV320 mono ADC output, left I2S slot, decimated to the source stream rate */
@@ -436,7 +438,6 @@ static bool mic_pcm_get(enum bt_audio_location chan_allocation, uint32_t freq_hz
 	/* Only called from the TX thread; static to save stack */
 	static int16_t in[(DAC_FRAME_SAMPLES + 1U) * DAC_CHAN_CNT];
 	const uint32_t prime = I2S_BLOCK_SIZE * MIC_PRIME_BLOCKS;
-	k_spinlock_key_t key;
 	uint32_t ratio;
 	uint32_t fill;
 	size_t frames;
@@ -454,8 +455,6 @@ static bool mic_pcm_get(enum bt_audio_location chan_allocation, uint32_t freq_hz
 	frames = samples * ratio;
 	read = frames;
 
-	key = k_spin_lock(&mic_ring_buf_lock);
-
 	fill = ring_buf_size_get(&mic_ring_buf);
 	if (!mic_primed && fill >= MAX(prime, frames * MIC_FRAME_SIZE)) {
 		mic_primed = true;
@@ -467,7 +466,6 @@ static bool mic_pcm_get(enum bt_audio_location chan_allocation, uint32_t freq_hz
 	}
 
 	if (!mic_primed) {
-		k_spin_unlock(&mic_ring_buf_lock, key);
 		(void)memset(pcm, 0, samples * sizeof(int16_t));
 		return false;
 	}
@@ -482,7 +480,6 @@ static bool mic_pcm_get(enum bt_audio_location chan_allocation, uint32_t freq_hz
 	}
 
 	(void)ring_buf_get(&mic_ring_buf, (uint8_t *)in, read * MIC_FRAME_SIZE);
-	k_spin_unlock(&mic_ring_buf_lock, key);
 
 	if (read < frames) {
 		in[(frames - 1U) * DAC_CHAN_CNT] = in[(frames - 2U) * DAC_CHAN_CNT];
@@ -697,13 +694,10 @@ static int tlv320_setup(void)
 static void dac_pll_track(void)
 {
 	static uint8_t d_lsb_cur = DAC_PLL_D_LSB_NOM;
-	k_spinlock_key_t key;
 	uint32_t space;
 	uint8_t d_lsb;
 
-	key = k_spin_lock(&i2s_ring_buf_lock);
 	space = ring_buf_space_get(&i2s_tx_ring_buf);
-	k_spin_unlock(&i2s_ring_buf_lock, key);
 
 	ring_buf_free_percent = (uint8_t)((space * 100U) / RING_BUF_SIZE);
 
@@ -730,10 +724,7 @@ static void dac_buf_reset(void)
 	k_msgq_purge(&recv_pkt_msgq_r);
 
 #if TLV320_AUDIO_OUTPUT_ENABLED
-	k_spinlock_key_t key = k_spin_lock(&i2s_ring_buf_lock);
-
-	ring_buf_reset(&i2s_tx_ring_buf);
-	k_spin_unlock(&i2s_ring_buf_lock, key);
+	atomic_set(&i2s_tx_flush, 1);
 #endif /* TLV320_AUDIO_OUTPUT_ENABLED */
 }
 
@@ -800,14 +791,10 @@ static void dac_decode(struct audio_sink *sink, const struct recv_pkt_info *pkt,
 static void dac_play(const int16_t *pcm)
 {
 #if TLV320_AUDIO_OUTPUT_ENABLED
-	k_spinlock_key_t key;
-
 	dac_pll_track();
 
-	key = k_spin_lock(&i2s_ring_buf_lock);
 	(void)ring_buf_put(&i2s_tx_ring_buf, (const uint8_t *)pcm,
 			   DAC_FRAME_SAMPLES * DAC_CHAN_CNT * sizeof(int16_t));
-	k_spin_unlock(&i2s_ring_buf_lock, key);
 #else
 	usb_audio_pcm_put(pcm, DAC_FRAME_SAMPLES, DAC_CHAN_CNT);
 #endif /* TLV320_AUDIO_OUTPUT_ENABLED */

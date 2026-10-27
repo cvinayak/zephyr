@@ -15,6 +15,11 @@
  * The clock is declared SOF-synchronized. The drift between the USB and Bluetooth clocks is
  * corrected by dropping or repeating one sample frame when a ring buffer fill level leaves its
  * window.
+ *
+ * Each ring buffer has a single producer and a single consumer, so no lock is needed and
+ * interrupts are never disabled while audio is copied. The USB stack callbacks run in the USB
+ * device thread and the encoder callback in the Bluetooth TX thread. Ring buffers are flushed
+ * only by their consumer.
  */
 
 #include <errno.h>
@@ -29,7 +34,7 @@
 #include <zephyr/drivers/usb/usb_buf.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
-#include <zephyr/spinlock.h>
+#include <zephyr/sys/atomic.h>
 #include <zephyr/sys/ring_buffer.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/usb/class/usbd_uac2.h>
@@ -78,8 +83,8 @@ RING_BUF_DECLARE(spk_ring_right, SPK_RING_SIZE);
 RING_BUF_DECLARE(mic_ring, MIC_RING_SIZE);
 
 static struct ring_buf *const spk_rings[USB_SPK_CHANNELS] = {&spk_ring_left, &spk_ring_right};
-static struct k_spinlock spk_lock;
-static struct k_spinlock mic_lock;
+/* Speaker ring buffer flush request, handled by the encoder (consumer) */
+static atomic_t spk_flush;
 static bool spk_primed[USB_SPK_CHANNELS];
 static bool mic_primed;
 static volatile bool spk_enabled;
@@ -97,26 +102,24 @@ static struct {
 	uint32_t send_err;
 } stats;
 
-static void spk_reset(void)
+/* Called by the speaker ring buffer consumer only */
+static void spk_flush_handle(void)
 {
-	k_spinlock_key_t key = k_spin_lock(&spk_lock);
-
-	for (size_t i = 0U; i < USB_SPK_CHANNELS; i++) {
-		ring_buf_reset(spk_rings[i]);
-		spk_primed[i] = false;
+	if (!atomic_cas(&spk_flush, 1, 0)) {
+		return;
 	}
 
-	k_spin_unlock(&spk_lock, key);
+	for (size_t i = 0U; i < USB_SPK_CHANNELS; i++) {
+		ring_buf_consume(spk_rings[i], ring_buf_size_get(spk_rings[i]));
+		spk_primed[i] = false;
+	}
 }
 
-static void mic_reset(void)
+/* Called by the microphone ring buffer consumer only, in the USB device thread */
+static void mic_flush(void)
 {
-	k_spinlock_key_t key = k_spin_lock(&mic_lock);
-
-	ring_buf_reset(&mic_ring);
+	ring_buf_consume(&mic_ring, ring_buf_size_get(&mic_ring));
 	mic_primed = false;
-
-	k_spin_unlock(&mic_lock, key);
 }
 
 static void terminal_update_cb(const struct device *dev, uint8_t terminal, bool enabled,
@@ -128,10 +131,10 @@ static void terminal_update_cb(const struct device *dev, uint8_t terminal, bool 
 
 	if (terminal == OUT_TERMINAL_ID) {
 		spk_enabled = enabled;
-		spk_reset();
+		atomic_set(&spk_flush, 1);
 	} else if (terminal == IN_TERMINAL_ID) {
 		mic_enabled = enabled;
-		mic_reset();
+		mic_flush();
 	}
 
 	LOG_INF("USB %s %s", terminal == OUT_TERMINAL_ID ? "speaker" : "microphone",
@@ -166,7 +169,6 @@ static void data_recv_cb(const struct device *dev, uint8_t terminal, void *buf, 
 	const int16_t *pcm = buf;
 	size_t frames;
 	uint32_t fill;
-	k_spinlock_key_t key;
 
 	ARG_UNUSED(dev);
 	ARG_UNUSED(terminal);
@@ -190,8 +192,6 @@ static void data_recv_cb(const struct device *dev, uint8_t terminal, void *buf, 
 
 	k_mem_slab_free(&usb_out_pool, buf);
 
-	key = k_spin_lock(&spk_lock);
-
 	fill = ring_buf_size_get(spk_rings[0]) / sizeof(int16_t);
 	if (fill > MS_TO_SAMPLES(DRIFT_HIGH_MS)) {
 		frames--;
@@ -212,8 +212,6 @@ static void data_recv_cb(const struct device *dev, uint8_t terminal, void *buf, 
 			stats.spk_overrun++;
 		}
 	}
-
-	k_spin_unlock(&spk_lock, key);
 }
 
 /* Read samples of one speaker channel and decimate them by averaging */
@@ -222,15 +220,13 @@ static bool spk_read(size_t ch, uint32_t ratio, int16_t *pcm, size_t samples)
 	const uint32_t needed = samples * ratio * sizeof(int16_t);
 	const uint32_t prime = MS_TO_SAMPLES(PRIME_MS) * sizeof(int16_t);
 	struct ring_buf *ring = spk_rings[ch];
-	k_spinlock_key_t key;
 	int16_t in[USB_FRAME_SAMPLES];
 	size_t out = 0U;
 
-	key = k_spin_lock(&spk_lock);
+	spk_flush_handle();
 
 	if (!spk_primed[ch]) {
 		if (ring_buf_size_get(ring) < MAX(needed, prime)) {
-			k_spin_unlock(&spk_lock, key);
 			return false;
 		}
 
@@ -240,7 +236,6 @@ static bool spk_read(size_t ch, uint32_t ratio, int16_t *pcm, size_t samples)
 	if (ring_buf_size_get(ring) < needed) {
 		spk_primed[ch] = false;
 		stats.spk_underrun++;
-		k_spin_unlock(&spk_lock, key);
 		return false;
 	}
 
@@ -259,8 +254,6 @@ static bool spk_read(size_t ch, uint32_t ratio, int16_t *pcm, size_t samples)
 			pcm[out++] = (int16_t)(sum / (int32_t)ratio);
 		}
 	}
-
-	k_spin_unlock(&spk_lock, key);
 
 	return true;
 }
@@ -305,14 +298,11 @@ bool usb_audio_pcm_get(enum bt_audio_location chan_allocation, uint32_t freq_hz,
 void usb_audio_pcm_put(const int16_t *pcm, size_t frames, uint8_t chan_cnt)
 {
 	int16_t frame[USB_MIC_CHANNELS];
-	k_spinlock_key_t key;
 	uint32_t fill;
 
 	if (!mic_enabled || frames == 0U || (chan_cnt != 1U && chan_cnt != 2U)) {
 		return;
 	}
-
-	key = k_spin_lock(&mic_lock);
 
 	fill = ring_buf_size_get(&mic_ring) / (USB_MIC_CHANNELS * sizeof(int16_t));
 	if (fill > MS_TO_SAMPLES(DRIFT_HIGH_MS)) {
@@ -345,14 +335,11 @@ void usb_audio_pcm_put(const int16_t *pcm, size_t frames, uint8_t chan_cnt)
 			}
 		}
 	}
-
-	k_spin_unlock(&mic_lock, key);
 }
 
 /* Called every 1 ms, sends one frame of microphone audio to the USB host */
 static void sof_cb(const struct device *dev, void *user_data)
 {
-	k_spinlock_key_t key;
 	void *buf;
 	int err;
 
@@ -366,8 +353,6 @@ static void sof_cb(const struct device *dev, void *user_data)
 		stats.send_err++;
 		return;
 	}
-
-	key = k_spin_lock(&mic_lock);
 
 	if (!mic_primed &&
 	    ring_buf_size_get(&mic_ring) >= MS_TO_SAMPLES(PRIME_MS) * USB_MIC_CHANNELS *
@@ -385,8 +370,6 @@ static void sof_cb(const struct device *dev, void *user_data)
 
 		(void)memset(buf, 0, USB_MIC_FRAME_SIZE);
 	}
-
-	k_spin_unlock(&mic_lock, key);
 
 	err = usbd_uac2_send(dev, IN_TERMINAL_ID, buf, USB_MIC_FRAME_SIZE);
 	if (err != 0) {
