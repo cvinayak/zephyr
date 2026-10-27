@@ -21,7 +21,7 @@
 };
 
 &hfpll {
-	clock-frequency = <DT_FREQ_M(128)>;
+	clock-frequency = <DT_FREQ_M(64)>;
 };
 
 / {
