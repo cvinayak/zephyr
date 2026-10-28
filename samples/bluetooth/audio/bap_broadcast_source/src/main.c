@@ -114,6 +114,19 @@ static struct bt_bap_lc3_preset preset_active = BT_BAP_LC3_BROADCAST_PRESET_48_6
 #define MAX_FRAME_DURATION_US 10000U
 #define MAX_NUM_SAMPLES       ((MAX_FRAME_DURATION_US * MAX_SAMPLE_RATE) / USEC_PER_SEC)
 
+/* Audio channels encoded per SDU interval: left, right and the (left + right) / 2 mix.
+ * Streams beyond the first AUDIO_CHAN_COUNT repeat the encoded channels, i.e. stream n
+ * carries audio channel (n % AUDIO_CHAN_COUNT).
+ */
+#define AUDIO_CHAN_LEFT  0U
+#define AUDIO_CHAN_RIGHT 1U
+#define AUDIO_CHAN_MIX   2U
+#define AUDIO_CHAN_COUNT MIN(CONFIG_BT_BAP_BROADCAST_SRC_STREAM_COUNT, 3U)
+
+BUILD_ASSERT((CONFIG_BT_BAP_BROADCAST_SRC_STREAM_COUNT %
+	      CONFIG_BT_BAP_BROADCAST_SRC_SUBGROUP_COUNT) == 0U,
+	     "Streams shall be evenly distributed across subgroups");
+
 #if defined(CONFIG_LIBLC3)
 #include "lc3.h"
 
@@ -176,8 +189,11 @@ static struct broadcast_source_stream {
 	uint16_t seq_num;
 	uint8_t bis_number;
 	size_t sent_cnt;
+} streams[CONFIG_BT_BAP_BROADCAST_SRC_STREAM_COUNT];
+static struct bt_bap_broadcast_source *broadcast_source;
 
 #if defined(CONFIG_LIBLC3)
+static struct audio_chan_encoder {
 	lc3_encoder_t lc3_encoder;
 #if defined(CONFIG_BAP_BROADCAST_8_2_1)
 	lc3_encoder_mem_16k_t lc3_encoder_mem;
@@ -188,13 +204,17 @@ static struct broadcast_source_stream {
 #elif defined(CONFIG_BAP_BROADCAST_48_2_1) || defined(CONFIG_BAP_BROADCAST_48_6_1)
 	lc3_encoder_mem_48k_t lc3_encoder_mem;
 #endif
+	uint8_t encoded[CONFIG_BT_ISO_TX_MTU];
+} chan_encoders[AUDIO_CHAN_COUNT];
+
 #if defined(CONFIG_USE_USB_AUDIO_INPUT)
+/* Downsampled USB PCM per input channel (left, right) */
+static struct usb_audio_chan {
 	struct ring_buf audio_ring_buf;
 	uint8_t _ring_buffer_memory[AUDIO_RING_BUF_BYTES];
+} usb_chans[USB_CHANNELS];
 #endif /* defined(CONFIG_USE_USB_AUDIO_INPUT) */
 #endif /* defined(CONFIG_LIBLC3) */
-} streams[CONFIG_BT_BAP_BROADCAST_SRC_STREAM_COUNT];
-static struct bt_bap_broadcast_source *broadcast_source;
 
 NET_BUF_POOL_FIXED_DEFINE(tx_pool, TOTAL_BUF_NEEDED, BT_ISO_SDU_BUF_SIZE(CONFIG_BT_ISO_TX_MTU),
 			  CONFIG_BT_CONN_TX_USER_DATA_SIZE, NULL);
@@ -341,7 +361,70 @@ static int octets_per_frame;
 static K_SEM_DEFINE(lc3_encoder_sem, 0U, TOTAL_BUF_NEEDED);
 #endif
 
-static void send_data(struct broadcast_source_stream *source_stream)
+#if defined(CONFIG_LIBLC3)
+/* Encode one SDU interval of audio for each of the AUDIO_CHAN_COUNT audio channels */
+static int encode_audio_chans(void)
+{
+	const int16_t *pcm[AUDIO_CHAN_COUNT];
+
+#if defined(CONFIG_USE_USB_AUDIO_INPUT)
+	static int16_t usb_pcm[USB_CHANNELS][MAX_NUM_SAMPLES];
+	static int16_t mix_pcm[MAX_NUM_SAMPLES];
+
+	/* Always consume both USB channels so that left and right stay aligned */
+	for (size_t ch = 0U; ch < USB_CHANNELS; ch++) {
+		const uint32_t size = ring_buf_get(&usb_chans[ch].audio_ring_buf,
+						   (uint8_t *)usb_pcm[ch], sizeof(usb_pcm[ch]));
+
+		if (size < sizeof(usb_pcm[ch])) {
+			const size_t padding_size = sizeof(usb_pcm[ch]) - size;
+
+			printk("Not enough bytes ready, padding %zu!\n", padding_size);
+			(void)memset(&((uint8_t *)usb_pcm[ch])[size], 0, padding_size);
+		}
+	}
+
+	for (size_t ch = 0U; ch < AUDIO_CHAN_COUNT; ch++) {
+		if (ch == AUDIO_CHAN_MIX) {
+			for (size_t i = 0U; i < ARRAY_SIZE(mix_pcm); i++) {
+				mix_pcm[i] = (int16_t)(((int32_t)usb_pcm[AUDIO_CHAN_LEFT][i] +
+							(int32_t)usb_pcm[AUDIO_CHAN_RIGHT][i]) /
+						       2);
+			}
+			pcm[ch] = mix_pcm;
+		} else {
+			pcm[ch] = usb_pcm[ch];
+		}
+	}
+#else /* !defined(CONFIG_USE_USB_AUDIO_INPUT) */
+	/* Left and right carry the same tone, hence the mix is the same tone too */
+	for (size_t ch = 0U; ch < AUDIO_CHAN_COUNT; ch++) {
+		pcm[ch] = send_pcm_data;
+	}
+#endif /* defined(CONFIG_USE_USB_AUDIO_INPUT) */
+
+	for (size_t ch = 0U; ch < AUDIO_CHAN_COUNT; ch++) {
+		struct audio_chan_encoder *chan_encoder = &chan_encoders[ch];
+		int ret;
+
+		if (chan_encoder->lc3_encoder == NULL) {
+			printk("LC3 encoder not setup, cannot encode data.\n");
+			return -EINVAL;
+		}
+
+		ret = lc3_encode(chan_encoder->lc3_encoder, LC3_PCM_FORMAT_S16, pcm[ch], 1,
+				 octets_per_frame, chan_encoder->encoded);
+		if (ret == -1) {
+			printk("LC3 encoder failed - wrong parameters?: %d", ret);
+			return -EIO;
+		}
+	}
+
+	return 0;
+}
+#endif /* defined(CONFIG_LIBLC3) */
+
+static void send_sdu(struct broadcast_source_stream *source_stream, const void *data)
 {
 	struct bt_bap_stream *stream = &source_stream->stream;
 	struct net_buf *buf;
@@ -358,39 +441,7 @@ static void send_data(struct broadcast_source_stream *source_stream)
 	}
 
 	net_buf_reserve(buf, BT_ISO_CHAN_SEND_RESERVE);
-#if defined(CONFIG_LIBLC3)
-	uint8_t lc3_encoded_buffer[preset_active.qos.sdu];
-
-	if (source_stream->lc3_encoder == NULL) {
-		printk("LC3 encoder not setup, cannot encode data.\n");
-		net_buf_unref(buf);
-		return;
-	}
-
-#if defined(CONFIG_USE_USB_AUDIO_INPUT)
-	uint32_t size = ring_buf_get(&source_stream->audio_ring_buf, (uint8_t *)send_pcm_data,
-				     sizeof(send_pcm_data));
-
-	if (size < sizeof(send_pcm_data)) {
-		const size_t padding_size = sizeof(send_pcm_data) - size;
-
-		printk("Not enough bytes ready, padding %d!\n", padding_size);
-		memset(&((uint8_t *)send_pcm_data)[size], 0, padding_size);
-	}
-#endif
-
-	ret = lc3_encode(source_stream->lc3_encoder, LC3_PCM_FORMAT_S16, send_pcm_data, 1,
-			 octets_per_frame, lc3_encoded_buffer);
-	if (ret == -1) {
-		printk("LC3 encoder failed - wrong parameters?: %d", ret);
-		net_buf_unref(buf);
-		return;
-	}
-
-	net_buf_add_mem(buf, lc3_encoded_buffer, preset_active.qos.sdu);
-#else
-	net_buf_add_mem(buf, send_pcm_data, preset_active.qos.sdu);
-#endif /* defined(CONFIG_LIBLC3) */
+	net_buf_add_mem(buf, data, preset_active.qos.sdu);
 
 	ret = bt_bap_stream_send(stream, buf, source_stream->seq_num++);
 	if (ret < 0) {
@@ -455,13 +506,13 @@ static void init_lc3_thread(void *arg1, void *arg2, void *arg3)
 	fill_audio_buf_sin(send_pcm_data, frame_duration_us, AUDIO_TONE_FREQUENCY_HZ, freq_hz);
 #endif
 
-	/* Create the encoder instance. This shall complete before stream_started() is called. */
-	for (size_t i = 0U; i < ARRAY_SIZE(streams); i++) {
-		printk("Initializing lc3 encoder for stream %zu\n", i);
-		streams[i].lc3_encoder = lc3_setup_encoder(frame_duration_us, freq_hz, 0,
-							   &streams[i].lc3_encoder_mem);
+	/* Create the encoder instances. This shall complete before stream_started() is called. */
+	for (size_t ch = 0U; ch < ARRAY_SIZE(chan_encoders); ch++) {
+		printk("Initializing lc3 encoder for audio channel %zu\n", ch);
+		chan_encoders[ch].lc3_encoder = lc3_setup_encoder(
+			frame_duration_us, freq_hz, 0, &chan_encoders[ch].lc3_encoder_mem);
 
-		if (streams[i].lc3_encoder == NULL) {
+		if (chan_encoders[ch].lc3_encoder == NULL) {
 			printk("ERROR: Failed to setup LC3 encoder - wrong parameters?\n");
 		}
 	}
@@ -472,8 +523,14 @@ static void init_lc3_thread(void *arg1, void *arg2, void *arg3)
 
 			__ASSERT_NO_MSG(err == 0);
 		}
+
+		if (encode_audio_chans() != 0) {
+			continue;
+		}
+
+		/* Streams beyond the first AUDIO_CHAN_COUNT carry copies of the encoded audio */
 		for (size_t i = 0U; i < ARRAY_SIZE(streams); i++) {
-			send_data(&streams[i]);
+			send_sdu(&streams[i], chan_encoders[i % AUDIO_CHAN_COUNT].encoded);
 		}
 	}
 }
@@ -566,16 +623,16 @@ static void data_recv_cb(const struct device *dev, uint8_t terminal, void *buf, 
 		usb_pcm_data[1][i] = pcm[j + 1];
 	}
 
-	for (size_t i = 0U; i < MIN(ARRAY_SIZE(streams), 2); i++) {
+	for (size_t i = 0U; i < USB_CHANNELS; i++) {
 		const uint32_t size_put =
-			ring_buf_put(&(streams[i].audio_ring_buf), (uint8_t *)(usb_pcm_data[i]),
+			ring_buf_put(&(usb_chans[i].audio_ring_buf), (uint8_t *)(usb_pcm_data[i]),
 				     nsamples * USB_BYTES_PER_SAMPLE);
 		if (size_put < nsamples * USB_BYTES_PER_SAMPLE) {
 			printk("Not enough room for samples in %s buffer: %u < %u, total capacity: "
 			       "%u\n",
 			       i == 0U ? "left" : "right", size_put,
 			       nsamples * USB_BYTES_PER_SAMPLE,
-			       ring_buf_capacity_get(&(streams[i].audio_ring_buf)));
+			       ring_buf_capacity_get(&(usb_chans[i].audio_ring_buf)));
 		}
 	}
 
@@ -617,7 +674,7 @@ static void stream_sent_cb(struct bt_bap_stream *stream)
 	struct broadcast_source_stream *source_stream =
 		CONTAINER_OF(stream, struct broadcast_source_stream, stream);
 
-	send_data(source_stream);
+	send_sdu(source_stream, send_pcm_data);
 #endif
 }
 
@@ -634,10 +691,20 @@ static int setup_broadcast_source(struct bt_bap_broadcast_source **source)
 		subgroup_param[CONFIG_BT_BAP_BROADCAST_SRC_SUBGROUP_COUNT];
 	struct bt_bap_broadcast_source_param create_param = {0};
 	const size_t streams_per_subgroup = ARRAY_SIZE(stream_params) / ARRAY_SIZE(subgroup_param);
-	uint8_t left[] = {BT_AUDIO_CODEC_DATA(BT_AUDIO_CODEC_CFG_CHAN_ALLOC,
-					      BT_BYTES_LIST_LE32(BT_AUDIO_LOCATION_FRONT_LEFT))};
-	uint8_t right[] = {BT_AUDIO_CODEC_DATA(BT_AUDIO_CODEC_CFG_CHAN_ALLOC,
-					       BT_BYTES_LIST_LE32(BT_AUDIO_LOCATION_FRONT_RIGHT))};
+	static const uint8_t left[] = {BT_AUDIO_CODEC_DATA(
+		BT_AUDIO_CODEC_CFG_CHAN_ALLOC, BT_BYTES_LIST_LE32(BT_AUDIO_LOCATION_FRONT_LEFT))};
+	static const uint8_t right[] = {BT_AUDIO_CODEC_DATA(
+		BT_AUDIO_CODEC_CFG_CHAN_ALLOC, BT_BYTES_LIST_LE32(BT_AUDIO_LOCATION_FRONT_RIGHT))};
+	static const uint8_t mix[] = {BT_AUDIO_CODEC_DATA(
+		BT_AUDIO_CODEC_CFG_CHAN_ALLOC, BT_BYTES_LIST_LE32(BT_AUDIO_LOCATION_FRONT_CENTER))};
+	static const struct {
+		const uint8_t *data;
+		size_t data_len;
+	} chan_alloc[] = {
+		[AUDIO_CHAN_LEFT] = {left, sizeof(left)},
+		[AUDIO_CHAN_RIGHT] = {right, sizeof(right)},
+		[AUDIO_CHAN_MIX] = {mix, sizeof(mix)},
+	};
 	int err;
 
 	for (size_t i = 0U; i < ARRAY_SIZE(subgroup_param); i++) {
@@ -647,9 +714,11 @@ static int setup_broadcast_source(struct bt_bap_broadcast_source **source)
 	}
 
 	for (size_t j = 0U; j < ARRAY_SIZE(stream_params); j++) {
+		const size_t ch = j % AUDIO_CHAN_COUNT;
+
 		stream_params[j].stream = &streams[j].stream;
-		stream_params[j].data = j == 0U ? left : right;
-		stream_params[j].data_len = j == 0U ? sizeof(left) : sizeof(right);
+		stream_params[j].data = chan_alloc[ch].data;
+		stream_params[j].data_len = chan_alloc[ch].data_len;
 		bt_bap_stream_cb_register(stream_params[j].stream, &stream_ops);
 	}
 
@@ -925,11 +994,12 @@ int main(void)
 
 	(void)memset(streams, 0, sizeof(streams));
 
-	for (size_t i = 0U; i < ARRAY_SIZE(streams); i++) {
-		ring_buf_init(&(streams[i].audio_ring_buf), sizeof(streams[i]._ring_buffer_memory),
-			      streams[i]._ring_buffer_memory);
+	for (size_t i = 0U; i < ARRAY_SIZE(usb_chans); i++) {
+		ring_buf_init(&(usb_chans[i].audio_ring_buf),
+			      sizeof(usb_chans[i]._ring_buffer_memory),
+			      usb_chans[i]._ring_buffer_memory);
 		printk("Initialized ring buf %zu: capacity: %u\n", i,
-		       ring_buf_capacity_get(&(streams[i].audio_ring_buf)));
+		       ring_buf_capacity_get(&(usb_chans[i].audio_ring_buf)));
 	}
 
 	usbd_uac2_set_ops(broadcaster_dev, &usb_audio_ops, NULL);
