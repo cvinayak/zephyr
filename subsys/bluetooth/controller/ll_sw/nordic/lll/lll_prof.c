@@ -43,9 +43,9 @@
 #define LLL_PROF_ULL_HIGH_MAX_US 640  /* Max. Radio + LLL + ULL High, O(1) */
 #define LLL_PROF_ULL_LOW_MAX_US  855  /* Max. ULL Low, O(n) n is ticker nodes */
 #elif defined(CONFIG_SOC_COMPATIBLE_NRF54LX) && !defined(CONFIG_RISCV)
-#define LLL_PROF_RADIO_MAX_US    123  /* Max. Radio Rx/Tx ISR, O(1)*/
-#define LLL_PROF_LLL_MAX_US      123  /* Max. LLL prepare, O(1) */
-#define LLL_PROF_ULL_HIGH_MAX_US 367  /* Max. Radio + LLL + ULL High, O(1) */
+#define LLL_PROF_RADIO_MAX_US    92   /* Max. Radio Rx/Tx ISR, O(1)*/
+#define LLL_PROF_LLL_MAX_US      92   /* Max. LLL prepare, O(1) */
+#define LLL_PROF_ULL_HIGH_MAX_US 336  /* Max. Radio + LLL + ULL High, O(1) */
 #define LLL_PROF_ULL_LOW_MAX_US  763  /* Max. ULL Low, O(n) n is ticker nodes */
 #else /* !CONFIG_SOC_COMPATIBLE_NRF54LX */
 #define LLL_PROF_RADIO_MAX_US    123  /* Max. Radio Rx/Tx ISR, O(1)*/

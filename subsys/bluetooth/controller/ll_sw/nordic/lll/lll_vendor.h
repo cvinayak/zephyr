@@ -29,8 +29,8 @@
 #define EVENT_OVERHEAD_START_US       306 /* 10 RTC ticks equivalent */
 #define EVENT_OVERHEAD_RESUME_US      92
 #elif defined(CONFIG_SOC_COMPATIBLE_NRF54LX) && !defined(CONFIG_RISCV)
-#define EVENT_OVERHEAD_START_US       306 /* 10 RTC ticks equivalent */
-#define EVENT_OVERHEAD_RESUME_US      123
+#define EVENT_OVERHEAD_START_US       153 /* 5 RTC ticks equivalent */
+#define EVENT_OVERHEAD_RESUME_US      62
 #elif defined(CONFIG_SOC_COMPATIBLE_NRF52X)
 #define EVENT_OVERHEAD_START_US       306 /* 10 RTC ticks equivalent */
 #define EVENT_OVERHEAD_RESUME_US      123
