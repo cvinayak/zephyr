@@ -94,9 +94,18 @@ BUILD_ASSERT(IS_ENABLED(CONFIG_CPU_CORTEX_M));
 #endif /* CONFIG_BT_CTLR_ASSERT_VENDOR */
 
 #if defined(CONFIG_BT_CTLR_ASSERT_OVERHEAD_START)
+#if defined(CONFIG_BT_CTLR_PROFILE_ISR)
+void lll_prof_overhead_dump(void);
+#define LL_ASSERT_OVERHEAD_DUMP() lll_prof_overhead_dump()
+#else /* !CONFIG_BT_CTLR_PROFILE_ISR */
+#define LL_ASSERT_OVERHEAD_DUMP()
+#endif /* !CONFIG_BT_CTLR_PROFILE_ISR */
 #define LL_ASSERT_OVERHEAD(overhead) \
-	LL_ASSERT_MSG(false, "%s: Actual EVENT_OVERHEAD_START_US = %u", \
-		      __func__, HAL_TICKER_TICKS_TO_US(overhead));
+	do { \
+		LL_ASSERT_OVERHEAD_DUMP(); \
+		LL_ASSERT_MSG(false, "%s: Actual EVENT_OVERHEAD_START_US = %u", \
+			      __func__, HAL_TICKER_TICKS_TO_US(overhead)); \
+	} while (0)
 #else /* !CONFIG_BT_CTLR_ASSERT_OVERHEAD_START */
 #define LL_ASSERT_OVERHEAD(overhead) ARG_UNUSED(overhead)
 #endif /* !CONFIG_BT_CTLR_ASSERT_OVERHEAD_START */

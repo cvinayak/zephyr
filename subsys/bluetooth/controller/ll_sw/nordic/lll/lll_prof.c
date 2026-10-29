@@ -11,6 +11,7 @@
 #include <string.h>
 
 #include <zephyr/toolchain.h>
+#include <zephyr/sys/printk.h>
 #include <zephyr/sys/util.h>
 
 #include "hal/ccm.h"
@@ -328,6 +329,61 @@ void lll_prof_chain_resume(void)
 	chain_ticks_resume = chain_ticks_handler;
 	chain_resume_valid = chain_valid;
 }
+
+#if defined(CONFIG_BT_CTLR_ASSERT_OVERHEAD_START)
+void lll_prof_overhead_dump(void)
+{
+	static const char type_str[] = "?RTL";
+	struct ticker_prof_expire tkr[TICKER_PROF_EXPIRE_MAX];
+	uint32_t ticks_now;
+	uint8_t tkr_cnt;
+	uint8_t cnt;
+
+	ticks_now = ticker_ticks_now_get();
+	tkr_cnt = ticker_prof_expire_get(tkr);
+
+	if (!chain_valid) {
+		printk("p0 assert: no chain\n");
+		return;
+	}
+
+	/* Current handler has not exited, use its duration until now */
+	cnt = MIN(chain_cnt, PROFILE_CHAIN_LEN_MAX);
+	if (chain_cnt <= PROFILE_CHAIN_LEN_MAX) {
+		chain_dur[chain_cnt - 1U] =
+			MIN(HAL_TICKER_TICKS_TO_US(ticks_now - chain_ticks_handler), UINT8_MAX);
+	}
+
+	printk("p0 assert: chain %u (%u):", HAL_TICKER_TICKS_TO_US(ticks_now - chain_ticks_start),
+	       chain_cnt);
+	for (uint8_t i = 0U; i < cnt; i++) {
+		uint8_t type = (chain_seq >> (i * PROFILE_CHAIN_TYPE_BITS)) &
+			       PROFILE_CHAIN_TYPE_MASK;
+
+		printk(" %c%u", type_str[type], chain_dur[i]);
+		if (chain_tag[i] != PROFILE_CHAIN_TAG_NONE) {
+			printk("#%u%s@%d/%u", chain_tag[i] & PROFILE_CHAIN_TAG_ID_MASK,
+			       (chain_tag[i] & PROFILE_CHAIN_TAG_RESUME) ? "r" : "",
+			       chain_at[i], chain_slot[i]);
+		}
+	}
+
+	printk("; tkr:");
+	for (uint8_t i = 0U; i < tkr_cnt; i++) {
+		struct ticker_prof_expire *e = &tkr[i];
+
+		printk(" %u@%d/%u p%d:%u r%u l%u d%u z%u", e->ticker_id,
+		       ticks_rel_us(e->ticks_at_expire, chain_ticks_start),
+		       HAL_TICKER_TICKS_TO_US(e->ticks_slot),
+		       (e->ticker_id_slot_previous == 0xFFU) ? -1 :
+							     (int)e->ticker_id_slot_previous,
+		       HAL_TICKER_TICKS_TO_US(e->ticks_slot_previous), e->slot_reserved,
+		       HAL_TICKER_TICKS_TO_US(e->ticks_to_expire_minus),
+		       HAL_TICKER_TICKS_TO_US(e->ticks_drift), e->lazy);
+	}
+	printk("\n");
+}
+#endif /* CONFIG_BT_CTLR_ASSERT_OVERHEAD_START */
 
 static void chain_enter(uint8_t type)
 {
