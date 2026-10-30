@@ -15,4 +15,21 @@ config ISO_PRINT_INTERVAL
 	help
 	  Only print the packet report once in a given interval of ISO packets.
 
+config ISO_BROADCAST_SID
+	int "Advertising SID"
+	range 0 15
+	default 0
+	help
+	  Advertising Set ID used by the extended and periodic advertising
+	  carrying the BIGInfo. Use a unique value for each iso_broadcast
+	  device that an iso_receive device synchronizes to.
+
+config ISO_BIG_TERMINATE_TIMEOUT
+	int "BIG terminate timeout in seconds"
+	range 0 3600
+	default 60
+	help
+	  Terminate and re-create the BIG after this many seconds. Set to 0 to
+	  never terminate the BIG.
+
 source "Kconfig.zephyr"

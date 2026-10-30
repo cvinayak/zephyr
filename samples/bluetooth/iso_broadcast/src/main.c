@@ -11,10 +11,11 @@
 #include <zephyr/bluetooth/hci_types.h>
 #include <zephyr/bluetooth/iso.h>
 #include <zephyr/sys/byteorder.h>
+#include <zephyr/toolchain.h>
 
 #define BIG_SDU_INTERVAL_US      (10000)
 #define BUF_ALLOC_TIMEOUT_US     (BIG_SDU_INTERVAL_US * 3U) /* milliseconds */
-#define BIG_TERMINATE_TIMEOUT_US (60 * USEC_PER_SEC) /* microseconds */
+#define BIG_TERMINATE_TIMEOUT_US (CONFIG_ISO_BIG_TERMINATE_TIMEOUT * USEC_PER_SEC)
 
 #define BIS_ISO_CHAN_COUNT 2
 NET_BUF_POOL_FIXED_DEFINE(bis_tx_pool, BIS_ISO_CHAN_COUNT,
@@ -29,6 +30,12 @@ static K_SEM_DEFINE(sem_iso_data, CONFIG_BT_ISO_TX_BUF_COUNT,
 #define INITIAL_TIMEOUT_COUNTER (BIG_TERMINATE_TIMEOUT_US / BIG_SDU_INTERVAL_US)
 
 static uint16_t seq_num;
+
+/* Overridden by test applications that run multiple instances of this sample */
+__weak uint8_t iso_broadcast_sid_get(void)
+{
+	return CONFIG_ISO_BROADCAST_SID;
+}
 
 static void iso_connected(struct bt_iso_chan *chan)
 {
@@ -136,11 +143,8 @@ int main(void)
 		return 0;
 	}
 
-	extern int get_device_nbr(void);
-
 	/* Create a non-connectable advertising set */
-	ext_adv_param.sid = 0U; /* Change this for each iso_broadcast device */
-	ext_adv_param.sid = get_device_nbr();
+	ext_adv_param.sid = iso_broadcast_sid_get();
 	err = bt_le_ext_adv_create(&ext_adv_param, NULL, &adv);
 	if (err) {
 		printk("Failed to create advertising set (err %d)\n", err);
@@ -232,8 +236,12 @@ int main(void)
 		iso_send_count++;
 		seq_num++;
 
+		if (CONFIG_ISO_BIG_TERMINATE_TIMEOUT == 0) {
+			continue;
+		}
+
 		timeout_counter--;
-		if (!timeout_counter) {
+		if (timeout_counter == 0U) {
 			timeout_counter = INITIAL_TIMEOUT_COUNTER;
 
 			printk("BIG Terminate...");
