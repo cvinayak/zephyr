@@ -137,6 +137,11 @@ struct ll_sync_iso_set {
 	uint16_t volatile timeout_reload; /* Non-zero when sync established */
 	uint16_t timeout_expire; /* timeout countdown */
 
+#if defined(CONFIG_BT_CTLR_SYNC_ISO_SLOT_WINDOW_JITTER)
+	/* Ousted ticker expiries prepared since the last expiry that was not ousted */
+	uint16_t lazy_oust;
+#endif /* CONFIG_BT_CTLR_SYNC_ISO_SLOT_WINDOW_JITTER */
+
 	/* Encryption */
 	uint8_t gltk[16];
 
