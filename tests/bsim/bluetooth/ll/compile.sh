@@ -31,6 +31,8 @@ app=tests/bsim/bluetooth/ll/bis conf_overlay=overlay-scan_aux_use_chains.conf co
 app=tests/bsim/bluetooth/ll/bis conf_file=prj_vs_dp.conf compile
 app=tests/bsim/bluetooth/ll/bis conf_file=prj_past.conf compile
 
+${ZEPHYR_BASE}/tests/bsim/bluetooth/ll/bis/multi_big_drift/compile.sh
+
 ${ZEPHYR_BASE}/tests/bsim/bluetooth/ll/cis/compile.sh
 
 app=tests/bsim/bluetooth/ll/edtt/hci_test_app \
