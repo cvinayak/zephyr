@@ -13,17 +13,22 @@
 #include <zephyr/bluetooth/iso.h>
 #include <zephyr/sys/byteorder.h>
 
+#include "iso_rx_stats.h"
+
 #define TIMEOUT_SYNC_CREATE K_SECONDS(10)
 #define NAME_LEN            30
 
+/* Continuous scanning, scan window equal to scan interval, so that scanning uses the radio
+ * between subevents of already synchronized BIGs.
+ */
 #define BT_LE_SCAN_CUSTOM BT_LE_SCAN_PARAM(BT_LE_SCAN_TYPE_ACTIVE, \
 					   BT_LE_SCAN_OPT_NONE, \
 					   BT_GAP_SCAN_FAST_INTERVAL_MIN, \
-					   BT_GAP_SCAN_FAST_WINDOW)
+					   BT_GAP_SCAN_FAST_INTERVAL_MIN)
 
 #define PA_RETRY_COUNT 6
 
-#define BIS_ISO_CHAN_COUNT MIN(2U, CONFIG_BT_ISO_MAX_CHAN)
+BUILD_ASSERT(BIS_ISO_CHAN_COUNT > 0U, "Insufficient CONFIG_BT_ISO_MAX_CHAN");
 
 static bool         per_adv_found;
 static bool         per_adv_lost;
@@ -32,6 +37,8 @@ static uint8_t      per_sid;
 static uint32_t     per_interval_us;
 
 static uint32_t     iso_recv_count;
+
+struct iso_rx_stats iso_rx_stats[ISO_CHAN_COUNT];
 
 static K_SEM_DEFINE(sem_per_adv, 0, 1);
 static K_SEM_DEFINE(sem_per_sync, 0, 1);
@@ -191,12 +198,47 @@ static struct bt_le_per_adv_sync_cb sync_callbacks = {
 	.biginfo = biginfo_cb,
 };
 
+static struct bt_iso_chan bis_iso_chan[ISO_CHAN_COUNT];
+
+static struct iso_rx_stats *iso_rx_stats_get(const struct bt_iso_chan *chan)
+{
+	return &iso_rx_stats[ARRAY_INDEX(bis_iso_chan, chan)];
+}
+
+static void iso_rx_stats_update(struct bt_iso_chan *chan, const struct bt_iso_recv_info *info)
+{
+	struct iso_rx_stats *stats = iso_rx_stats_get(chan);
+
+	if (stats->seq_num_valid) {
+		uint16_t seq_num_expected = stats->seq_num_last + 1U;
+
+		if (info->seq_num != seq_num_expected) {
+			stats->seq_gap_cnt += (uint16_t)(info->seq_num - seq_num_expected);
+			printk("ISO chan %p seq_num gap: expected %u, got %u\n", chan,
+			       seq_num_expected, info->seq_num);
+		}
+	}
+
+	stats->seq_num_last = info->seq_num;
+	stats->seq_num_valid = true;
+
+	if ((info->flags & BT_ISO_FLAGS_VALID) != 0U) {
+		stats->rx_cnt++;
+	} else {
+		stats->lost_cnt++;
+		printk("ISO chan %p seq_num %u ts %u SDU not valid, flags 0x%x\n", chan,
+		       info->seq_num, info->ts, info->flags);
+	}
+}
+
 static void iso_recv(struct bt_iso_chan *chan, const struct bt_iso_recv_info *info,
 		struct net_buf *buf)
 {
 	char data_str[128];
 	size_t str_len;
 	uint32_t count = 0; /* only valid if the data is a counter */
+
+	iso_rx_stats_update(chan, info);
 
 	if (buf->len == sizeof(count)) {
 		count = sys_get_le32(buf->data);
@@ -225,6 +267,9 @@ static void iso_connected(struct bt_iso_chan *chan)
 
 	printk("ISO Channel %p connected\n", chan);
 
+	iso_rx_stats_get(chan)->connected = true;
+	iso_rx_stats_get(chan)->seq_num_valid = false;
+
 	err = bt_iso_setup_data_path(chan, BT_HCI_DATAPATH_DIR_CTLR_TO_HOST, &hci_path);
 	if (err != 0) {
 		printk("Failed to setup ISO RX data path: %d\n", err);
@@ -238,6 +283,8 @@ static void iso_disconnected(struct bt_iso_chan *chan, uint8_t reason)
 	printk("ISO Channel %p disconnected with reason 0x%02x\n",
 	       chan, reason);
 
+	iso_rx_stats_get(chan)->connected = false;
+
 	if (reason != BT_HCI_ERR_OP_CANCELLED_BY_HOST) {
 		k_sem_give(&sem_big_sync_lost);
 	}
@@ -249,49 +296,28 @@ static struct bt_iso_chan_ops iso_ops = {
 	.disconnected	= iso_disconnected,
 };
 
-static struct bt_iso_chan_io_qos iso_rx_qos[BIS_ISO_CHAN_COUNT * 2];
+static struct bt_iso_chan_io_qos iso_rx_qos[ISO_CHAN_COUNT];
+static struct bt_iso_chan_qos bis_iso_qos[ISO_CHAN_COUNT];
+static struct bt_iso_chan *bis[ISO_CHAN_COUNT];
+static struct bt_iso_big_sync_param big_sync_param[BIG_SYNC_COUNT];
 
-static struct bt_iso_chan_qos bis_iso_qos[] = {
-	{ .rx = &iso_rx_qos[0], },
-	{ .rx = &iso_rx_qos[1], },
-	{ .rx = &iso_rx_qos[2], },
-	{ .rx = &iso_rx_qos[3], },
-};
+static void iso_chan_init(void)
+{
+	for (size_t i = 0U; i < ISO_CHAN_COUNT; i++) {
+		bis_iso_qos[i].rx = &iso_rx_qos[i];
+		bis_iso_chan[i].ops = &iso_ops;
+		bis_iso_chan[i].qos = &bis_iso_qos[i];
+		bis[i] = &bis_iso_chan[i];
+	}
 
-static struct bt_iso_chan bis_iso_chan[] = {
-	{ .ops = &iso_ops,
-	  .qos = &bis_iso_qos[0], },
-	{ .ops = &iso_ops,
-	  .qos = &bis_iso_qos[1], },
-	{ .ops = &iso_ops,
-	  .qos = &bis_iso_qos[2], },
-	{ .ops = &iso_ops,
-	  .qos = &bis_iso_qos[2], },
-};
-
-static struct bt_iso_chan *bis[] = {
-	&bis_iso_chan[0],
-	&bis_iso_chan[1],
-	&bis_iso_chan[2],
-	&bis_iso_chan[3],
-};
-
-static struct bt_iso_big_sync_param big_sync_param[2] = {
-	{
-	.bis_channels = &bis[0],
-	.num_bis = BIS_ISO_CHAN_COUNT,
-	.bis_bitfield = (BIT_MASK(BIS_ISO_CHAN_COUNT)),
-	.mse = BT_ISO_SYNC_MSE_ANY, /* any number of subevents */
-	.sync_timeout = 100, /* in 10 ms units */
-	},
-	{
-	.bis_channels = &bis[2],
-	.num_bis = BIS_ISO_CHAN_COUNT,
-	.bis_bitfield = (BIT_MASK(BIS_ISO_CHAN_COUNT)),
-	.mse = BT_ISO_SYNC_MSE_ANY, /* any number of subevents */
-	.sync_timeout = 100, /* in 10 ms units */
-	},
-};
+	for (size_t i = 0U; i < BIG_SYNC_COUNT; i++) {
+		big_sync_param[i].bis_channels = &bis[i * BIS_ISO_CHAN_COUNT];
+		big_sync_param[i].num_bis = BIS_ISO_CHAN_COUNT;
+		big_sync_param[i].bis_bitfield = BIT_MASK(BIS_ISO_CHAN_COUNT);
+		big_sync_param[i].mse = BT_ISO_SYNC_MSE_ANY; /* any number of subevents */
+		big_sync_param[i].sync_timeout = 100; /* in 10 ms units */
+	}
+}
 
 static void reset_semaphores(void)
 {
@@ -312,6 +338,7 @@ int main(void)
 	int err;
 
 	iso_recv_count = 0;
+	iso_chan_init();
 
 	printk("Starting Synchronized Receiver Demo\n");
 
@@ -474,7 +501,7 @@ big_sync_create:
 		printk("BIG sync established.\n");
 
 		per_sid++;
-		if (per_sid < CONFIG_BT_PER_ADV_SYNC_MAX) {
+		if (per_sid < BIG_SYNC_COUNT) {
 			goto next_per_adv;
 		}
 
