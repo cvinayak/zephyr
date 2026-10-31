@@ -8,6 +8,16 @@
 #define LLL_CIS_FLUSH_PENDING   1
 #define LLL_CIS_FLUSH_COMPLETE  2
 
+/* Per-CIS channel-selection (PRN) state saved/restored when bouncing
+ * between CISes during interleaved subevent traversal.
+ */
+struct lll_conn_iso_data_chan_interleaved {
+	uint16_t prn_s;      /* Channel PRN state */
+	uint16_t remap_idx;  /* Channel remap index */
+	uint16_t id;         /* data_chan_id for this CIS */
+	uint8_t  chan_use;   /* Current channel in use */
+};
+
 struct lll_conn_iso_stream_rxtx {
 	uint64_t payload_count:39; /* cisPayloadCounter */
 	uint64_t phy_flags:1;      /* S2 or S8 coding scheme */
@@ -17,8 +27,11 @@ struct lll_conn_iso_stream_rxtx {
 	uint64_t phy:3;            /* PHY */
 	uint64_t rfu0:1;
 
-	uint8_t bn_curr:4;        /* Current burst number */
-	uint8_t rfu1:4;
+	uint8_t bn_curr:5;        /* Current burst number, which is BN + 1
+				   * once the burst is done, so one bit
+				   * more than BN
+				   */
+	uint8_t rfu1:3;
 
 #if defined(CONFIG_BT_CTLR_LE_ENC)
 	struct ccm ccm;
@@ -97,7 +110,7 @@ struct lll_conn_iso_group {
 	uint32_t num_cis:5;   /* Number of CISes in this CIG */
 	uint32_t role:1;      /* 0: CENTRAL, 1: PERIPHERAL*/
 	uint32_t paused:1;    /* 1: CIG is paused */
-	uint32_t rfu0:1;
+	uint32_t packing:1;   /* 0: sequential, 1: interleaved */
 
 	/* ISO interval to calculate timestamp under FT > 1,
 	 * maximum ISO interval of 4 seconds can be represented in 22-bits.
