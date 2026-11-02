@@ -929,6 +929,19 @@ config BT_CTLR_CENTRAL_ISO_SLOT_WINDOW_JITTER
 	  LLL implementation can use the ticks_drift value to determine the
 	  correct CIS subevents to setup for transmission/reception.
 
+config BT_CTLR_CENTRAL_CONN_INTERVAL_ISO_HARMONIC
+	bool "Select Central ACL connection interval harmonic to ISO intervals"
+	depends on BT_CTLR_CENTRAL_ISO
+	default y
+	help
+	  When creating a connection as Central, select a connection interval
+	  in the requested range that is a multiple of the commonly used ISO
+	  intervals (30 ms, 10 ms or 7.5 ms), instead of the maximum requested
+	  connection interval. This avoids the ACL events of multiple
+	  connections periodically beating through the CIG events, which no
+	  CIG placement can avoid when the ACL interval is not a multiple of
+	  the ISO interval.
+
 config BT_CTLR_EVENT_OVERHEAD_RESERVE_MAX
 	bool "Reserve maximum event overhead in time reservations"
 	default y

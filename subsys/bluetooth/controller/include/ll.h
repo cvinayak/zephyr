@@ -238,6 +238,7 @@ uint8_t ll_create_connection(uint16_t scan_interval, uint16_t scan_window,
 			  uint16_t interval, uint16_t latency, uint16_t timeout);
 #endif /* !CONFIG_BT_CTLR_ADV_EXT */
 uint8_t ll_connect_disable(void **rx);
+uint16_t ll_conn_interval_select(uint16_t interval_min, uint16_t interval_max);
 uint8_t ll_conn_update(uint16_t handle, uint8_t cmd, uint8_t status, uint16_t interval_min,
 		    uint16_t interval_max, uint16_t latency, uint16_t timeout, uint16_t *offset);
 uint8_t ll_chm_update(uint8_t const *const chm);

@@ -1948,6 +1948,7 @@ static void le_create_connection(struct net_buf *buf, struct net_buf **evt)
 	struct bt_hci_cp_le_create_conn *cmd = (void *)buf->data;
 	uint16_t supervision_timeout;
 	uint16_t conn_interval_max;
+	uint16_t conn_interval_min;
 	uint16_t scan_interval;
 	uint16_t conn_latency;
 	uint16_t scan_window;
@@ -1961,6 +1962,7 @@ static void le_create_connection(struct net_buf *buf, struct net_buf **evt)
 	scan_interval = sys_le16_to_cpu(cmd->scan_interval);
 	scan_window = sys_le16_to_cpu(cmd->scan_window);
 	conn_interval_max = sys_le16_to_cpu(cmd->conn_interval_max);
+	conn_interval_min = sys_le16_to_cpu(cmd->conn_interval_min);
 	conn_latency = sys_le16_to_cpu(cmd->conn_latency);
 	supervision_timeout = sys_le16_to_cpu(cmd->supervision_timeout);
 
@@ -1981,7 +1983,9 @@ static void le_create_connection(struct net_buf *buf, struct net_buf **evt)
 				      cmd->filter_policy,
 				      cmd->peer_addr.type,
 				      &cmd->peer_addr.a.val[0],
-				      cmd->own_addr_type, conn_interval_max,
+				      cmd->own_addr_type,
+				      ll_conn_interval_select(conn_interval_min,
+							      conn_interval_max),
 				      conn_latency, supervision_timeout,
 				      PHY_LEGACY);
 	if (status) {
@@ -1996,7 +2000,9 @@ static void le_create_connection(struct net_buf *buf, struct net_buf **evt)
 				      cmd->filter_policy,
 				      cmd->peer_addr.type,
 				      &cmd->peer_addr.a.val[0],
-				      cmd->own_addr_type, conn_interval_max,
+				      cmd->own_addr_type,
+				      ll_conn_interval_select(conn_interval_min,
+							      conn_interval_max),
 				      conn_latency, supervision_timeout);
 #endif /* !CONFIG_BT_CTLR_ADV_EXT */
 
@@ -4340,6 +4346,7 @@ static void le_ext_create_connection(struct net_buf *buf, struct net_buf **evt)
 	do {
 		uint16_t supervision_timeout;
 		uint16_t conn_interval_max;
+		uint16_t conn_interval_min;
 		uint16_t scan_interval;
 		uint16_t conn_latency;
 		uint16_t scan_window;
@@ -4352,6 +4359,8 @@ static void le_ext_create_connection(struct net_buf *buf, struct net_buf **evt)
 			scan_window = sys_le16_to_cpu(p->scan_window);
 			conn_interval_max =
 				sys_le16_to_cpu(p->conn_interval_max);
+			conn_interval_min =
+				sys_le16_to_cpu(p->conn_interval_min);
 			conn_latency = sys_le16_to_cpu(p->conn_latency);
 			supervision_timeout =
 				sys_le16_to_cpu(p->supervision_timeout);
@@ -4374,7 +4383,8 @@ static void le_ext_create_connection(struct net_buf *buf, struct net_buf **evt)
 						      peer_addr_type,
 						      peer_addr,
 						      own_addr_type,
-						      conn_interval_max,
+						      ll_conn_interval_select(conn_interval_min,
+									      conn_interval_max),
 						      conn_latency,
 						      supervision_timeout,
 						      phy);

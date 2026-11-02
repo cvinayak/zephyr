@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+#include <zephyr/kernel.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/slist.h>
 
@@ -51,6 +52,7 @@
 #include "ull_conn_internal.h"
 #include "ull_conn_iso_internal.h"
 
+#include "ll.h"
 #include "ll_feat.h"
 
 #include "hal/debug.h"
@@ -89,6 +91,36 @@ static bool ticker_match_any_op_cb(uint8_t ticker_id, uint32_t ticks_slot,
 	*/
 
 #if defined(CONFIG_BT_CTLR_ADV_EXT) && defined(CONFIG_BT_BROADCASTER)
+#if defined(CONFIG_BT_CENTRAL)
+uint16_t ll_conn_interval_select(uint16_t interval_min, uint16_t interval_max)
+{
+#if defined(CONFIG_BT_CTLR_CENTRAL_CONN_INTERVAL_ISO_HARMONIC)
+	/* Connection interval multiples, in 1.25 ms units, that are harmonic
+	 * with ISO intervals of 7.5 ms and 10 ms (30 ms), 10 ms and 7.5 ms, in
+	 * order of preference.
+	 */
+	static const uint8_t harmonic[] = {24U, 8U, 6U};
+
+	if (interval_min > interval_max) {
+		return interval_max;
+	}
+
+	for (uint8_t i = 0U; i < ARRAY_SIZE(harmonic); i++) {
+		uint16_t interval;
+
+		interval = interval_max - (interval_max % harmonic[i]);
+		if (interval >= interval_min) {
+			return interval;
+		}
+	}
+#else /* !CONFIG_BT_CTLR_CENTRAL_CONN_INTERVAL_ISO_HARMONIC */
+	ARG_UNUSED(interval_min);
+#endif /* !CONFIG_BT_CTLR_CENTRAL_CONN_INTERVAL_ISO_HARMONIC */
+
+	return interval_max;
+}
+#endif /* CONFIG_BT_CENTRAL */
+
 int ull_sched_adv_aux_sync_free_anchor_get(uint32_t ticks_slot_abs,
 					   uint32_t *ticks_anchor)
 {
