@@ -713,6 +713,15 @@ static int init_reset(void)
 	return 0;
 }
 
+#if defined(CONFIG_BT_CTLR_CENTRAL_ISO_SLOT_WINDOW_JITTER)
+uint32_t ull_conn_iso_cig_ticks_drift_get(struct ll_conn_iso_group *cig)
+{
+	struct ticker_ext *ext = &cig_ticker_ext[ll_conn_iso_group_handle_get(cig)];
+
+	return ext->is_jitter_in_window ? ext->ticks_drift : 0U;
+}
+#endif /* CONFIG_BT_CTLR_CENTRAL_ISO_SLOT_WINDOW_JITTER */
+
 void ull_conn_iso_ticker_cb(uint32_t ticks_at_expire, uint32_t ticks_drift,
 			    uint32_t remainder, uint16_t lazy, uint8_t force,
 			    void *param)

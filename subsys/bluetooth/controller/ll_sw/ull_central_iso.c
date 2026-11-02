@@ -1318,6 +1318,22 @@ static void mfy_cis_offset_get(void *param)
 		LL_ASSERT_ERR(id != TICKER_NULL);
 	} while (id != ticker_id);
 
+#if defined(CONFIG_BT_CTLR_CENTRAL_ISO_SLOT_WINDOW_JITTER)
+	/* Exclude any jitter in slot window drift of the pending CIG expiry, the CIG
+	 * events are placed relative to the nominal anchor point.
+	 */
+	{
+		uint32_t ticks_drift = ull_conn_iso_cig_ticks_drift_get(cig);
+		uint32_t ticks_interval = HAL_TICKER_US_TO_TICKS(cig->iso_interval *
+								 ISO_INT_UNIT_US);
+
+		while (ticks_to_expire < ticks_drift) {
+			ticks_to_expire += ticks_interval;
+		}
+		ticks_to_expire -= ticks_drift;
+	}
+#endif /* CONFIG_BT_CTLR_CENTRAL_ISO_SLOT_WINDOW_JITTER */
+
 	/* Reduced a tick for negative remainder and return positive remainder
 	 * value.
 	 */

@@ -17,6 +17,7 @@
 
 /* Helper functions to initialize and reset ull_conn_iso module */
 int ull_conn_iso_init(void);
+uint32_t ull_conn_iso_cig_ticks_drift_get(struct ll_conn_iso_group *cig);
 int ull_conn_iso_reset(void);
 
 struct ll_conn_iso_group *ll_conn_iso_group_acquire(void);
