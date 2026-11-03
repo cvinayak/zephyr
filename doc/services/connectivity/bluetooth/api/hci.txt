@@ -45,6 +45,7 @@ command is supported.
 	|       | 7    | Read USB Supported Transport Modes         |
 	+-------+------+--------------------------------------------+
 	| 2     | 0    | Set USB Transport Mode                     |
+	|       | 1    | Set Advertising Reports                    |
 	+-------+------+--------------------------------------------+
 
 Only Read_Version_Information and Read_Supported_Commands commands are
@@ -90,7 +91,7 @@ the controller. By default no vendor events are reported.
 	|       | 3    | Scan Request Received Event                |
 	|       | 4    | Connectionless IQ Report Event             |
 	|       | 5    | Connection IQ Report Event                 |
-	|       | 6    | Reserved                                   |
+	|       | 6    | LE Advertising Report Event                |
 	|       | 7    | Reserved                                   |
 	+-------+------+--------------------------------------------+
 
@@ -803,7 +804,46 @@ When the Set_Scan_Request_Reports command has completed, a Command Complete
 event shall be generated.
 
 
-Zephyr Write Tx Power Level (per Role/Connection) Command
+Zephyr Set Advertising Reports Command
+=======================================
+
+This command configures the reporting of vendor-specific LE Advertising Report
+events that augment the standard LE Advertising Report with a channel index.
+
++------------------------------+-------+--------------------+--------------------+
+| Command                      | OCF   | Command            | Return             |
+|                              |       | Parameters         | Parameters         |
++------------------------------+-------+--------------------+--------------------+
+| Set_Advertising_Reports      | 0x013 | Enable             | Status             |
++------------------------------+-------+--------------------+--------------------+
+
+The Enable parameter controls whether the Controller sends the vendor-specific
+LE_Advertising_Report event in addition to the standard LE Advertising Report
+meta event. The vendor-specific event includes the advertising channel index on
+which the PDU was received.
+
+	Status:                                         Size: 1 Octet
+	+--------------------+--------------------------------------+
+	| Value              | Parameter Description                |
+	+--------------------+--------------------------------------+
+	| 0x00               | Command succeeded                    |
+	| 0x01-0xFF          | Command failed                       |
+	+--------------------+--------------------------------------+
+
+	Enable:                                         Size: 1 Octet
+	+--------------------+--------------------------------------+
+	| Value              | Parameter Description                |
+	+--------------------+--------------------------------------+
+	| 0x00               | Advertising report events disabled   |
+	| 0x01               | Advertising report events enabled    |
+	| All other values   | Reserved for future use              |
+	+--------------------+--------------------------------------+
+
+When the Set_Advertising_Reports command has completed, a Command Complete
+event shall be generated.
+
+
+
 =========================================================
 
 This command dynamically modifies Bluetooth Tx power level given a handle and a
@@ -1690,6 +1730,118 @@ Constant Tone Extension associated with a given connection.
 	|                    | The list in the order of the sampling|
 	|                    | points within the packet.            |
 	+--------------------+--------------------------------------+
+
+Zephyr LE Advertising Report Event
+===================================
+
+This event indicates that a legacy advertising PDU has been received. It is a
+vendor-specific augmentation of the standard LE Advertising Report meta-event
+that includes the advertising channel index on which the PDU was received.
+
+This event is generated in addition to the standard LE Advertising Report
+meta-event, when enabled via the Set_Advertising_Reports command.
+
++-------------------------------+------------+-------------------------------+
+| Event                         | Event Code | Event Parameters              |
++-------------------------------+------------+-------------------------------+
+| LE_Advertising_Report         | 0xFF       | Subevent_Code,                |
+|                               |            | Num_Reports,                  |
+|                               |            | Event_Type[i],                |
+|                               |            | Address_Type[i],              |
+|                               |            | Address[i],                   |
+|                               |            | Data_Length[i],               |
+|                               |            | Data[i],                      |
+|                               |            | RSSI[i],                      |
+|                               |            | Channel_Index[i]              |
++-------------------------------+------------+-------------------------------+
+
+	Subevent_Code:                                  Size: 1 Octet
+	+--------------------+--------------------------------------+
+	| Value              | Parameter Description                |
+	+--------------------+--------------------------------------+
+	| 0x07               | Subevent code for LE Advertising     |
+	|                    | Report event                         |
+	+--------------------+--------------------------------------+
+
+	Num_Reports:                                    Size: 1 Octet
+	+--------------------+--------------------------------------+
+	| Value              | Parameter Description                |
+	+--------------------+--------------------------------------+
+	| 0x01               | Number of responses in event         |
+	+--------------------+--------------------------------------+
+
+	Event_Type[i]:                                  Size: 1 Octet
+	+--------------------+--------------------------------------+
+	| Value              | Parameter Description                |
+	+--------------------+--------------------------------------+
+	| 0x00               | ADV_IND (connectable undirected)     |
+	| 0x01               | ADV_DIRECT_IND (connectable direct.) |
+	| 0x02               | ADV_SCAN_IND (scannable undirected)  |
+	| 0x03               | ADV_NONCONN_IND (non-connectable)    |
+	| 0x04               | SCAN_RSP (scan response)             |
+	| All other values   | Reserved for future use              |
+	+--------------------+--------------------------------------+
+
+	Address_Type[i]:                                Size: 1 Octet
+	+--------------------+--------------------------------------+
+	| Value              | Parameter Description                |
+	+--------------------+--------------------------------------+
+	| 0x00               | Public Device Address                |
+	| 0x01               | Random Device Address                |
+	| 0x02               | Public Identity Address              |
+	| 0x03               | Random (static) Identity Address     |
+	| All other values   | Reserved for future use              |
+	+--------------------+--------------------------------------+
+
+	Address[i]:                                    Size: 6 Octets
+	+--------------------+--------------------------------------+
+	| Value              | Parameter Description                |
+	+--------------------+--------------------------------------+
+	| 0xXXXXXXXXXXXX     | Public Device Address, Random Device |
+	|                    | Address, Public Identity Address or  |
+	|                    | Random (static) Identity Address of  |
+	|                    | the advertising device.              |
+	+--------------------+--------------------------------------+
+
+	Data_Length[i]:                                 Size: 1 Octet
+	+--------------------+--------------------------------------+
+	| Value              | Parameter Description                |
+	+--------------------+--------------------------------------+
+	| 0xXX               | Length of the advertising data       |
+	+--------------------+--------------------------------------+
+
+	Data[i]:                       Size: Data_Length[i] Octets
+	+--------------------+--------------------------------------+
+	| Value              | Parameter Description                |
+	+--------------------+--------------------------------------+
+	| N/A                | Advertising or scan response data    |
+	+--------------------+--------------------------------------+
+
+	RSSI[i]:                                        Size: 1 Octet
+	+--------------------+--------------------------------------+
+	| Value              | Parameter Description                |
+	+--------------------+--------------------------------------+
+	| N                  | Size: 1 Octet (signed integer)       |
+	|                    | Range: -127 <= N <= +20              |
+	|                    | Units: dBm                           |
+	+--------------------+--------------------------------------+
+	| 127                | RSSI is not available                |
+	+--------------------+--------------------------------------+
+	| 21 to 126          | Reserved for future use              |
+	+--------------------+--------------------------------------+
+
+	Channel_Index[i]:                               Size: 1 Octet
+	+--------------------+--------------------------------------+
+	| Value              | Parameter Description                |
+	+--------------------+--------------------------------------+
+	| 37                 | Advertising channel 37               |
+	| 38                 | Advertising channel 38               |
+	| 39                 | Advertising channel 39               |
+	+--------------------+--------------------------------------+
+
+The event is only reported when unmasked by Set_Event_Mask command and
+enabled by Set_Advertising_Reports command.
+
 
  Zephyr Vendor Diagnostic Channel
 ================================
