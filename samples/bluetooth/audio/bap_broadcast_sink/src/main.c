@@ -29,9 +29,11 @@
 #include <zephyr/devicetree.h>
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/kernel.h>
+#include <zephyr/logging/log_ctrl.h>
 #include <zephyr/net_buf.h>
 #include <zephyr/sys/__assert.h>
 #include <zephyr/sys/byteorder.h>
+#include <zephyr/sys/poweroff.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/sys/util.h>
 #include <zephyr/sys/util_macro.h>
@@ -1221,6 +1223,137 @@ static int stop_adv(void)
 	return 0;
 }
 
+/* sw2 powers off; wake-up from System OFF is a reset */
+#define BUTTON_DEBOUNCE K_MSEC(30)
+
+static const struct gpio_dt_spec power_button = GPIO_DT_SPEC_GET_OR(DT_ALIAS(sw2), gpios, {0});
+static struct gpio_callback power_button_cb_data;
+
+static void conn_disconnect(struct bt_conn *conn, void *data)
+{
+	ARG_UNUSED(data);
+
+	(void)bt_conn_disconnect(conn, BT_HCI_ERR_REMOTE_POWER_OFF);
+}
+
+static void leds_off(void)
+{
+	struct k_work_sync sync;
+
+	(void)k_work_cancel_delayable_sync(&led_work, &sync);
+
+	for (size_t i = 0U; i < ARRAY_SIZE(leds); i++) {
+		if (led_ready[i]) {
+			(void)gpio_pin_set_dt(&leds[i], 0);
+		}
+	}
+}
+
+static void power_off(void)
+{
+	int err;
+
+	printk("Stopping and entering System OFF\n");
+
+	if (broadcast_sink != NULL && big_synced) {
+		k_sem_reset(&sem_broadcast_sink_stopped);
+		err = bt_bap_broadcast_sink_stop(broadcast_sink);
+		if (err != 0) {
+			printk("Failed to stop Broadcast Sink: %d\n", err);
+		} else {
+			(void)k_sem_take(&sem_broadcast_sink_stopped, K_SECONDS(1));
+		}
+	}
+
+	if (pa_sync != NULL) {
+		err = bt_le_per_adv_sync_delete(pa_sync);
+		if (err != 0) {
+			printk("Failed to delete PA sync: %d\n", err);
+		}
+	}
+
+	err = bt_le_scan_stop();
+	if (err != 0 && err != -EALREADY) {
+		printk("Failed to stop scanning: %d\n", err);
+	}
+
+	if (ext_adv != NULL) {
+		(void)stop_adv();
+	}
+
+	bt_conn_foreach(BT_CONN_TYPE_LE, conn_disconnect, NULL);
+	k_sleep(K_MSEC(100));
+
+	leds_off();
+
+	/* Arm wake-up only once released, a held button wakes the board immediately */
+	while (gpio_pin_get_dt(&power_button) > 0) {
+		k_sleep(K_MSEC(10));
+	}
+
+	err = gpio_pin_interrupt_configure_dt(&power_button, GPIO_INT_LEVEL_ACTIVE);
+	if (err != 0) {
+		printk("Failed to configure wake-up button: %d\n", err);
+	}
+
+	printk("System OFF, press the power button to restart\n");
+	log_panic();
+
+	sys_poweroff();
+}
+
+static void power_button_work_handler(struct k_work *work)
+{
+	ARG_UNUSED(work);
+
+	if (gpio_pin_get_dt(&power_button) <= 0) {
+		return;
+	}
+
+	printk("Power off requested\n");
+	power_off();
+}
+
+static K_WORK_DELAYABLE_DEFINE(power_button_work, power_button_work_handler);
+
+static void power_button_isr(const struct device *port, struct gpio_callback *cb,
+			     gpio_port_pins_t pins)
+{
+	ARG_UNUSED(port);
+	ARG_UNUSED(cb);
+	ARG_UNUSED(pins);
+
+	(void)k_work_reschedule(&power_button_work, BUTTON_DEBOUNCE);
+}
+
+static void power_button_init(void)
+{
+	int err;
+
+	if (power_button.port == NULL || !gpio_is_ready_dt(&power_button)) {
+		return;
+	}
+
+	err = gpio_pin_configure_dt(&power_button, GPIO_INPUT);
+	if (err != 0) {
+		printk("Failed to configure power button: %d\n", err);
+		return;
+	}
+
+	gpio_init_callback(&power_button_cb_data, power_button_isr, BIT(power_button.pin));
+
+	err = gpio_add_callback_dt(&power_button, &power_button_cb_data);
+	if (err != 0) {
+		printk("Failed to add power button callback: %d\n", err);
+		return;
+	}
+
+	err = gpio_pin_interrupt_configure_dt(&power_button, GPIO_INT_EDGE_TO_ACTIVE);
+	if (err != 0) {
+		printk("Failed to configure power button interrupt: %d\n", err);
+	}
+}
+
 static int pa_sync_create(void)
 {
 	struct bt_le_per_adv_sync_param create_params = {0};
@@ -1370,6 +1503,10 @@ int main(void)
 	if (err != 0) {
 		printk("Init failed (err %d)\n", err);
 		return 0;
+	}
+
+	if (IS_ENABLED(CONFIG_POWEROFF)) {
+		power_button_init();
 	}
 
 	if (!IS_ENABLED(CONFIG_SCAN_OFFLOAD)) {
