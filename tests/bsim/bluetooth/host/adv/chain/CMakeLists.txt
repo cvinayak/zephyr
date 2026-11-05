@@ -10,6 +10,7 @@ target_link_libraries(app PRIVATE babblekit)
 
 target_sources(app PRIVATE
   src/main.c
+  src/test_aux_time.c
   ${ZEPHYR_BASE}/samples/bluetooth/broadcaster_multiple/src/broadcaster_multiple.c
   ${ZEPHYR_BASE}/samples/bluetooth/observer/src/observer.c
 )
@@ -17,4 +18,11 @@ target_sources(app PRIVATE
 zephyr_include_directories(
   ${BSIM_COMPONENTS_PATH}/libUtilv1/src/
   ${BSIM_COMPONENTS_PATH}/libPhyComv1/src/
+)
+
+target_include_directories(app PRIVATE
+  ${ZEPHYR_BASE}/subsys/bluetooth/controller
+  ${ZEPHYR_BASE}/subsys/bluetooth/controller/include
+  ${ZEPHYR_BASE}/subsys/bluetooth/controller/ll_sw
+  ${ZEPHYR_BASE}/subsys/bluetooth/controller/ll_sw/nordic
 )
