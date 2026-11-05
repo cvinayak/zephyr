@@ -131,7 +131,7 @@ static void create_prepare_bh(void *param)
 	int err;
 
 	/* Invoke common pipeline handling of prepare */
-	err = lll_prepare(lll_is_abort_cb, lll_abort_cb, create_prepare_cb, 0U,
+	err = lll_prepare(lll_is_abort_cb, abort_cb, create_prepare_cb, 0U,
 			  param);
 	LL_ASSERT_ERR(!err || err == -EINPROGRESS);
 }

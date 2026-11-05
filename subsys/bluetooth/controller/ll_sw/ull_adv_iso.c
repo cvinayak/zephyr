@@ -407,26 +407,17 @@ void ull_adv_iso_offset_get(struct ll_adv_sync_set *sync)
 void ull_adv_iso_lll_biginfo_fill(struct pdu_adv *pdu, struct lll_adv_sync *lll_sync)
 {
 	struct lll_adv_iso *lll_iso;
-	uint16_t latency_prepare;
 	struct pdu_big_info *bi;
 	uint64_t payload_count;
 
 	lll_iso = lll_sync->iso;
 
-	/* Calculate current payload count. If refcount is non-zero, we have called
-	 * prepare and the LLL implementation has incremented latency_prepare already.
-	 * In this case we need to subtract lazy + 1 from latency_prepare
+	/* Calculate the payload count of the next BIG event. LLL updates the payload count and
+	 * resets latency_prepare in the BIG event prepare; latency_prepare accumulates the
+	 * events cancelled in the prepare pipeline.
 	 */
-	latency_prepare = lll_iso->latency_prepare;
-	if (ull_ref_get(HDR_LLL2ULL(lll_iso))) {
-		/* We are in post-prepare. latency_prepare is already
-		 * incremented by lazy + 1 for next event
-		 */
-		latency_prepare -= lll_iso->iso_lazy + 1;
-	}
-
-	payload_count = lll_iso->payload_count + ((latency_prepare +
-						   lll_iso->iso_lazy) * lll_iso->bn);
+	payload_count = lll_iso->payload_count +
+			(((uint64_t)lll_iso->latency_prepare + lll_iso->iso_lazy) * lll_iso->bn);
 
 	bi = big_info_get(pdu);
 	big_info_offset_fill(bi, lll_iso->ticks_sync_pdu_offset, 0U);
