@@ -1061,13 +1061,13 @@ static uint8_t ticker_resolve_collision(struct ticker_node *nodes, struct ticker
 					  ticker_next->ticks_slot) < ticker_ticks_slot);
 
 			/* Can the current ticker with ticks_slot_window be
-			 * scheduled after the colliding ticker?
+			 * scheduled after the colliding ticker? A ticker with
+			 * reserved time yields only if the colliding ticker
+			 * fits before the end of the remaining slot window.
 			 */
 			uint8_t curr_has_ticks_slot_window =
 					TICKER_HAS_SLOT_WINDOW(ticker) &&
 					((ticker->ticks_slot == 0U) ||
-					 ((ticker->ext_data->is_drift_in_window == 0U) &&
-					  (ticker->ext_data->is_jitter_in_window == 0U)) ||
 					 ((acc_ticks_to_expire < ticker->ticks_slot) &&
 					  (ticker->ext_data->ticks_slot_window >=
 					   (ticker->ext_data->ticks_drift + ticker->ticks_slot)) &&
