@@ -39,6 +39,8 @@
 #include <zephyr/usb/class/usbd_uac2.h>
 #include <zephyr/usb/usbd.h>
 
+#include "chan_map.h"
+
 #if defined(CONFIG_SOC_NRF5340_CPUAPP)
 #include <zephyr/drivers/clock_control/nrf_clock_control.h>
 
@@ -1238,6 +1240,13 @@ int main(void)
 	err = button_adv_init();
 	if (err != 0) {
 		printk("Button 0 not available (err %d)\n", err);
+	}
+
+	if (IS_ENABLED(CONFIG_CHAN_MAP_UPDATE)) {
+		err = chan_map_init();
+		if (err != 0) {
+			printk("Failed to start channel map update (err %d)\n", err);
+		}
 	}
 #endif /* CONFIG_BT_PERIPHERAL */
 
