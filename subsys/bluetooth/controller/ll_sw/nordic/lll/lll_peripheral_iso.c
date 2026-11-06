@@ -2251,6 +2251,24 @@ static void payload_count_rx_flush_or_txrx_inc(struct lll_conn_iso_stream *cis_l
 
 static void payload_count_lazy(struct lll_conn_iso_stream *cis_lll, uint16_t lazy)
 {
+	/* A CIS event that was preempted after its payloads were acknowledged
+	 * or received, and then not closed, leaves bn_curr beyond bn for a
+	 * previous event. SN and NESN have already been incremented for these
+	 * payloads, hence move to the next event's payloads without flushing
+	 * them again.
+	 */
+	if ((cis_lll->tx.bn != 0U) && (cis_lll->tx.bn_curr > cis_lll->tx.bn) &&
+	    ((cis_lll->tx.payload_count / cis_lll->tx.bn) < cis_lll->event_count)) {
+		cis_lll->tx.payload_count += cis_lll->tx.bn;
+		cis_lll->tx.bn_curr = 1U;
+	}
+
+	if ((cis_lll->rx.bn != 0U) && (cis_lll->rx.bn_curr > cis_lll->rx.bn) &&
+	    ((cis_lll->rx.payload_count / cis_lll->rx.bn) < cis_lll->event_count)) {
+		cis_lll->rx.payload_count += cis_lll->rx.bn;
+		cis_lll->rx.bn_curr = 1U;
+	}
+
 	if (cis_lll->tx.bn && lazy) {
 		uint16_t tx_lazy;
 
