@@ -908,6 +908,29 @@ static uint32_t cig_ticks_anchor_get(const struct lll_prepare_param *p)
 }
 #endif /* CONFIG_BT_CTLR_CENTRAL_ISO_SLOT_WINDOW_JITTER */
 
+#if defined(CONFIG_BT_CTLR_CENTRAL_ISO_SLOT_WINDOW_JITTER)
+/* Check if a prepare of the CIG is pending in the prepare pipeline */
+static bool is_prepare_pending(void *param)
+{
+	struct lll_event *e;
+	void *idx;
+
+	idx = NULL;
+	while ((e = ull_prepare_dequeue_iter(&idx)) != NULL) {
+		if ((e->is_aborted == 0U) && (e->is_resume == 0U) &&
+		    (e->prepare_param.param == param)) {
+			return true;
+		}
+
+		if (idx == NULL) {
+			break;
+		}
+	}
+
+	return false;
+}
+#endif /* CONFIG_BT_CTLR_CENTRAL_ISO_SLOT_WINDOW_JITTER */
+
 static int is_abort_cb(void *next, void *curr, lll_prepare_cb_t *resume_cb)
 {
 #if defined(CONFIG_BT_CTLR_CENTRAL_ISO_SLOT_WINDOW_JITTER)
@@ -929,6 +952,15 @@ static int is_abort_cb(void *next, void *curr, lll_prepare_cb_t *resume_cb)
 	}
 
 	if (next != curr) {
+		/* The next CIG event is already prepared, the remaining
+		 * subevents of the current CIG event cannot be resumed before
+		 * it; cancel the current event so that the next CIG event is
+		 * not aborted as a duplicate of the resumed event.
+		 */
+		if (is_prepare_pending(curr)) {
+			return -ECANCELED;
+		}
+
 		/* A different role preempted this CIG event; request the
 		 * pipeline to re-enqueue this event to be resumed after the
 		 * preempting role.
