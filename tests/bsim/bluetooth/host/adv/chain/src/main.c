@@ -189,8 +189,11 @@ struct bst_test_list *test_adv_chain_install(struct bst_test_list *tests)
 	return bst_add_tests(tests, test_def);
 }
 
+extern struct bst_test_list *test_adv_aux_time_install(struct bst_test_list *tests);
+
 bst_test_install_t test_installers[] = {
 	test_adv_chain_install,
+	test_adv_aux_time_install,
 	NULL
 };
 
