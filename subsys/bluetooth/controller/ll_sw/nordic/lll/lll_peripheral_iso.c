@@ -269,7 +269,7 @@ static int prepare_cb_common(struct lll_prepare_param *p)
 		do {
 			cis_lll = ull_conn_iso_lll_stream_sorted_get_by_group(cig_lll,
 									      &cis_handle_curr);
-		} while (cis_lll && !cis_lll->active);
+		} while (cis_lll && (!cis_lll->active || !cis_lll->active_prepare));
 
 #if defined(CONFIG_BT_CTLR_PERIPHERAL_ISO_SLOT_WINDOW_JITTER)
 		if (cis_lll && (cis_handle_resume != LLL_HANDLE_INVALID)) {
@@ -595,7 +595,7 @@ static int prepare_cb_common(struct lll_prepare_param *p)
 
 		do {
 			cis_lll = ull_conn_iso_lll_stream_sorted_get_by_group(cig_lll, &cis_handle);
-		} while (cis_lll && !cis_lll->active);
+		} while (cis_lll && (!cis_lll->active || !cis_lll->active_prepare));
 
 		if (!cis_lll) {
 			break;

@@ -281,7 +281,7 @@ static int prepare_cb_common(struct lll_prepare_param *p)
 
 		do {
 			iter_cis = ull_conn_iso_lll_stream_get_by_group(cig_lll, &iter_handle);
-			if (iter_cis && iter_cis->active) {
+			if (iter_cis && iter_cis->active && iter_cis->active_prepare) {
 				uint8_t skip;
 
 				skip = cis_se_skip_get(iter_cis, drift_us);
@@ -312,7 +312,7 @@ static int prepare_cb_common(struct lll_prepare_param *p)
 			do {
 				cis_lll = ull_conn_iso_lll_stream_get_by_group(cig_lll,
 									       &cis_handle_curr);
-			} while (cis_lll && !cis_lll->active);
+			} while (cis_lll && (!cis_lll->active || !cis_lll->active_prepare));
 
 #if defined(CONFIG_BT_CTLR_CENTRAL_ISO_SLOT_WINDOW_JITTER)
 			if (cis_lll && (cis_handle_resume != LLL_HANDLE_INVALID)) {
@@ -659,7 +659,7 @@ static int prepare_cb_common(struct lll_prepare_param *p)
 
 	do {
 		cis_lll = ull_conn_iso_lll_stream_get_by_group(cig_lll, &cis_handle);
-		if (cis_lll && cis_lll->active) {
+		if (cis_lll && cis_lll->active && cis_lll->active_prepare) {
 			if (cis_handle == cis_handle_curr) {
 				/* First CIS in the round has already been
 				 * prepared above.
