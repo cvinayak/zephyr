@@ -1255,6 +1255,11 @@ void ull_conn_iso_start(struct ll_conn *conn, uint16_t cis_handle,
 #endif /* CONFIG_BT_CTLR_PERIPHERAL_ISO_SLOT_WINDOW_JITTER */
 		}
 
+		/* CIG ticker expires at the CIG reference point, include the
+		 * offset of the CIS in the CIG event in the time reservation.
+		 */
+		slot_us += cis->lll.offset;
+
 		if (IS_ENABLED(CONFIG_BT_CTLR_EVENT_OVERHEAD_RESERVE_MAX)) {
 			slot_us += EVENT_OVERHEAD_START_US + EVENT_OVERHEAD_END_US;
 		}
