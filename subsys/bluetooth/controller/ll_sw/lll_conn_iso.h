@@ -135,6 +135,10 @@ struct lll_conn_iso_group {
 	 * resume.
 	 */
 	uint16_t cis_handle_resume;
+	/* Ticker expiry less the drift of the CIG event being executed, used
+	 * to identify the CIG event that cis_handle_resume belongs to.
+	 */
+	uint32_t ticks_anchor;
 	uint32_t ticks_start;
 	uint32_t ready_us;
 	uint32_t aa_us;

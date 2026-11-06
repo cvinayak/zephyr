@@ -51,6 +51,7 @@ static int prepare_cb_common(struct lll_prepare_param *p);
 static int drift_prepare_cb(struct lll_prepare_param *p);
 static int resume_prepare_cb(struct lll_prepare_param *p);
 static void cis_resume_close(struct lll_conn_iso_group *cig_lll);
+static uint32_t cig_ticks_anchor_get(const struct lll_prepare_param *p);
 #endif /* CONFIG_BT_CTLR_CENTRAL_ISO_SLOT_WINDOW_JITTER */
 static int is_abort_cb(void *next, void *curr, lll_prepare_cb_t *resume_cb);
 static void abort_cb(struct lll_prepare_param *prepare_param, void *param);
@@ -180,10 +181,15 @@ static int init_reset(void)
 static int prepare_cb(struct lll_prepare_param *p)
 {
 #if defined(CONFIG_BT_CTLR_CENTRAL_ISO_SLOT_WINDOW_JITTER)
-	/* A pending resume of the previous CIG event is superseded by this
-	 * CIG event; close the CISes that were not closed before preemption.
+	struct lll_conn_iso_group *cig_lll = p->param;
+
+	/* A pending resume of a preempted previous CIG event is superseded by
+	 * this CIG event; close the CISes that were not closed before
+	 * preemption. A deferred prepare of the preempted CIG event resumes it.
 	 */
-	cis_resume_close(p->param);
+	if (cig_ticks_anchor_get(p) != cig_lll->ticks_anchor) {
+		cis_resume_close(cig_lll);
+	}
 #endif /* CONFIG_BT_CTLR_CENTRAL_ISO_SLOT_WINDOW_JITTER */
 
 	return prepare_cb_common(p);
@@ -236,6 +242,7 @@ static int prepare_cb_common(struct lll_prepare_param *p)
 	 */
 	cis_handle_resume = cig_lll->cis_handle_resume;
 	cig_lll->cis_handle_resume = LLL_HANDLE_INVALID;
+	cig_lll->ticks_anchor = cig_ticks_anchor_get(p);
 
 	/* Reset resume flag for this preparation attempt */
 	cig_lll->is_lll_resume = 0U;
@@ -821,12 +828,15 @@ static int resume_prepare_cb(struct lll_prepare_param *p)
 
 	cig_lll = p->param;
 
-	if (cig_lll->cis_handle_resume == LLL_HANDLE_INVALID) {
+	if ((cig_lll->cis_handle_resume == LLL_HANDLE_INVALID) ||
+	    (cig_ticks_anchor_get(p) != cig_lll->ticks_anchor)) {
 		/* Superseded by a later CIG event that has closed the CISes
 		 * of the preempted CIG event; abort without changing the CIS
 		 * states.
 		 */
-		cig_lll->is_lll_resume = 0U;
+		if (cig_lll->cis_handle_resume == LLL_HANDLE_INVALID) {
+			cig_lll->is_lll_resume = 0U;
+		}
 
 		radio_isr_set(lll_isr_early_abort, cig_lll);
 		radio_disable();
@@ -890,6 +900,11 @@ static void cis_resume_close(struct lll_conn_iso_group *cig_lll)
 
 		cis_lll = ull_conn_iso_lll_stream_get_by_group(cig_lll, &cis_handle);
 	}
+}
+
+static uint32_t cig_ticks_anchor_get(const struct lll_prepare_param *p)
+{
+	return ticker_ticks_diff_get(p->ticks_at_expire, p->ticks_drift);
 }
 #endif /* CONFIG_BT_CTLR_CENTRAL_ISO_SLOT_WINDOW_JITTER */
 
@@ -1016,8 +1031,10 @@ static void abort_cb(struct lll_prepare_param *prepare_param, void *param)
 		return;
 	}
 
-	/* Event will not be resumed, close the CISes of a preempted CIG event */
-	cis_resume_close(cig_lll);
+	/* Event will not be resumed, close the CISes of the preempted CIG event */
+	if (cig_ticks_anchor_get(prepare_param) == cig_lll->ticks_anchor) {
+		cis_resume_close(cig_lll);
+	}
 #endif /* CONFIG_BT_CTLR_CENTRAL_ISO_SLOT_WINDOW_JITTER */
 
 	/* NOTE: Else clean the top half preparations of the aborted event
