@@ -1043,13 +1043,11 @@ static uint8_t ticker_resolve_collision(struct ticker_node *nodes, struct ticker
 			uint8_t next_is_critical = 0U;
 			uint8_t equal_priority = 1U;
 			uint8_t next_has_priority = 0U;
-			uint8_t next_window_unfit = 0U;
 
 #endif /* !CONFIG_BT_TICKER_PRIORITY_SET */
 
 #if defined(CONFIG_BT_TICKER_EXT)
 #if defined(CONFIG_BT_TICKER_EXT_SLOT_WINDOW_YIELD)
-#if defined(CONFIG_BT_TICKER_PRIORITY_SET)
 			/* Does next node with ticks_slot_window not fit after
 			 * the current node within its ticks_slot_window?
 			 */
@@ -1059,6 +1057,7 @@ static uint8_t ticker_resolve_collision(struct ticker_node *nodes, struct ticker
 				  ticker_next->ext_data->ticks_slot_window -
 				  ticker_next->ticks_slot) < ticker_ticks_slot);
 
+#if defined(CONFIG_BT_TICKER_PRIORITY_SET)
 			/* Does next node have higher priority? */
 			uint8_t next_has_priority =
 				((!TICKER_HAS_SLOT_WINDOW(ticker_next) ||
@@ -1106,12 +1105,12 @@ static uint8_t ticker_resolve_collision(struct ticker_node *nodes, struct ticker
 #endif /* CONFIG_BT_TICKER_PRIORITY_SET */
 
 #else /* !CONFIG_BT_TICKER_EXT_SLOT_WINDOW_YIELD */
+			uint8_t next_window_unfit = 0U;
 #if defined(CONFIG_BT_TICKER_PRIORITY_SET)
 			/* Does next node have higher priority? */
 			uint8_t next_has_priority =
 				(lazy_next - ticker_next->priority) >
 				(lazy_current - ticker->priority);
-			uint8_t next_window_unfit = 0U;
 
 #endif /* CONFIG_BT_TICKER_PRIORITY_SET */
 			uint8_t next_not_ticks_slot_window =
@@ -1131,12 +1130,12 @@ static uint8_t ticker_resolve_collision(struct ticker_node *nodes, struct ticker
 
 #endif /* !CONFIG_BT_TICKER_EXT_SLOT_WINDOW_YIELD */
 #else /* !CONFIG_BT_TICKER_EXT */
+			uint8_t next_window_unfit = 0U;
 #if defined(CONFIG_BT_TICKER_PRIORITY_SET)
 			/* Does next node have higher priority? */
 			uint8_t next_has_priority =
 				(lazy_next - ticker_next->priority) >
 				(lazy_current - ticker->priority);
-			uint8_t next_window_unfit = 0U;
 
 #endif /* CONFIG_BT_TICKER_PRIORITY_SET */
 			uint8_t next_not_ticks_slot_window = 1U;
@@ -1164,6 +1163,25 @@ static uint8_t ticker_resolve_collision(struct ticker_node *nodes, struct ticker
 					*oust = 1U;
 					return 1U;
 				}
+
+#if defined(CONFIG_BT_TICKER_EXT_SLOT_WINDOW_YIELD)
+				/* Preserve a jitter reservation when the collision would
+				 * leave insufficient time for it in its remaining window.
+				 */
+				if ((next_window_unfit != 0U) &&
+				    (ticker_next->ext_data->is_jitter_in_window != 0U) &&
+				    !TICKER_HAS_SLOT_WINDOW(ticker)) {
+					return 1U;
+				}
+
+				if (TICKER_HAS_SLOT_WINDOW(ticker) &&
+				    (ticker->ext_data->is_jitter_in_window != 0U) &&
+				    (curr_has_ticks_slot_window == 0U) &&
+				    !TICKER_HAS_SLOT_WINDOW(ticker_next)) {
+					id_head = ticker_next->next;
+					continue;
+				}
+#endif /* CONFIG_BT_TICKER_EXT_SLOT_WINDOW_YIELD */
 
 				if ((next_has_priority != 0U) &&
 				    ((current_is_older == 0U) || (next_window_unfit != 0U))) {
@@ -2954,12 +2972,9 @@ static uint8_t ticker_job_reschedule_in_window(struct ticker_instance *instance)
 			ticker_next = &nodes[ticker_id_next];
 			ticks_to_expire_offset += ticker_next->ticks_to_expire;
 
-#if defined(CONFIG_BT_TICKER_PRIORITY_SET)
-			/* A jitter in window ticker that does not fit after a
-			 * next node without slot window and of lower composite
-			 * priority is placed at the start of the window, before
-			 * the next node, which then loses the collision
-			 * resolution when the rescheduled ticker expires.
+			/* Keep a jitter reservation ahead of a fixed reservation
+			 * when placing it afterwards would exhaust its window.
+			 * Collision resolution protects its remaining window.
 			 */
 			if ((ext_data->is_jitter_in_window != 0U) &&
 			    ((ticks_to_expire_offset + ticker_next->ticks_slot +
@@ -2967,16 +2982,12 @@ static uint8_t ticker_job_reschedule_in_window(struct ticker_instance *instance)
 			     ticks_slot_window) &&
 			    (ticker_next->ticks_slot != 0U) &&
 			    !TICKER_HAS_SLOT_WINDOW(ticker_next) &&
-			    (((int32_t)ticker_next->lazy_current - ticker_next->priority) <=
-			     ((int32_t)ticker_resched->lazy_current - ticker_resched->priority)) &&
-			    (ticker_next->priority > ticker_resched->priority) &&
 			    (window_start_ticks < (ticks_start_offset + ticks_to_expire_offset)) &&
 			    ((window_start_ticks + ticker_resched->ticks_slot) <=
 			     ticks_slot_window)) {
 				ticks_to_expire = window_start_ticks;
 				break;
 			}
-#endif /* CONFIG_BT_TICKER_PRIORITY_SET */
 
 			ticks_to_expire_latest = ticks_to_expire_offset;
 			if (!TICKER_RESCHEDULE_PENDING(ticker_next) &&
