@@ -130,6 +130,15 @@ config CHAN_MAP_UPDATE_INTERVAL
 	default 10
 	range 1 3600
 
+config CHAN_MAP_RESET_INTERVAL
+	int "Channel map reset interval in seconds"
+	default 30
+	range 1 3600
+	help
+	  Restore the score of all channels at this interval, so that the full
+	  channel map is used again until the channel metrics report a channel
+	  as bad.
+
 config CHAN_MAP_UPDATE_THRESHOLD
 	int "Channel success percentage threshold"
 	default 90

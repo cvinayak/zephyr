@@ -6,15 +6,18 @@
 
 /* Channel map update from the Zephyr vendor-specific Channel Metrics event.
  *
- * The controller reports, per data channel, the acknowledgment success percentage of the
- * connections since its previous report, filtered into a per channel score. Periodically,
- * the channels scoring at or above the threshold, topped up with the best scoring channels
- * to a minimum count, are set as the Host Channel Classification, used by the extended
- * advertising, the periodic advertising and the Broadcast ISO.
+ * The controller reports, per data channel, the reception success percentage of the
+ * connections and of the scanning since its previous report, filtered into a per channel
+ * score. Periodically, the channels scoring at or above the threshold, topped up with the best
+ * scoring channels to a minimum count, are set as the Host Channel Classification, used by the
+ * extended advertising, the periodic advertising and the Broadcast ISO.
+ *
+ * Every reset interval all channel scores are restored, so that the full channel map is used
+ * again until the metrics report a channel as bad.
  *
  * The central decides the connection channel map. Channels it excludes, at connection or by
- * a Channel Map Update procedure, are reported as bad: their score is cleared, they do not
- * recover and they are not used to reach the minimum channel count. When the central uses
+ * a Channel Map Update procedure, are reported as bad: their score is cleared, they are not
+ * restored and they are not used to reach the minimum channel count. When the central uses
  * a channel again, its score is restored.
  */
 
@@ -25,13 +28,11 @@
 
 #include <zephyr/autoconf.h>
 #include <zephyr/bluetooth/bluetooth.h>
-#include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/hci.h>
 #include <zephyr/bluetooth/hci_vs.h>
 #include <zephyr/kernel.h>
 #include <zephyr/net_buf.h>
 #include <zephyr/spinlock.h>
-#include <zephyr/sys/atomic.h>
 #include <zephyr/sys/byteorder.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/sys/util.h>
@@ -45,15 +46,12 @@
 #define SCORE_THRESHOLD     ((uint32_t)CONFIG_CHAN_MAP_UPDATE_THRESHOLD << SCORE_SHIFT)
 /* A report moves the score by 1/4 of its difference to the reported percentage */
 #define SCORE_FILTER_SHIFT  2U
-/* Each interval with a central connected recovers 1/8 of the score deficit */
-#define SCORE_RECOVER_SHIFT 3U
 
 static struct k_spinlock lock;
 static uint8_t pending_success[CHAN_COUNT];
 static uint8_t pending_peer_map[CHAN_MAP_LEN];
 static bool pending;
 
-static atomic_t conn_count;
 static uint32_t score[CHAN_COUNT];
 static uint8_t peer_map[CHAN_MAP_LEN] = {0xFF, 0xFF, 0xFF, 0xFF, 0x1F};
 
@@ -156,10 +154,21 @@ static bool vnd_evt_cb(struct net_buf_simple *buf)
 static void chan_map_work_handler(struct k_work *work)
 {
 	static uint8_t map_curr[CHAN_MAP_LEN] = {0xFF, 0xFF, 0xFF, 0xFF, 0x1F};
+	static int64_t reset_uptime;
 	struct k_work_delayable *dwork = k_work_delayable_from_work(work);
 	uint8_t map[CHAN_MAP_LEN] = {0U};
 	uint8_t count = 0U;
 	int err;
+
+	if ((k_uptime_get() - reset_uptime) >= (CONFIG_CHAN_MAP_RESET_INTERVAL * MSEC_PER_SEC)) {
+		reset_uptime = k_uptime_get();
+
+		for (uint8_t i = 0U; i < CHAN_COUNT; i++) {
+			if (chan_is_set(peer_map, i)) {
+				score[i] = SCORE_MAX;
+			}
+		}
+	}
 
 	for (uint8_t i = 0U; i < CHAN_COUNT; i++) {
 		if (chan_is_set(peer_map, i) && (score[i] >= SCORE_THRESHOLD)) {
@@ -201,33 +210,8 @@ static void chan_map_work_handler(struct k_work *work)
 		}
 	}
 
-	if (atomic_get(&conn_count) > 0) {
-		for (uint8_t i = 0U; i < CHAN_COUNT; i++) {
-			if (chan_is_set(peer_map, i)) {
-				score[i] += (SCORE_MAX - score[i]) >> SCORE_RECOVER_SHIFT;
-			}
-		}
-	}
-
 	(void)k_work_reschedule(dwork, K_SECONDS(CONFIG_CHAN_MAP_UPDATE_INTERVAL));
 }
-
-static void connected_cb(struct bt_conn *conn, uint8_t err)
-{
-	if (err == 0U) {
-		atomic_inc(&conn_count);
-	}
-}
-
-static void disconnected_cb(struct bt_conn *conn, uint8_t reason)
-{
-	atomic_dec(&conn_count);
-}
-
-BT_CONN_CB_DEFINE(chan_map_conn_callbacks) = {
-	.connected = connected_cb,
-	.disconnected = disconnected_cb,
-};
 
 int chan_map_init(void)
 {
