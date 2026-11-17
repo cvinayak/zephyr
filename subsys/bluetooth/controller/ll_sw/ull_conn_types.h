@@ -260,6 +260,12 @@ struct ll_conn {
 	struct past_params past;
 #endif /* CONFIG_BT_CTLR_SYNC_TRANSFER_RECEIVER */
 
+#if defined(CONFIG_BT_CTLR_SUBRATING)
+	uint16_t subrate_factor;
+	uint16_t subrate_base_event;
+	uint16_t continuation_number;
+#endif /* CONFIG_BT_CTLR_SUBRATING */
+
 #if defined(CONFIG_BT_CTLR_CHECK_SAME_PEER_CONN)
 	uint8_t own_id_addr_type:1;
 	uint8_t peer_id_addr_type:1;
@@ -308,6 +314,14 @@ struct node_rx_pu {
 struct node_rx_sca {
 	uint8_t status;
 	uint8_t sca;
+};
+
+struct node_rx_subrate_change {
+	uint8_t  status;
+	uint16_t subrate_factor;
+	uint16_t peripheral_latency;
+	uint16_t continuation_number;
+	uint16_t supervision_timeout;
 };
 
 struct node_rx_path_loss {

@@ -104,6 +104,11 @@ if(CONFIG_BT_CONN)
         ll_sw/ull_llcp_past.c
       )
     endif()
+    if(CONFIG_BT_CTLR_SUBRATING)
+      zephyr_library_sources(
+        ll_sw/ull_llcp_subrate.c
+      )
+    endif()
     zephyr_library_sources_ifdef(
     CONFIG_BT_PERIPHERAL
     ll_sw/ull_peripheral.c

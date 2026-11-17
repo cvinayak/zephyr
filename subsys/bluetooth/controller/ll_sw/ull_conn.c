@@ -337,6 +337,43 @@ uint8_t ll_conn_update(uint16_t handle, uint8_t cmd, uint8_t status, uint16_t in
 	return 0;
 }
 
+#if defined(CONFIG_BT_CTLR_SUBRATING)
+uint8_t ll_subrate_req(uint16_t handle, uint16_t subrate_min, uint16_t subrate_max,
+		      uint16_t max_latency, uint16_t continuation_number,
+		      uint16_t supervision_timeout)
+{
+	struct ll_conn *conn;
+	struct proc_ctx *ctx;
+
+	conn = ll_connected_get(handle);
+	if (!conn) {
+		return BT_HCI_ERR_UNKNOWN_CONN_ID;
+	}
+
+	/* Allocate procedure context */
+	ctx = llcp_create_local_procedure(PROC_SUBRATE_UPDATE);
+	if (!ctx) {
+		return BT_HCI_ERR_CMD_DISALLOWED;
+	}
+
+	/* Initialize procedure data */
+	ctx->data.subrate.subrate_factor_min = subrate_min;
+	ctx->data.subrate.subrate_factor_max = subrate_max;
+	ctx->data.subrate.max_latency = max_latency;
+	ctx->data.subrate.continuation_number = continuation_number;
+	ctx->data.subrate.supervision_timeout = supervision_timeout;
+	ctx->data.subrate.error = BT_HCI_ERR_SUCCESS;
+
+	/* Initialize procedure state */
+	llcp_lp_subrate_init_proc(ctx);
+
+	/* Enqueue procedure */
+	llcp_lr_enqueue(conn, ctx);
+
+	return BT_HCI_ERR_SUCCESS;
+}
+#endif /* CONFIG_BT_CTLR_SUBRATING */
+
 uint8_t ll_chm_get(uint16_t handle, uint8_t *chm)
 {
 	struct ll_conn *conn;
